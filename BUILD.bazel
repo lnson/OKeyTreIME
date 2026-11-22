@@ -1,0 +1,71 @@
+# Copyright (C) 2026 lnson
+# SPDX-License-Identifier: GPL-3.0-only
+
+load("@build_bazel_rules_apple//apple:macos.bzl", "macos_application", "macos_unit_test")
+load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
+
+package(default_visibility = ["//visibility:public"])
+
+MINIMUM_OS_VERSION = "14.0"
+
+filegroup(
+    name = "generated_automata",
+    srcs = [
+        "//OKeyTre/ime/core:telex-automaton.generated.h",
+        "//OKeyTre/ime/core:viqr-automaton.generated.h",
+        "//OKeyTre/ime/core:vni-automaton.generated.h",
+        "@uni_algo",
+    ],
+)
+
+# Main OKeyTre Swift library
+swift_library(
+    name = "OKeyTreLib",
+    module_name = "OKeyTre",
+    srcs = glob(["OKeyTre/*.swift"]),
+    copts = [
+        "-import-objc-header",
+        "OKeyTre/ime/core/okeytre-engine.h",
+        "-default-isolation",
+        "MainActor",
+        "-enable-upcoming-feature",
+        "MemberImportVisibility",
+    ],
+    swiftc_inputs = ["//OKeyTre/ime/core:okeytre-engine.h"],
+    deps = ["//OKeyTre/ime/core:OKeyTreEngineLib"],
+)
+
+# macOS Menu Bar Application bundle (`OKeyTre.app`)
+macos_application(
+    name = "OKeyTreApp",
+    app_icons = glob(
+        ["OKeyTre/Assets.xcassets/**"],
+        allow_empty = True,
+    ),
+    bundle_id = "com.okeytre.OKeyTre",
+    bundle_name = "OKeyTre",
+    infoplists = ["BazelInfo.plist"],
+    minimum_os_version = MINIMUM_OS_VERSION,
+    strings = glob(["OKeyTre/*.lproj/*.strings"]),
+    deps = [":OKeyTreLib"],
+)
+
+# Unit Test Library & Runner (`OKeyTreTests`)
+swift_library(
+    name = "OKeyTreTestsLib",
+    testonly = True,
+    module_name = "OKeyTreTests",
+    srcs = glob(["OKeyTreTests/*.swift"]),
+    copts = [
+        "-enable-upcoming-feature",
+        "MemberImportVisibility",
+    ],
+    deps = [":OKeyTreLib"],
+)
+
+macos_unit_test(
+    name = "OKeyTreTestsSuite",
+    minimum_os_version = MINIMUM_OS_VERSION,
+    test_host = ":OKeyTreApp",
+    deps = [":OKeyTreTestsLib"],
+)

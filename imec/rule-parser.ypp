@@ -1,0 +1,415 @@
+%{
+// Copyright (C) 2026 lnson
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Bison LALR(1) grammar for `.ime` specifications.
+
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#pragma clang diagnostic ignored "-Wsign-compare"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "absl/strings/substitute.h"
+#include "rule-ast.h"
+
+int okeytre_yylex(YYSTYPE* yylval_param, okeytre::ParseContext* ctx);
+
+void okeytre_yyerror(okeytre::ParseContext* ctx, const char* msg) {
+  if (ctx != nullptr && !ctx->has_error) {
+    ctx->SetError(
+        ctx->last_token_line,
+        msg != nullptr ? msg : "Syntax error in .ime specification.");
+  }
+}
+%}
+
+%pure-parser
+%name-prefix="okeytre_yy"
+%lex-param   { okeytre::ParseContext* ctx }
+%parse-param { okeytre::ParseContext* ctx }
+
+%token TOK_SECTION_SEP     258
+%token TOK_DIR_NAME        259
+%token TOK_DIR_FLAG        260
+%token TOK_DIR_MAP         261
+%token TOK_IDENT           262
+%token TOK_STRING          263
+%token TOK_CHAR_LIT        264
+%token TOK_UCHAR           265
+%token TOK_CHAR_LIST       266
+%token TOK_CHAR_CLASS      267
+%token TOK_BRACE_REF       268
+%token TOK_LPAREN          269
+%token TOK_LPAREN_NC       270
+%token TOK_RPAREN          271
+%token TOK_LBRACE          272
+%token TOK_RBRACE          273
+%token TOK_PIPE            274
+%token TOK_STAR            275
+%token TOK_PLUS            276
+%token TOK_QUEST           277
+%token TOK_DOT             278
+%token TOK_CARET           279
+%token TOK_FLAG_GUARD      280
+%token TOK_RULE_PLUS       281
+%token TOK_ARROW           282
+%token TOK_EQ              283
+%token TOK_COLON           284
+%token TOK_COMMA           285
+%token TOK_MAP_SEP         286
+%token TOK_EOL             287
+%token TOK_RHS_INPUT_KEY   288
+%token TOK_RHS_CAPTURE     289
+%token TOK_RHS_PROJECTION  290
+%token TOK_LEX_ERROR       291
+
+%start grammar_spec
+
+%%
+
+grammar_spec
+    : section1_defs TOK_SECTION_SEP section2_rules opt_section3
+    ;
+
+opt_section3
+    : /* empty */
+    | TOK_SECTION_SEP section3_tests
+    ;
+
+/* ============================================================================
+ * SECTION 1: Definitions (%name, %flag, %map, MACRO regex)
+ * ============================================================================ */
+
+section1_defs
+    : /* empty */
+    | section1_defs section1_def
+    ;
+
+section1_def
+    : TOK_DIR_NAME TOK_STRING TOK_EOL {
+      ctx->spec.name = ctx->strings[static_cast<size_t>($2.node_idx)];
+      ctx->spec.has_name = true;
+    }
+    | TOK_DIR_FLAG TOK_IDENT TOK_EOL {
+      if (!ctx->AddFlagDecl($2.node_idx, std::nullopt, $1.line)) YYABORT;
+    }
+    | TOK_DIR_FLAG TOK_IDENT TOK_EQ TOK_IDENT TOK_EOL {
+      if (!ctx->AddFlagDecl($2.node_idx, $4.node_idx, $1.line)) YYABORT;
+    }
+    | TOK_DIR_MAP TOK_IDENT TOK_LBRACE map_body TOK_RBRACE {
+      if (!ctx->AddMap1D($2.node_idx, $4.list_idx, $1.line)) YYABORT;
+    }
+    | TOK_DIR_MAP TOK_IDENT TOK_LPAREN map_key_list TOK_RPAREN TOK_LBRACE map_body TOK_RBRACE {
+      if (!ctx->AddMap2D($2.node_idx, $4.list_idx, $7.list_idx, $1.line)) {
+        YYABORT;
+      }
+    }
+    | TOK_IDENT regex_alt TOK_EOL {
+      if (!ctx->AddMacroDecl($1.node_idx, $2.node_idx, $1.line)) YYABORT;
+    }
+    ;
+
+map_key_list
+    : TOK_UCHAR {
+      $$.list_idx = ctx->InternCharList({$1.char_val});
+    }
+    | map_key_list TOK_COMMA TOK_UCHAR {
+      ctx->char_lists[static_cast<size_t>($1.list_idx)].push_back($3.char_val);
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+map_seps
+    : TOK_MAP_SEP
+    | map_seps TOK_MAP_SEP
+    ;
+
+opt_map_seps
+    : /* empty */
+    | map_seps
+    ;
+
+map_body
+    : opt_map_seps map_items {
+      $$.list_idx = $2.list_idx;
+    }
+    ;
+
+map_items
+    : map_entry {
+      $$.list_idx = ctx->NewMapEntryList($1.node_idx);
+    }
+    | map_items map_seps map_entry {
+      ctx->map_entry_lists[static_cast<size_t>($1.list_idx)].push_back(
+          ctx->map_entries[static_cast<size_t>($3.node_idx)]);
+      $$.list_idx = $1.list_idx;
+    }
+    | map_items map_seps {
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+map_entry
+    : map_lhs TOK_COLON map_rhs_list {
+      $$.node_idx = ctx->InternMapEntry(
+          ctx->char_lists[static_cast<size_t>($1.list_idx)],
+          ctx->char_lists[static_cast<size_t>($3.list_idx)]);
+    }
+    ;
+
+map_lhs
+    : TOK_UCHAR {
+      $$.list_idx = ctx->InternCharList({$1.char_val});
+    }
+    | TOK_CHAR_LIST {
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+map_rhs_list
+    : TOK_UCHAR {
+      $$.list_idx = ctx->InternCharList({$1.char_val});
+    }
+    | map_rhs_list TOK_UCHAR {
+      ctx->char_lists[static_cast<size_t>($1.list_idx)].push_back($2.char_val);
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+/* ============================================================================
+ * Regular Expressions (used in Section 1 macros and Section 2 rule LHS)
+ * ============================================================================ */
+
+regex_alt
+    : regex_branch_list {
+      std::vector<okeytre::RegexAST>& branches =
+          ctx->regex_lists[static_cast<size_t>($1.list_idx)];
+      $$.node_idx = ctx->InternRegex(okeytre::RegexAST::MakeAlternation(branches));
+    }
+    ;
+
+regex_branch_list
+    : regex_concat {
+      $$.list_idx =
+          ctx->NewRegexList(ctx->regex_nodes[static_cast<size_t>($1.node_idx)]);
+    }
+    | regex_branch_list TOK_PIPE regex_concat {
+      ctx->regex_lists[static_cast<size_t>($1.list_idx)].push_back(
+          ctx->regex_nodes[static_cast<size_t>($3.node_idx)]);
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+regex_concat
+    : regex_seq_list {
+      std::vector<okeytre::RegexAST>& items =
+          ctx->regex_lists[static_cast<size_t>($1.list_idx)];
+      $$.node_idx = ctx->InternRegex(okeytre::RegexAST::MakeConcat(items));
+    }
+    ;
+
+regex_seq_list
+    : regex_quant {
+      $$.list_idx =
+          ctx->NewRegexList(ctx->regex_nodes[static_cast<size_t>($1.node_idx)]);
+    }
+    | regex_seq_list regex_quant {
+      ctx->regex_lists[static_cast<size_t>($1.list_idx)].push_back(
+          ctx->regex_nodes[static_cast<size_t>($2.node_idx)]);
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+regex_quant
+    : regex_atom {
+      $$.node_idx = $1.node_idx;
+    }
+    | regex_quant TOK_STAR {
+      $$.node_idx = ctx->InternRegex(okeytre::RegexAST::MakeQuantifier(
+          ctx->regex_nodes[static_cast<size_t>($1.node_idx)], 0, -1));
+    }
+    | regex_quant TOK_PLUS {
+      $$.node_idx = ctx->InternRegex(okeytre::RegexAST::MakeQuantifier(
+          ctx->regex_nodes[static_cast<size_t>($1.node_idx)], 1, -1));
+    }
+    | regex_quant TOK_QUEST {
+      $$.node_idx = ctx->InternRegex(okeytre::RegexAST::MakeQuantifier(
+          ctx->regex_nodes[static_cast<size_t>($1.node_idx)], 0, 1));
+    }
+    ;
+
+lparen_open
+    : TOK_LPAREN {
+      if (ctx->capturing_groups_enabled) {
+        ctx->current_capture_count += 1;
+        $$.int_val = ctx->current_capture_count;
+      } else {
+        $$.int_val = 0;
+      }
+    }
+    ;
+
+regex_atom
+    : TOK_UCHAR {
+      uint16_t lower = okeytre::ToLower($1.char_val);
+      $$.node_idx = ctx->InternRegex(
+          okeytre::RegexAST::MakePredicate(okeytre::CharPredicate::Positive({lower})));
+    }
+    | TOK_DOT {
+      $$.node_idx = ctx->InternRegex(
+          okeytre::RegexAST::MakePredicate(okeytre::CharPredicate::AnyWordChar()));
+    }
+    | TOK_CHAR_CLASS {
+      $$.node_idx = ctx->InternRegex(okeytre::RegexAST::MakePredicate(
+          ctx->predicates[static_cast<size_t>($1.node_idx)]));
+    }
+    | TOK_BRACE_REF {
+      int r_idx = 0;
+      if (!ctx->ParseBraceRefToRegex($1.node_idx, $1.line, r_idx)) YYABORT;
+      $$.node_idx = r_idx;
+    }
+    | lparen_open regex_alt TOK_RPAREN {
+      const okeytre::RegexAST& inner =
+          ctx->regex_nodes[static_cast<size_t>($2.node_idx)];
+      if ($1.int_val > 0) {
+        $$.node_idx =
+            ctx->InternRegex(okeytre::RegexAST::MakeCapture($1.int_val, inner));
+      } else {
+        $$.node_idx = ctx->InternRegex(okeytre::RegexAST::MakeGroup(inner));
+      }
+    }
+    | TOK_LPAREN_NC regex_alt TOK_RPAREN {
+      const okeytre::RegexAST& inner =
+          ctx->regex_nodes[static_cast<size_t>($2.node_idx)];
+      $$.node_idx = ctx->InternRegex(okeytre::RegexAST::MakeGroup(inner));
+    }
+    ;
+
+/* ============================================================================
+ * SECTION 2: Rewrite Productions ([?flag] [^]<lhs> + <input> --> <rhs>)
+ * ============================================================================ */
+
+section2_rules
+    : /* empty */
+    | section2_rules rule_decl
+    ;
+
+rule_lhs_begin
+    : /* empty */ {
+      if (!ctx->BeginRule(std::nullopt, false, ctx->line)) YYABORT;
+    }
+    | TOK_CARET {
+      if (!ctx->BeginRule(std::nullopt, true, $1.line)) YYABORT;
+    }
+    | TOK_FLAG_GUARD {
+      if (!ctx->BeginRule($1.node_idx, false, $1.line)) YYABORT;
+    }
+    | TOK_FLAG_GUARD TOK_CARET {
+      if (!ctx->BeginRule($1.node_idx, true, $1.line)) YYABORT;
+    }
+    ;
+
+rule_decl
+    : rule_lhs_begin regex_alt TOK_RULE_PLUS input_spec TOK_ARROW rhs_item_list TOK_EOL {
+      if (!ctx->FinishRule($2.node_idx, $4.node_idx, $6.list_idx, $3.line)) {
+        YYABORT;
+      }
+    }
+    ;
+
+input_spec
+    : TOK_CHAR_LIT {
+      $$.node_idx = ctx->InternPredicate(
+          okeytre::CharPredicate::Positive({okeytre::ToLower($1.char_val)}));
+    }
+    | TOK_UCHAR {
+      $$.node_idx = ctx->InternPredicate(
+          okeytre::CharPredicate::Positive({okeytre::ToLower($1.char_val)}));
+    }
+    | TOK_CHAR_CLASS {
+      $$.node_idx = $1.node_idx;
+    }
+    | TOK_DOT {
+      $$.node_idx = ctx->InternPredicate(okeytre::CharPredicate::AnyWordChar());
+    }
+    | TOK_BRACE_REF {
+      int pred_idx = 0;
+      if (!ctx->ResolveInputBraceRef($1.node_idx, $1.line, pred_idx)) YYABORT;
+      $$.node_idx = pred_idx;
+    }
+    ;
+
+rhs_item_list
+    : rhs_item {
+      $$.list_idx = ctx->NewRHSList($1.node_idx);
+    }
+    | rhs_item_list rhs_item {
+      ctx->rhs_lists[static_cast<size_t>($1.list_idx)].push_back(
+          ctx->rhs_items[static_cast<size_t>($2.node_idx)]);
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+rhs_item
+    : TOK_UCHAR {
+      $$.node_idx = ctx->InternRHSItem(okeytre::RHSItem::MakeLiteral($1.char_val));
+    }
+    | TOK_RHS_INPUT_KEY {
+      $$.node_idx = ctx->InternRHSItem(okeytre::RHSItem::MakeInputKey());
+    }
+    | TOK_RHS_CAPTURE {
+      if ($1.int_val > ctx->current_capture_count) {
+        ctx->SetError(
+            $1.line,
+            absl::Substitute("Replacement references '$$$0', but rule only has "
+                             "$1 capture group(s).",
+                             $1.int_val, ctx->current_capture_count));
+        YYABORT;
+      }
+      $$.node_idx = ctx->InternRHSItem(okeytre::RHSItem::MakeCapture($1.int_val));
+    }
+    | TOK_RHS_PROJECTION {
+      int item_idx = 0;
+      if (!ctx->ParseMapProjectionRHS($1.node_idx, $1.line, item_idx)) YYABORT;
+      $$.node_idx = item_idx;
+    }
+    ;
+
+/* ============================================================================
+ * SECTION 3: Inline Verification Test Vectors ([?flag...] "in" + 'k' --> "out")
+ * ============================================================================ */
+
+section3_tests
+    : /* empty */
+    | section3_tests test_vector
+    ;
+
+test_flag_guards
+    : /* empty */ {
+      $$.list_idx = ctx->NewFlagSet();
+    }
+    | test_flag_guards TOK_FLAG_GUARD {
+      ctx->flag_sets[static_cast<size_t>($1.list_idx)].insert(
+          ctx->strings[static_cast<size_t>($2.node_idx)]);
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+test_vector
+    : test_flag_guards TOK_STRING TOK_RULE_PLUS TOK_CHAR_LIT TOK_ARROW TOK_STRING {
+      if (!ctx->AddTestVector(
+              $1.list_idx, $2.node_idx, $4.char_val, $6.node_idx, $2.line)) {
+        YYABORT;
+      }
+    }
+    ;
+
+%%

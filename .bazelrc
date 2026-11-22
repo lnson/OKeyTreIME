@@ -1,0 +1,12 @@
+# Enable Bzlmod and Apple platform toolchains
+common --enable_bzlmod
+build --apple_platform_type=macos
+build --macos_minimum_os=14.0
+build --cxxopt=-std=c++23
+build --host_cxxopt=-std=c++23
+test --test_output=errors
+
+# Release build profile (`bazel build --config=release //:OKeyTreApp`)
+build:release --compilation_mode=opt
+build:release --strip=always
+build:release --objc_enable_binary_stripping

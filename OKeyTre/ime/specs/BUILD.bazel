@@ -1,0 +1,19 @@
+# Copyright (C) 2026 lnson
+# SPDX-License-Identifier: GPL-3.0-only
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files([
+    "telex.ime",
+    "viqr.ime",
+    "vni.ime",
+])
+
+filegroup(
+    name = "all_specs",
+    srcs = [
+        "telex.ime",
+        "viqr.ime",
+        "vni.ime",
+    ],
+)

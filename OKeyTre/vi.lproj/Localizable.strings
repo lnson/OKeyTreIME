@@ -1,0 +1,52 @@
+/* Menu Bar */
+"menu.accessibility_missing.title" = "⚠️ Chưa cấp quyền trợ năng";
+"menu.accessibility_missing.subtitle" = "Cần quyền trợ năng để bộ gõ hoạt động";
+"menu.input_source_warning.title" = "⚠️ Bàn phím: %@";
+"menu.input_source_warning.subtitle" = "Nên dùng bàn phím tiếng Anh (U.S.)";
+"menu.input_style" = "Kiểu gõ";
+"menu.launch_at_login" = "Khởi động cùng hệ thống";
+"menu.language" = "Ngôn ngữ";
+"menu.settings" = "Cài đặt...";
+"menu.quit" = "Thoát";
+
+/* Shared Actions */
+"action.open_settings_now" = "Mở cài đặt ngay";
+"action.switch_to_us" = "Chuyển sang U.S.";
+
+/* Language Options */
+"language.system" = "Theo hệ thống";
+
+/* Settings Window & Sidebar */
+"app.name" = "ÔKêyTre";
+"settings.window_title" = "Cài đặt ÔKêyTre";
+"settings.sidebar.version" = "Phiên bản %@";
+"settings.section.correction" = "Bỏ dấu & Chính tả";
+"settings.section.advanced" = "Dành cho chuyên gia";
+
+/* Tone Placement Settings */
+"settings.orthography.header" = "Quy tắc đặt dấu";
+"settings.orthography.modern_tone.title" = "Đặt dấu theo chính tả kiểu mới (\"oà, oé, uý\")";
+"settings.orthography.modern_tone.description" = "Đặt dấu thanh lên nguyên âm thứ hai trong các vần mở \"oa\", \"oe\", \"uy\" (ví dụ: hoà, khoẻ, thuý thay vì hòa, khỏe, thúy).";
+
+/* Auto-Correction Settings */
+"settings.correction.header" = "Chính tả & Nguyên âm đôi";
+"settings.correction.uo_horn.title" = "Tự động sửa \"ưo\" thành \"ươ\"";
+"settings.correction.uo_horn.description" = "Tự động chuyển chữ 'o' ngay sau 'ư' thành 'ơ' (ví dụ: tư + o → tươ, như + o → nhươ).";
+"settings.correction.ng_to_ngh.title" = "Tự động sửa \"ng + i/e\" thành \"nghi/nghe\"";
+"settings.correction.ng_to_ngh.description" = "Tự động thêm 'h' khi gõ 'i' hoặc 'e' ngay sau phụ âm đầu 'ng' (ví dụ: ng + i → nghi, ng + e → nghe).";
+"settings.correction.ngh_to_ng.title" = "Tự động sửa \"ngh + a/o/u\" thành \"nga/ngo/ngu\"";
+"settings.correction.ngh_to_ng.description" = "Tự động bỏ 'h' khi gõ 'a', 'o', hoặc 'u' ngay sau phụ âm đầu 'ngh' (ví dụ: ngh + a → nga, ngh + o → ngo, ngh + u → ngu).";
+
+/* Advanced Settings */
+"settings.advanced.header" = "Bộ đệm gõ phím";
+"settings.advanced.buffer_size.title" = "Kích thước bộ đệm ký tự";
+"settings.advanced.buffer_size.description" = "Số ký tự tối đa được lưu trong bộ đệm để hỗ trợ xóa lùi (Backspace) về các từ trước đó trong những ứng dụng không hỗ trợ đọc văn bản quanh con trỏ (như Terminal).";
+
+/* Alerts & System Input Sources */
+"input_source.unknown" = "Không rõ";
+"alert.accessibility_granted.title" = "Kích hoạt thành công!";
+"alert.accessibility_granted.message" = "Bộ gõ sẵn sàng!";
+"alert.non_english_keyboard.title" = "Bàn phím hệ thống không phải tiếng Anh";
+"alert.non_english_keyboard.message" = "Bàn phím hiện tại là \"%@\". Để ÔKêyTre hoạt động chính xác và không bị xung đột gõ, bạn nên chuyển sang bàn phím U.S. hoặc ABC.";
+"alert.non_english_keyboard.open_keyboard_settings" = "Mở Cài đặt Bàn phím";
+"alert.non_english_keyboard.ignore" = "Bỏ qua";

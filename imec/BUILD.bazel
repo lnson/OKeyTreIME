@@ -1,0 +1,162 @@
+# Copyright (C) 2026 lnson
+# SPDX-License-Identifier: GPL-3.0-only
+
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# 1. Flex & Bison codegen for rule-lexer.lpp and rule-parser.ypp
+genrule(
+    name = "generate_rule_lexer",
+    srcs = ["rule-lexer.lpp"],
+    outs = ["rule-lexer.yy.cc"],
+    cmd = "/usr/bin/flex -o $@ $(location rule-lexer.lpp)",
+)
+
+genrule(
+    name = "generate_rule_parser",
+    srcs = ["rule-parser.ypp"],
+    outs = [
+        "rule-parser.yacc.cc",
+        "rule-parser.yacc.h",
+    ],
+    cmd = "/usr/bin/bison -y --defines=$(location rule-parser.yacc.h) -o $(location rule-parser.yacc.cc) $(location rule-parser.ypp)",
+)
+
+# 2. `.ime` AST, Automaton IR, Compiler & Codegen Libraries
+cc_library(
+    name = "utf8_utils",
+    hdrs = ["utf8-utils.h"],
+    includes = ["."],
+    deps = [
+        "//OKeyTre/ime/core:unicode_utils",
+        "@simdutf",
+    ],
+)
+
+cc_library(
+    name = "rule_ast",
+    srcs = [
+        "rule-ast.cc",
+        ":rule-lexer.yy.cc",
+        ":rule-parser.yacc.cc",
+        ":rule-parser.yacc.h",
+    ],
+    hdrs = ["rule-ast.h"],
+    includes = ["."],
+    deps = [
+        ":utf8_utils",
+        "//OKeyTre/ime/core:unicode_utils",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "rule_ast_test",
+    size = "small",
+    srcs = ["rule-ast_test.cc"],
+    deps = [
+        ":rule_ast",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/strings",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "compiled_automaton",
+    srcs = ["compiled-automaton.cc"],
+    hdrs = ["compiled-automaton.h"],
+    includes = ["."],
+    deps = [
+        ":rule_ast",
+        "//OKeyTre/ime/core:pike_vm",
+        "//OKeyTre/ime/core:unicode_utils",
+        "@abseil-cpp//absl/container:flat_hash_set",
+    ],
+)
+
+cc_test(
+    name = "compiled_automaton_test",
+    size = "small",
+    srcs = ["compiled-automaton_test.cc"],
+    deps = [
+        ":compiled_automaton",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "automaton_compiler",
+    srcs = ["automaton-compiler.cc"],
+    hdrs = ["automaton-compiler.h"],
+    includes = ["."],
+    deps = [
+        ":compiled_automaton",
+        ":rule_ast",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "automaton_compiler_test",
+    size = "small",
+    srcs = ["automaton-compiler_test.cc"],
+    deps = [
+        ":automaton_compiler",
+        "@abseil-cpp//absl/strings",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "cpp_automaton_codegen",
+    srcs = ["cpp-automaton-codegen.cc"],
+    hdrs = ["cpp-automaton-codegen.h"],
+    includes = ["."],
+    deps = [
+        ":compiled_automaton",
+        "//OKeyTre/ime/core:unicode_utils",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+    ],
+)
+
+cc_test(
+    name = "cpp_automaton_codegen_test",
+    size = "small",
+    srcs = ["cpp-automaton-codegen_test.cc"],
+    deps = [
+        ":automaton_compiler",
+        ":cpp_automaton_codegen",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+        "@googletest//:gtest_main",
+    ],
+)
+
+# 3. Ahead-of-Time `.ime` -> `.generated.h` C++ compiler CLI (`imec`)
+cc_binary(
+    name = "imec",
+    srcs = ["ime-compiler.cc"],
+    deps = [
+        ":automaton_compiler",
+        ":cpp_automaton_codegen",
+        ":rule_ast",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:status_macros",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+    ],
+)

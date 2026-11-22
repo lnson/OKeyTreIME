@@ -1,0 +1,680 @@
+%{
+// Copyright (C) 2026 lnson
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Flex lexical analyzer for `.ime` grammar specifications.
+
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#pragma clang diagnostic ignored "-Wsign-compare"
+#pragma clang diagnostic ignored "-Wdeprecated-register"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+
+#include <cstring>
+#include <string>
+
+#include "absl/strings/substitute.h"
+#include "rule-ast.h"
+
+#define YY_DECL int okeytre_yylex(YYSTYPE* yylval_param, okeytre::ParseContext* ctx)
+#define YY_USER_ACTION ctx->last_token_line = ctx->line;
+
+// When Xcode invokes `/usr/bin/lex` without `-8`, Flex defaults to 7-bit mode
+// (`%option 8bit` is ignored unless passed on the CLI) and masks bytes through
+// a 7-bit table. If `yytext[0]` is the first byte of a multi-byte UTF-8
+// sequence (`>= 0xC0`), this helper consumes the remaining UTF-8 continuation
+// bytes via `yyinput()` and returns the decoded UTF-16 code unit.
+static int OkeytreYyInputWrapper();
+static uint16_t OkeytreReadUtf8Char(const char* text, int len) {
+  const uint8_t b0 = static_cast<uint8_t>(text[0]);
+  if (b0 < 0x80) {
+    return b0;
+  }
+  char buf[4] = {static_cast<char>(b0), 0, 0, 0};
+  int needed = 1;
+  if ((b0 & 0xE0) == 0xC0) {
+    needed = 2;
+  } else if ((b0 & 0xF0) == 0xE0) {
+    needed = 3;
+  } else if ((b0 & 0xF8) == 0xF0) {
+    needed = 4;
+  }
+
+  int have = (len <= needed) ? len : needed;
+  for (int i = 1; i < have; ++i) {
+    buf[i] = text[i];
+  }
+  for (int i = have; i < needed; ++i) {
+    int c = OkeytreYyInputWrapper();
+    if (c == EOF || c == 0) break;
+    buf[i] = static_cast<char>(c);
+  }
+  std::u16string u16 =
+      okeytre::Utf8ToU16(std::string_view(buf, static_cast<size_t>(needed)));
+  return u16.size() == 1 ? static_cast<uint16_t>(u16[0]) : 0xFFFD;
+}
+%}
+
+%option noyywrap
+%option nounput
+%option nodefault
+%option 8bit
+%option prefix="okeytre_yy"
+
+%x IN_COMMENT
+%x NAME_DEF
+%x FLAG_DEF
+%x MAP_HDR
+%x MAP_KEYS
+%x MAP_BODY
+%x REGEX_DEF
+%x SEC_RULES
+%x RULE_LHS_START
+%x RULE_LHS
+%x RULE_INPUT
+%x RULE_RHS
+%x SEC_TESTS
+
+UTF8_NONASCII ([\300-\337][\200-\277]|[\340-\357][\200-\277]{2}|[\360-\367][\200-\277]{3})
+IDENT         [A-Za-z_][A-Za-z0-9_]*
+
+%%
+
+  /* ------------------------------------------------------------------------
+   * Comments (handled across all active states via IN_COMMENT caller stack)
+   * ------------------------------------------------------------------------ */
+<INITIAL,NAME_DEF,FLAG_DEF,MAP_HDR,MAP_KEYS,MAP_BODY,REGEX_DEF,SEC_RULES,RULE_LHS_START,RULE_LHS,RULE_INPUT,RULE_RHS,SEC_TESTS>"/*" {
+  ctx->comment_start_line = ctx->line;
+  ctx->comment_caller_state = YY_START;
+  BEGIN(IN_COMMENT);
+}
+
+<IN_COMMENT>{
+  "*/"          { BEGIN(ctx->comment_caller_state); }
+  \n            { ctx->line++; }
+  {UTF8_NONASCII}|. { /* skip comment content */ }
+  <<EOF>>       {
+    ctx->SetError(ctx->comment_start_line,
+                  "Unterminated '/*' block comment.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+}
+
+<INITIAL,NAME_DEF,FLAG_DEF,MAP_HDR,MAP_BODY,REGEX_DEF,SEC_RULES,RULE_LHS_START,RULE_RHS,SEC_TESTS>("//"|"#")[^\n]* {
+  /* skip line comment up to newline */
+}
+
+  /* ------------------------------------------------------------------------
+   * Section 1: Definitions (INITIAL, NAME_DEF, FLAG_DEF, MAP_*, REGEX_DEF)
+   * ------------------------------------------------------------------------ */
+<INITIAL>{
+  [ \t\r]+      { /* skip whitespace */ }
+  \n            { ctx->line++; }
+  "%%"          {
+    ctx->section_count++;
+    BEGIN(SEC_RULES);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_SECTION_SEP;
+  }
+  "%name"       {
+    BEGIN(NAME_DEF);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_DIR_NAME;
+  }
+  "%flag"       {
+    BEGIN(FLAG_DEF);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_DIR_FLAG;
+  }
+  "%map"        {
+    ctx->map_start_line = ctx->line;
+    BEGIN(MAP_HDR);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_DIR_MAP;
+  }
+  "%"[^\t\r\n ]* {
+    ctx->SetError(
+        ctx->line,
+        absl::Substitute("Unknown directive in definitions: '$0'.", yytext));
+    return okeytre::TOK_LEX_ERROR;
+  }
+  {IDENT}       {
+    ctx->capturing_groups_enabled = false;
+    ctx->current_capture_count = 0;
+    BEGIN(REGEX_DEF);
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx =
+        ctx->InternString(std::string(yytext, static_cast<size_t>(yyleng)));
+    return okeytre::TOK_IDENT;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(
+        ctx->line,
+        absl::Substitute("Expected macro definition or directive, got '$0'.",
+                         yytext));
+    return okeytre::TOK_LEX_ERROR;
+  }
+  <<EOF>>       {
+    if (ctx->section_count < 1) {
+      ctx->SetError(
+          ctx->line,
+          "Missing '%%' delimiter separating definitions and rules.");
+      return okeytre::TOK_LEX_ERROR;
+    }
+    yyterminate();
+  }
+}
+
+<NAME_DEF>{
+  [ \t\r]+      { /* skip */ }
+  \"([^\"\\\n]|\\.)*\" {
+    int idx = 0;
+    if (!ctx->DecodeQuotedString(
+            yytext, static_cast<size_t>(yyleng), ctx->line, idx)) {
+      return okeytre::TOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = idx;
+    return okeytre::TOK_STRING;
+  }
+  \n            {
+    int ln = ctx->line;
+    ctx->line++;
+    BEGIN(INITIAL);
+    yylval_param->line = ln;
+    return okeytre::TOK_EOL;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(ctx->line, "Expected double-quoted string in '%name'.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+}
+
+<FLAG_DEF>{
+  [ \t\r]+      { /* skip */ }
+  "="           {
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_EQ;
+  }
+  [A-Za-z0-9_]+ {
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx =
+        ctx->InternString(std::string(yytext, static_cast<size_t>(yyleng)));
+    return okeytre::TOK_IDENT;
+  }
+  \n            {
+    int ln = ctx->line;
+    ctx->line++;
+    BEGIN(INITIAL);
+    yylval_param->line = ln;
+    return okeytre::TOK_EOL;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(ctx->line,
+                  absl::Substitute("Invalid token in '%flag': '$0'.", yytext));
+    return okeytre::TOK_LEX_ERROR;
+  }
+}
+
+<MAP_HDR>{
+  [ \t\r]+      { /* skip */ }
+  \n            { ctx->line++; }
+  {IDENT}       {
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx =
+        ctx->InternString(std::string(yytext, static_cast<size_t>(yyleng)));
+    return okeytre::TOK_IDENT;
+  }
+  "("           {
+    BEGIN(MAP_KEYS);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_LPAREN;
+  }
+  "{"           {
+    BEGIN(MAP_BODY);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_LBRACE;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(ctx->line,
+                  "Malformed '%map' declaration; expected '{ ... }'.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  <<EOF>>       {
+    ctx->SetError(ctx->map_start_line,
+                  "Malformed '%map' declaration; expected '{ ... }'.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+}
+
+<MAP_KEYS>{
+  [ \t\r]+      { /* skip */ }
+  \n            { ctx->line++; }
+  ","           {
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_COMMA;
+  }
+  ")"           {
+    BEGIN(MAP_HDR);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_RPAREN;
+  }
+  "\\"({UTF8_NONASCII}|[^\n]) {
+    uint16_t ch = OkeytreReadUtf8Char(yytext + 1, yyleng - 1);
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = okeytre::ParseContext::UnescapeChar(ch);
+    return okeytre::TOK_UCHAR;
+  }
+  "\\"          {
+    ctx->SetError(ctx->line, "Invalid escape in '%map' key list.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  {UTF8_NONASCII}|. {
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = OkeytreReadUtf8Char(yytext, yyleng);
+    return okeytre::TOK_UCHAR;
+  }
+  <<EOF>>       {
+    ctx->SetError(ctx->map_start_line,
+                  "Malformed '%map' declaration; expected '{ ... }'.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+}
+
+<MAP_BODY>{
+  [ \t\r]+      { /* skip */ }
+  \n            {
+    int ln = ctx->line;
+    ctx->line++;
+    yylval_param->line = ln;
+    return okeytre::TOK_MAP_SEP;
+  }
+  ","           {
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_MAP_SEP;
+  }
+  ":"           {
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_COLON;
+  }
+  "}"           {
+    BEGIN(INITIAL);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_RBRACE;
+  }
+  "%%"          {
+    ctx->SetError(ctx->map_start_line,
+                  "Unclosed '%map' block before '%%'.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "["[^\]\n]*"]" {
+    int idx = 0;
+    if (!ctx->DecodeMapCharList(
+            yytext, static_cast<size_t>(yyleng), ctx->line, idx)) {
+      return okeytre::TOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->list_idx = idx;
+    return okeytre::TOK_CHAR_LIST;
+  }
+  "["           {
+    ctx->SetError(ctx->line, "Expected '[...]' in map row.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  {UTF8_NONASCII}|[^\t\r\n ,:{}[\]] {
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = OkeytreReadUtf8Char(yytext, yyleng);
+    return okeytre::TOK_UCHAR;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(ctx->line, "Unexpected delimiter in '%map' body.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  <<EOF>>       {
+    ctx->SetError(ctx->map_start_line, "Unclosed '%map' block.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+}
+
+  /* ------------------------------------------------------------------------
+   * Regular Expression Tokenization (REGEX_DEF in Section 1, RULE_LHS in Sec 2)
+   * ------------------------------------------------------------------------ */
+<RULE_LHS>[ \t]+"+"[ \t]+ {
+  BEGIN(RULE_INPUT);
+  yylval_param->line = ctx->line;
+  return okeytre::TOK_RULE_PLUS;
+}
+
+<REGEX_DEF>\n {
+  int ln = ctx->line;
+  ctx->line++;
+  BEGIN(INITIAL);
+  yylval_param->line = ln;
+  return okeytre::TOK_EOL;
+}
+
+<RULE_LHS>\n {
+  ctx->SetError(ctx->line,
+                "Missing ' + ' input separator before '-->' in rule.");
+  return okeytre::TOK_LEX_ERROR;
+}
+
+<REGEX_DEF,RULE_LHS>{
+  [ \t\r]+      { /* skip whitespace */ }
+  "(?:"         { yylval_param->line = ctx->line; return okeytre::TOK_LPAREN_NC; }
+  "("           { yylval_param->line = ctx->line; return okeytre::TOK_LPAREN; }
+  ")"           { yylval_param->line = ctx->line; return okeytre::TOK_RPAREN; }
+  "|"           { yylval_param->line = ctx->line; return okeytre::TOK_PIPE; }
+  "*"           { yylval_param->line = ctx->line; return okeytre::TOK_STAR; }
+  "+"           { yylval_param->line = ctx->line; return okeytre::TOK_PLUS; }
+  "?"           { yylval_param->line = ctx->line; return okeytre::TOK_QUEST; }
+  "."           { yylval_param->line = ctx->line; return okeytre::TOK_DOT; }
+  "["(\\.|[^\]\\\n])*"]" {
+    int idx = 0;
+    if (!ctx->DecodeCharClass(
+            yytext, static_cast<size_t>(yyleng), ctx->line, idx)) {
+      return okeytre::TOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = idx;
+    return okeytre::TOK_CHAR_CLASS;
+  }
+  "["           {
+    ctx->SetError(ctx->line, "Unclosed '[' character class.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "]"           {
+    ctx->SetError(ctx->line, "Unexpected metacharacter ']' in pattern.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "{"[^}\n]*"}" {
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = ctx->InternString(
+        std::string(yytext + 1, static_cast<size_t>(yyleng - 2)));
+    return okeytre::TOK_BRACE_REF;
+  }
+  "{"           {
+    ctx->SetError(ctx->line, "Unclosed '{' in pattern.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "}"           {
+    ctx->SetError(ctx->line, "Unexpected metacharacter '}' in pattern.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "\\s"         {
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = ctx->InternPredicate(
+        okeytre::CharPredicate::Positive({0x0020, 0x0009, 0x000A, 0x000D}));
+    return okeytre::TOK_CHAR_CLASS;
+  }
+  "\\"({UTF8_NONASCII}|[^\n]) {
+    uint16_t ch = OkeytreReadUtf8Char(yytext + 1, yyleng - 1);
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = okeytre::ParseContext::UnescapeChar(ch);
+    return okeytre::TOK_UCHAR;
+  }
+  "\\"          {
+    ctx->SetError(ctx->line, "Trailing '\\' in pattern.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  {UTF8_NONASCII}|. {
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = OkeytreReadUtf8Char(yytext, yyleng);
+    return okeytre::TOK_UCHAR;
+  }
+}
+
+  /* ------------------------------------------------------------------------
+   * Section 2: Rewrite Rules (SEC_RULES, RULE_LHS_START, RULE_INPUT, RULE_RHS)
+   * ------------------------------------------------------------------------ */
+<SEC_RULES>{
+  [ \t\r]+      { /* skip */ }
+  \n            { ctx->line++; }
+  "%%"          {
+    ctx->section_count++;
+    if (ctx->section_count > 2) {
+      ctx->SetError(ctx->line, "Unexpected extra '%%' section delimiter.");
+      return okeytre::TOK_LEX_ERROR;
+    }
+    BEGIN(SEC_TESTS);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_SECTION_SEP;
+  }
+  "?"{IDENT}    {
+    BEGIN(RULE_LHS_START);
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = ctx->InternString(
+        std::string(yytext + 1, static_cast<size_t>(yyleng - 1)));
+    return okeytre::TOK_FLAG_GUARD;
+  }
+  "^"           {
+    BEGIN(RULE_LHS);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_CARET;
+  }
+  {UTF8_NONASCII}|. {
+    yyless(0);
+    BEGIN(RULE_LHS);
+  }
+}
+
+<RULE_LHS_START>{
+  [ \t\r]+      { /* skip */ }
+  "^"           {
+    BEGIN(RULE_LHS);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_CARET;
+  }
+  \n            {
+    ctx->SetError(ctx->line, "Expected pattern after flag guard in rule.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  {UTF8_NONASCII}|. {
+    yyless(0);
+    BEGIN(RULE_LHS);
+  }
+}
+
+<RULE_INPUT>{
+  [ \t\r]+      { /* skip */ }
+  "-->"         {
+    BEGIN(RULE_RHS);
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_ARROW;
+  }
+  '([^'\\\n]|\\.)+' {
+    uint16_t ch = 0;
+    if (!ctx->DecodeCharLiteral(
+            yytext, static_cast<size_t>(yyleng), ctx->line, ch)) {
+      return okeytre::TOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = ch;
+    return okeytre::TOK_CHAR_LIT;
+  }
+  "'"[^'\n]*"'"? {
+    ctx->SetError(
+        ctx->line,
+        absl::Substitute("Invalid character literal '$0'.", yytext));
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "{"[^}\n]*"}" {
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = ctx->InternString(
+        std::string(yytext + 1, static_cast<size_t>(yyleng - 2)));
+    return okeytre::TOK_BRACE_REF;
+  }
+  "{"           {
+    ctx->SetError(ctx->line, "Unclosed '{' in input specification.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "["(\\.|[^\]\\\n])*"]" {
+    int idx = 0;
+    if (!ctx->DecodeCharClass(
+            yytext, static_cast<size_t>(yyleng), ctx->line, idx)) {
+      return okeytre::TOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = idx;
+    return okeytre::TOK_CHAR_CLASS;
+  }
+  "["           {
+    ctx->SetError(ctx->line, "Unclosed '[' character class.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "."           {
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_DOT;
+  }
+  "\\s"         {
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = ctx->InternPredicate(
+        okeytre::CharPredicate::Positive({0x0020, 0x0009, 0x000A, 0x000D}));
+    return okeytre::TOK_CHAR_CLASS;
+  }
+  "\\"({UTF8_NONASCII}|[^\n]) {
+    uint16_t ch = OkeytreReadUtf8Char(yytext + 1, yyleng - 1);
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = okeytre::ParseContext::UnescapeChar(ch);
+    return okeytre::TOK_UCHAR;
+  }
+  "\\"          {
+    ctx->SetError(ctx->line, "Trailing '\\' in input specification.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  \n            {
+    ctx->SetError(ctx->line, "Missing '-->' in rule.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  {UTF8_NONASCII}|. {
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = OkeytreReadUtf8Char(yytext, yyleng);
+    return okeytre::TOK_UCHAR;
+  }
+}
+
+<RULE_RHS>{
+  [ \t\r]+      { /* skip */ }
+  \n            {
+    int ln = ctx->line;
+    ctx->line++;
+    BEGIN(SEC_RULES);
+    yylval_param->line = ln;
+    return okeytre::TOK_EOL;
+  }
+  "$0"|"$key"   {
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_RHS_INPUT_KEY;
+  }
+  "$"[1-9]      {
+    yylval_param->line = ctx->line;
+    yylval_param->int_val = yytext[1] - '0';
+    return okeytre::TOK_RHS_CAPTURE;
+  }
+  "$"           {
+    ctx->SetError(
+        ctx->line,
+        "Invalid '$' reference in replacement; expected '$0'..'$9' or '$key'.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "{"[^}\n]*"}" {
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = ctx->InternString(
+        std::string(yytext + 1, static_cast<size_t>(yyleng - 2)));
+    return okeytre::TOK_RHS_PROJECTION;
+  }
+  "{"           {
+    ctx->SetError(ctx->line, "Unclosed '{' in replacement.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "\\"({UTF8_NONASCII}|[^\n]) {
+    uint16_t ch = OkeytreReadUtf8Char(yytext + 1, yyleng - 1);
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = okeytre::ParseContext::UnescapeChar(ch);
+    return okeytre::TOK_UCHAR;
+  }
+  "\\"          {
+    ctx->SetError(ctx->line, "Trailing '\\' in replacement.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  {UTF8_NONASCII}|. {
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = OkeytreReadUtf8Char(yytext, yyleng);
+    return okeytre::TOK_UCHAR;
+  }
+}
+
+  /* ------------------------------------------------------------------------
+   * Section 3: Inline Verification Test Vectors (SEC_TESTS)
+   * ------------------------------------------------------------------------ */
+<SEC_TESTS>{
+  [ \t\r]+      { /* skip */ }
+  \n            { ctx->line++; }
+  "%%"          {
+    ctx->SetError(ctx->line, "Unexpected extra '%%' section delimiter.");
+    return okeytre::TOK_LEX_ERROR;
+  }
+  "?"{IDENT}    {
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = ctx->InternString(
+        std::string(yytext + 1, static_cast<size_t>(yyleng - 1)));
+    return okeytre::TOK_FLAG_GUARD;
+  }
+  \"([^\"\\\n]|\\.)*\" {
+    int idx = 0;
+    if (!ctx->DecodeQuotedString(
+            yytext, static_cast<size_t>(yyleng), ctx->line, idx)) {
+      return okeytre::TOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = idx;
+    return okeytre::TOK_STRING;
+  }
+  '([^'\\\n]|\\.)+' {
+    uint16_t ch = 0;
+    if (!ctx->DecodeCharLiteral(
+            yytext, static_cast<size_t>(yyleng), ctx->line, ch)) {
+      return okeytre::TOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = ch;
+    return okeytre::TOK_CHAR_LIT;
+  }
+  "-->"         {
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_ARROW;
+  }
+  "+"           {
+    yylval_param->line = ctx->line;
+    return okeytre::TOK_RULE_PLUS;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(
+        ctx->line,
+        absl::Substitute("Unexpected token in test vector: '$0'.", yytext));
+    return okeytre::TOK_LEX_ERROR;
+  }
+}
+
+%%
+
+static int OkeytreYyInputWrapper() {
+  return yyinput();
+}
+
+static YY_BUFFER_STATE g_active_buffer = nullptr;
+
+void OkeytreLexerBeginScan(const char* utf8_source) {
+  g_active_buffer = okeytre_yy_scan_string(utf8_source);
+  BEGIN(INITIAL);
+}
+
+void OkeytreLexerEndScan() {
+  if (g_active_buffer != nullptr) {
+    okeytre_yy_delete_buffer(g_active_buffer);
+    g_active_buffer = nullptr;
+  }
+}

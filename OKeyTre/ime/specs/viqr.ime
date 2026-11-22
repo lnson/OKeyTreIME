@@ -1,0 +1,252 @@
+// Copyright (C) 2026 lnson
+// SPDX-License-Identifier: GPL-3.0-only
+
+/* ============================================================================
+ * Vietnamese VIQR (Strict) — Lex/Yacc Automaton Specification
+ *
+ * Strict VIQR requires vowel modifiers and tone marks to be typed immediately
+ * after the vowel they modify (and 'd' + 'd' immediately after initial 'd').
+ *
+ * Key Mappings:
+ *   Vowel Modifiers:
+ *     ^        : Circumflex (a -> â, e -> ê, o -> ô)
+ *     (        : Breve      (a -> ă)
+ *     + or *   : Horn       (o -> ơ, u -> ư, uo/ưo -> ươ)
+ *     d        : Stroke     (initial d -> đ)
+ *   Tone Marks (immediately following the target vowel):
+ *     '        : Sắc        (acute)
+ *     `        : Huyền      (grave)
+ *     ?        : Hỏi        (hook above)
+ *     ~        : Ngã        (tilde)
+ *     .        : Nặng       (dot below)
+ *     0 or z   : Remove tone on the immediately preceding vowel
+ * ============================================================================ */
+%name "Vietnamese VIQR (Strict)"
+
+/* Runtime flags (toggleable per automaton instance) */
+// Unused in strict VIQR (retained for uniform automaton flag layout)
+%flag modernTone = false
+// Automatically convert "ưo" -> "ươ" when typing 'o' after 'ư'
+%flag uoHorn = false
+// Automatically expand initial "ng" -> "ngh" before front vowels ('i', 'e')
+%flag ngToNgh = false
+// Automatically contract initial "ngh" -> "ng" before back vowels ('a', 'o', 'u')
+%flag nghToNg = false
+
+/* 1. Character Classes & Triggers */
+// Any ASCII Latin letter (a-z); used to detect syllable continuation (e.g. "huơ" + 'n' -> "hươn")
+LETTER          [a-z]
+// VIQR tone-mark trigger keys: ' (sắc), ` (huyền), ? (hỏi), ~ (ngã), . (nặng)
+TONE_KEY        ['`?~.]
+// VIQR horn trigger keys ('+' or '*') for converting o -> ơ and u -> ư
+HORN_KEY        [\+\*]
+// VIQR tone-removal trigger keys ('0' or 'z') on the immediately preceding toned vowel
+REMOVE_TONE_KEY [0z]
+
+/* 2. Bijective 1D Vowel Modifier Maps (auto-invertible via {!MAP}) */
+// VIQR '^' circumflex map: adds circumflex to 'a', 'e', or 'o' (a -> â, e -> ê, o -> ô)
+%map CIRC {
+    a:â, á:ấ, à:ầ, ả:ẩ, ã:ẫ, ạ:ậ,
+    e:ê, é:ế, è:ề, ẻ:ể, ẽ:ễ, ẹ:ệ,
+    o:ô, ó:ố, ò:ồ, ỏ:ổ, õ:ỗ, ọ:ộ
+}
+
+// VIQR '(' breve map: adds breve to 'a' (a -> ă) while preserving any existing tone mark
+%map BREVE {
+    a:ă, á:ắ, à:ằ, ả:ẳ, ã:ẵ, ạ:ặ
+}
+
+// Adds a horn to 'o' (o -> ơ) while preserving any existing tone mark
+%map HORN_O {
+    o:ơ, ó:ớ, ò:ờ, ỏ:ở, õ:ỡ, ọ:ợ
+}
+
+// Adds a horn to 'u' (u -> ư) while preserving any existing tone mark
+%map HORN_U {
+    u:ư, ú:ứ, ù:ừ, ủ:ử, ũ:ữ, ụ:ự
+}
+
+// VIQR '+'/'*' horn map: adds horn to 'o' or 'u' (o -> ơ, u -> ư) while preserving any existing tone mark
+%map HORN {
+    o:ơ, ó:ớ, ò:ờ, ỏ:ở, õ:ỡ, ọ:ợ,
+    u:ư, ú:ứ, ù:ừ, ủ:ử, ũ:ữ, ụ:ự
+}
+
+/* 3. Key-Parameterized 2D Tone Map ('=sắc, `=huyền, ?=hỏi, ~=ngã, .=nặng) */
+// Maps any vowel family (toned or untoned) + VIQR tone key (', `, ?, ~, .) to its toned vowel
+%map TONE(', `, ?, ~, .) {
+    [aáàảãạ] : á à ả ã ạ
+    [ăắằẳẵặ] : ắ ằ ẳ ẵ ặ
+    [âấầẩẫậ] : ấ ầ ẩ ẫ ậ
+    [eéèẻẽẹ] : é è ẻ ẽ ẹ
+    [êếềểễệ] : ế ề ể ễ ệ
+    [iíìỉĩị] : í ì ỉ ĩ ị
+    [oóòỏõọ] : ó ò ỏ õ ọ
+    [ôốồổỗộ] : ố ồ ổ ỗ ộ
+    [ơớờởỡợ] : ớ ờ ở ỡ ợ
+    [uúùủũụ] : ú ù ủ ũ ụ
+    [ưứừửữự] : ứ ừ ử ữ ự
+    [yýỳỷỹỵ] : ý ỳ ỷ ỹ ỵ
+}
+
+/* 4. Syllable & Vowel Structure Macros */
+// Any Vietnamese vowel (all 12 base vowels across all 6 tones = 72 vowel code points)
+V_ANY           [aăâeêioôơuưyáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]
+// Optional Vietnamese initial consonant cluster (onset) at the start of a syllable
+ONSET           (ngh|ch|gh|gi|kh|ng|nh|ph|qu|th|tr|[bcdđghklmnprstvx])?
+// Mandatory 'h'-ending onset (h, th, kh, ph, nh, ch, gh, ngh; where "uo" + '+'/'*' becomes "uơ" as in "thuở", "huơ")
+ONSET_H         (ngh|ch|gh|kh|nh|ph|th|h)
+
+%%
+/* ============================================================================
+ * SECTION 2: Strict VIQR Rewrite Productions
+ * (All modifiers and tones apply strictly to the vowel at the end of the buffer)
+ * ============================================================================ */
+
+/* 1. Tone Undo (same tone key pressed immediately after toned vowel) & Tone Removal */
+^({ONSET}{V_ANY}*)({!TONE($0)})                 + {TONE_KEY}        --> $1{!TONE($2)}$0
+^({ONSET}{V_ANY}*)({!TONE})                     + {REMOVE_TONE_KEY} --> $1{!TONE($2)}
+
+/* 2. Tone Placement (strictly on the immediately preceding vowel) */
+^({ONSET}{V_ANY}*)({V_ANY})                     + {TONE_KEY}        --> $1{TONE($2, $0)}
+
+/* 3. Consonant 'đ' + Undo (strictly right after initial 'd' / 'đ') & Orthographic Autocorrection */
+^đ                                              + d                 --> d$0
+^d                                              + d                 --> đ
+?ngToNgh ^ng                                    + [ie]              --> ngh$0
+?nghToNg ^ngh                                   + [aou]             --> ng$0
+?uoHorn ^({ONSET})({!HORN_U})                   + o                 --> $1$2ơ
+
+/* 4. Circumflex '^' (strictly on immediately preceding a, e, o) + Undo */
+^({ONSET}{V_ANY}*)({!CIRC})                     + '^'               --> $1{!CIRC($2)}$0
+^({ONSET}{V_ANY}*)({CIRC})                      + '^'               --> $1{CIRC($2)}
+
+/* 5. Breve '(' (strictly on immediately preceding a) + Undo */
+^({ONSET}{V_ANY}*)({!BREVE})                    + '('               --> $1{!BREVE($2)}$0
+^({ONSET}{V_ANY}*)({BREVE})                     + '('               --> $1{BREVE($2)}
+
+/* 6. Horn '+' or '*' (strictly on immediately preceding o, u, or uo/ưo cluster) + Undo */
+^({ONSET})({!HORN_U})({!HORN_O})                + {HORN_KEY}        --> $1{!HORN_U($2)}{!HORN_O($3)}$0
+^({ONSET_H})(u)({HORN_O})                       + {HORN_KEY}        --> $1$2{HORN_O($3)}
+^({ONSET})({HORN_U})({HORN_O})                  + {HORN_KEY}        --> $1{HORN_U($2)}{HORN_O($3)}
+^({ONSET})({!HORN_U})({HORN_O})                 + {HORN_KEY}        --> $1$2{HORN_O($3)}
+^({ONSET}{V_ANY}*)({!HORN})                     + {HORN_KEY}        --> $1{!HORN($2)}$0
+^({ONSET}{V_ANY}*)({HORN})                      + {HORN_KEY}        --> $1{HORN($2)}
+
+/* 7. Deferred 'huơ' + Letter Closure ("huơ" + 'n' -> "hươn"; ignores "thuở" & spaces) */
+^hu({!HORN_O})                                  + {LETTER}          --> hư$1$0
+
+%%
+/* ============================================================================
+ * SECTION 3: Inline Self-Verification Vectors
+ * ============================================================================ */
+
+/* 1. Strict Tone Placement Immediately After Vowel */
+"a"       + '\'' --> "á"
+"a"       + '`'  --> "à"
+"a"       + '?'  --> "ả"
+"a"       + '~'  --> "ã"
+"a"       + '.'  --> "ạ"
+"co"      + '\'' --> "có"
+"me"      + '`'  --> "mè"
+"ho"      + '`'  --> "hò"
+"hoa"     + '`'  --> "hoà"
+"to"      + '\'' --> "tó"
+
+/* 2. Strict Rejection When Consonant Already Follows Vowel */
+"con"     + '\'' --> "con'"
+"ban"     + '`'  --> "ban`"
+"cat"     + '?'  --> "cat?"
+"anh"     + '~'  --> "anh~"
+"hoc"     + '.'  --> "hoc."
+"can"     + '^'  --> "can^"
+"can"     + '('  --> "can("
+"con"     + '+'  --> "con+"
+"con"     + '*'  --> "con*"
+"dan"     + 'd'  --> "dand"
+
+/* 3. Strict Vowel Modifiers ('^', '(', '+', '*') Immediately After Target Vowel */
+"a"       + '^'  --> "â"
+"e"       + '^'  --> "ê"
+"o"       + '^'  --> "ô"
+"A"       + '^'  --> "Â"
+"E"       + '^'  --> "Ê"
+"O"       + '^'  --> "Ô"
+"a"       + '('  --> "ă"
+"A"       + '('  --> "Ă"
+"o"       + '+'  --> "ơ"
+"u"       + '+'  --> "ư"
+"o"       + '*'  --> "ơ"
+"u"       + '*'  --> "ư"
+"O"       + '+'  --> "Ơ"
+"U"       + '*'  --> "Ư"
+"tưo"     + '+'  --> "tươ"
+"tuo"     + '+'  --> "tươ"
+"huo"     + '+'  --> "huơ"
+"quo"     + '+'  --> "quơ"
+
+/* 4. Chaining Modifier + Tone Immediately on the Same Vowel */
+"a"       + '^'  --> "â"
+"â"       + '\'' --> "ấ"
+"ă"       + '\'' --> "ắ"
+"ê"       + '.'  --> "ệ"
+"ô"       + '`'  --> "ồ"
+"ơ"       + '?'  --> "ở"
+"ư"       + '~'  --> "ữ"
+"viê"     + '.'  --> "việ"
+"tiê"     + '\'' --> "tiế"
+"ươ"      + '\'' --> "ướ"
+
+/* 5. Consonant 'đ' & Undo */
+"d"       + 'd'  --> "đ"
+"D"       + 'd'  --> "Đ"
+"D"       + 'D'  --> "Đ"
+"đ"       + 'd'  --> "dd"
+"Đ"       + 'd'  --> "Dd"
+"Đ"       + 'D'  --> "DD"
+
+/* 6. Undo & Tone Deletion */
+"á"       + '\'' --> "a'"
+"Á"       + '\'' --> "A'"
+"â"       + '^'  --> "a^"
+"Â"       + '^'  --> "A^"
+"ă"       + '('  --> "a("
+"ơ"       + '+'  --> "o+"
+"ư"       + '*'  --> "u*"
+"tươ"     + '+'  --> "tuo+"
+"á"       + '0'  --> "a"
+"ế"       + '0'  --> "ê"
+"ở"       + 'z'  --> "ơ"
+
+/* 7. Autocorrection Flags (?uoHorn, ?ngToNgh, ?nghToNg) & Deferred 'huơ' Closure */
+"huơ"     + 'n'  --> "hươn"
+"ư"       + 'o'  --> "ưo"
+"tư"      + 'o'  --> "tưo"
+?uoHorn "ư"       + 'o'  --> "ươ"
+?uoHorn "Ư"       + 'O'  --> "ƯƠ"
+?uoHorn "tư"      + 'o'  --> "tươ"
+?uoHorn "TƯ"      + 'O'  --> "TƯƠ"
+?uoHorn "như"     + 'o'  --> "nhươ"
+?uoHorn "ngư"     + 'o'  --> "ngươ"
+"ng"      + 'i'  --> "ngi"
+"ng"      + 'e'  --> "nge"
+?ngToNgh "ng"      + 'i'  --> "nghi"
+?ngToNgh "NG"      + 'I'  --> "NGHI"
+?ngToNgh "Ng"      + 'i'  --> "Nghi"
+?ngToNgh "ng"      + 'e'  --> "nghe"
+?ngToNgh "NG"      + 'E'  --> "NGHE"
+?ngToNgh "Ng"      + 'e'  --> "Nghe"
+?ngToNgh "ang"     + 'i'  --> "angi"
+?ngToNgh "ang"     + 'e'  --> "ange"
+"ngh"     + 'a'  --> "ngha"
+"ngh"     + 'o'  --> "ngho"
+"ngh"     + 'u'  --> "nghu"
+?nghToNg "ngh"     + 'a'  --> "nga"
+?nghToNg "ngh"     + 'o'  --> "ngo"
+?nghToNg "ngh"     + 'u'  --> "ngu"
+?nghToNg "NGH"     + 'A'  --> "NGA"
+?nghToNg "NGH"     + 'O'  --> "NGO"
+?nghToNg "NGH"     + 'U'  --> "NGU"
+?nghToNg "Ngh"     + 'a'  --> "Nga"
+?nghToNg "Ngh"     + 'o'  --> "Ngo"
+?nghToNg "Ngh"     + 'u'  --> "Ngu"

@@ -1,0 +1,365 @@
+// Copyright (C) 2026 lnson
+// SPDX-License-Identifier: GPL-3.0-only
+
+/* ============================================================================
+ * Vietnamese VNI (New Style) — Lex/Yacc Automaton Specification
+ *
+ * Key Mappings:
+ *   Vowel & Consonant Modifiers:
+ *     6 : Circumflex (a -> â, e -> ê, o -> ô)
+ *     7 : Horn       (o -> ơ, u -> ư, uo/ưo -> ươ)
+ *     8 : Breve      (a -> ă)
+ *     9 : Stroke     (initial d -> đ)
+ *   Tone Marks:
+ *     1 : Sắc        (acute)
+ *     2 : Huyền      (grave)
+ *     3 : Hỏi        (hook above)
+ *     4 : Ngã        (tilde)
+ *     5 : Nặng       (dot below)
+ *     0 : Remove tone
+ * ============================================================================ */
+%name "Vietnamese VNI"
+
+/* Runtime flags (toggleable per automaton instance) */
+// Place tone marks on the second vowel in open "oa", "oe", "uy" syllables (oà, oé, uý)
+%flag modernTone = false
+// Automatically convert "ưo" -> "ươ" when typing 'o' after 'ư'
+%flag uoHorn = false
+// Automatically expand initial "ng" -> "ngh" before front vowels ('i', 'e')
+%flag ngToNgh = false
+// Automatically contract initial "ngh" -> "ng" before back vowels ('a', 'o', 'u')
+%flag nghToNg = false
+
+/* 1. Character Classes & Phonological Macros */
+// Any ASCII Latin letter (a-z); used to detect syllable continuation (e.g. "huơ" + 'n' -> "hươn")
+LETTER          [a-z]
+// VNI tone-mark trigger keys: 1 (sắc), 2 (huyền), 3 (hỏi), 4 (ngã), 5 (nặng)
+TONE_KEY        [12345]
+
+/* 2. Bijective 1D Vowel Modifier Maps (auto-invertible via {!MAP}) */
+// Adds a circumflex to 'a' (a -> â) while preserving any existing tone mark
+%map CIRC_A {
+    a:â, á:ấ, à:ầ, ả:ẩ, ã:ẫ, ạ:ậ
+}
+
+// Adds a circumflex to 'e' (e -> ê) while preserving any existing tone mark
+%map CIRC_E {
+    e:ê, é:ế, è:ề, ẻ:ể, ẽ:ễ, ẹ:ệ
+}
+
+// Adds a circumflex to 'o' (o -> ô) while preserving any existing tone mark
+%map CIRC_O {
+    o:ô, ó:ố, ò:ồ, ỏ:ổ, õ:ỗ, ọ:ộ
+}
+
+// VNI '6' circumflex map: adds circumflex to 'a', 'e', or 'o' (a -> â, e -> ê, o -> ô)
+%map CIRC {
+    a:â, á:ấ, à:ầ, ả:ẩ, ã:ẫ, ạ:ậ,
+    e:ê, é:ế, è:ề, ẻ:ể, ẽ:ễ, ẹ:ệ,
+    o:ô, ó:ố, ò:ồ, ỏ:ổ, õ:ỗ, ọ:ộ
+}
+
+// VNI '8' breve map: adds breve to 'a' (a -> ă) while preserving any existing tone mark
+%map BREVE {
+    a:ă, á:ắ, à:ằ, ả:ẳ, ã:ẵ, ạ:ặ
+}
+
+// Adds a horn to 'o' (o -> ơ) while preserving any existing tone mark
+%map HORN_O {
+    o:ơ, ó:ớ, ò:ờ, ỏ:ở, õ:ỡ, ọ:ợ
+}
+
+// Adds a horn to 'u' (u -> ư) while preserving any existing tone mark
+%map HORN_U {
+    u:ư, ú:ứ, ù:ừ, ủ:ử, ũ:ữ, ụ:ự
+}
+
+// VNI '7' horn map: adds horn to 'o' or 'u' (o -> ơ, u -> ư) while preserving any existing tone mark
+%map HORN {
+    o:ơ, ó:ớ, ò:ờ, ỏ:ở, õ:ỡ, ọ:ợ,
+    u:ư, ú:ứ, ù:ừ, ủ:ử, ũ:ữ, ụ:ự
+}
+
+// 1D tone transfer maps for reflowing traditional "òa"/"óe"/"úy" when closed by a coda/glide
+%map TONE_SAC   { a:á, e:é, y:ý }
+%map TONE_HUYEN { a:à, e:è, y:ỳ }
+%map TONE_HOI   { a:ả, e:ẻ, y:ỷ }
+%map TONE_NGA   { a:ã, e:ẽ, y:ỹ }
+%map TONE_NANG  { a:ạ, e:ẹ, y:ỵ }
+
+/* 3. Key-Parameterized 2D Tone Map (1=sắc, 2=huyền, 3=hỏi, 4=ngã, 5=nặng) */
+// Maps any vowel family (toned or untoned) + VNI tone key (1..5) to its toned vowel
+%map TONE(1, 2, 3, 4, 5) {
+    [aáàảãạ] : á à ả ã ạ
+    [ăắằẳẵặ] : ắ ằ ẳ ẵ ặ
+    [âấầẩẫậ] : ấ ầ ẩ ẫ ậ
+    [eéèẻẽẹ] : é è ẻ ẽ ẹ
+    [êếềểễệ] : ế ề ể ễ ệ
+    [iíìỉĩị] : í ì ỉ ĩ ị
+    [oóòỏõọ] : ó ò ỏ õ ọ
+    [ôốồổỗộ] : ố ồ ổ ỗ ộ
+    [ơớờởỡợ] : ớ ờ ở ỡ ợ
+    [uúùủũụ] : ú ù ủ ũ ụ
+    [ưứừửữự] : ứ ừ ử ữ ự
+    [yýỳỷỹỵ] : ý ỳ ỷ ỹ ỵ
+}
+
+/* 4. Syllable, Onset & Coda Structure Macros */
+// Any Vietnamese vowel (all 12 base vowels across all 6 tones = 72 vowel code points)
+V_ANY           [aăâeêioôơuưyáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]
+// Any Vietnamese vowel except the 'i' family (used to prevent "g" + "i..." from misparsing "gi" onset)
+V_NO_I          [aăâeêoôơuưyáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]
+// The 'i' vowel family (plain 'i' and its 5 toned forms)
+I_ANY           [iíìỉĩị]
+// The 'e' and 'ê' vowel families (toned or untoned; e.g. for "uyê"/"uye" triphthongs)
+E_ANY           [eêéèẻẽẹếềểễệ]
+// Unmodified 'o' family (plain 'o' with or without tone, excluding 'ô' and 'ơ'; used in "oa", "oe")
+O_PLAIN         [oóòỏõọ]
+// Unmodified 'u' family (plain 'u' with or without tone, excluding 'ư'; used in "uy", "uya", "uyê")
+U_PLAIN         [uúùủũụ]
+// The 'y' vowel family (plain 'y' and its 5 toned forms)
+Y_PLAIN         [yýỳỷỹỵ]
+// Unmodified 'a' or 'e' family (with or without tone; used for new-style "oa"/"oe" tone placement)
+AE_PLAIN        [aeáàảãạéèẻẽẹ]
+
+/* Prioritized diacritic nuclei (ê, ô, ơ, â, ă and toned variants) */
+// Vowels carrying a quality diacritic (ă, â, ê, ô, ơ); takes tone priority in 2-vowel clusters
+V_MOD           [ăâêôơắằẳẵặấầẩẫậếềểễệốồổỗộớờởỡợ]
+
+/* Remaining-vowel classes within the vowel cluster */
+// Any vowel outside the 'a'/'ă'/'â' families (used in VNI '8' breve rules to match non-'a' vowels around target 'a')
+V_NO_A_FAM      [eêioôơuưyéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]
+// Any vowel without a circumflex (excludes â, ê, ô; ensures VNI '6' applies or undoes at most one circumflex)
+V_NO_CIRC       [aăeioơuưyáàảãạắằẳẵặéèẻẽẹíìỉĩịóòỏõọớờởỡợúùủũụứừửữựýỳỷỹỵ]
+// Vowels that cannot take a circumflex (i, u, ư, y; allowed before the target a/e/o in VNI '6' rules)
+V_NO_CIRC_ALL   [iuưyíìỉĩịúùủũụứừửữựýỳỷỹỵ]
+// Vowels unaffected by horn/breve (excludes a/ă, o/ơ, u/ư; allowed before the target o/u in VNI '7' horn rules)
+V_NO_MOD_W_ALL  [âeêiôyấầẩẫậéèẻẽẹếềểễệíìỉĩịốồổỗộýỳỷỹỵ]
+// Vowels without horn or breve (excludes ă, ơ, ư; ensures VNI '7'/'8' targets or undoes at most one horn/breve vowel)
+V_NO_HORN_BREVE [aâeêioôuyáàảãạấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộúùủũụýỳỷỹỵ]
+
+/* Allowed Vietnamese initial consonant onsets (or empty onset at word start):
+ * b, c, d, đ, g, h, k, l, m, n, p, r, s, t, v, x, qu, ch, gh, gi, kh, ng, nh, ph, th, tr, ngh */
+// Optional Vietnamese initial consonant cluster (onset) at the start of a syllable
+ONSET           (ngh|ch|gh|gi|kh|ng|nh|ph|qu|th|tr|[bcdđghklmnprstvx])?
+// Optional onset excluding bare 'g' (forces "gi" + vowel to parse "gi" as the onset rather than 'g' + 'i' vowel)
+ONSET_NO_G      (ngh|ch|gh|gi|kh|ng|nh|ph|qu|th|tr|[bcdđhklmnprstvx])?
+// Mandatory 'h'-ending onset (h, th, kh, ph, nh, ch, gh, ngh; where "uo" + '7' becomes "uơ" as in "thuở", "huơ")
+ONSET_H         (ngh|ch|gh|kh|nh|ph|th|h)
+
+/* Allowed Vietnamese final consonant codas (or empty coda at word end):
+ * p, t, c, ch, m, n, ng, nh */
+// Required Vietnamese final consonant cluster (closed-syllable coda: ch, ng, nh, c, m, n, p, t)
+CODA_REQ        (ch|ng|nh|[cmnpt])
+// Optional Vietnamese final consonant cluster (matches both open syllables and closed syllables ending in CODA_REQ)
+CODA            (ch|ng|nh|[cmnpt])?
+
+%%
+/* ============================================================================
+ * SECTION 2: Rewrite Productions (Pattern + Input --> Replacement)
+ * ============================================================================ */
+
+/* 1. Tone Undo (same tone key pressed again) & '0' Tone Deletion */
+^({ONSET}{V_ANY}*)({!TONE($0)})({V_ANY}*{CODA})                 + {TONE_KEY} --> $1{!TONE($2)}$3$0
+^({ONSET}{V_ANY}*)({!TONE})({V_ANY}*{CODA})                     + 0          --> $1{!TONE($2)}$3
+
+/* 2. Consonant 'đ' ('9') + Undo & Orthographic Autocorrection */
+^đ({V_ANY}*{CODA})                                              + 9          --> d$1$0
+^d({V_ANY}*{CODA})                                              + 9          --> đ$1
+?ngToNgh ^ng                                                    + [ie]       --> ngh$0
+?nghToNg ^ngh                                                   + [aou]      --> ng$0
+?uoHorn ^({ONSET})({!HORN_U})                                   + o          --> $1$2ơ
+
+/* 3. Circumflex '6' ('a' -> 'â', 'e' -> 'ê', 'o' -> 'ô') + Undo */
+^({ONSET}{V_NO_CIRC}*)({!CIRC})({V_NO_CIRC}*{CODA})             + 6          --> $1{!CIRC($2)}$3$0
+^({ONSET}{O_PLAIN})({CIRC_E})({CODA})                           + 6          --> $1{CIRC_E($2)}$3
+^({ONSET}{O_PLAIN})({CIRC_A})({CODA})                           + 6          --> $1{CIRC_A($2)}$3
+^({ONSET}{V_NO_CIRC_ALL}*)({CIRC})({V_NO_CIRC}*{CODA})          + 6          --> $1{CIRC($2)}$3
+
+/* 4. Horn '7' ('o' -> 'ơ', 'u' -> 'ư', 'uo/ưo' -> 'ươ'): Diphthong Undo, Open -huo, Diphthongs, Single + Undo */
+^({ONSET})({!HORN_U})({!HORN_O})({V_ANY}*{CODA})                + 7          --> $1{!HORN_U($2)}{!HORN_O($3)}$4$0
+^({ONSET_H})(u)({HORN_O})                                       + 7          --> $1$2{HORN_O($3)}
+^({ONSET})({HORN_U})({HORN_O})({V_NO_HORN_BREVE}*{CODA})        + 7          --> $1{HORN_U($2)}{HORN_O($3)}$4
+^({ONSET})({!HORN_U})({HORN_O})({V_NO_HORN_BREVE}*{CODA})       + 7          --> $1$2{HORN_O($3)}$4
+^({ONSET}{V_NO_HORN_BREVE}*)({!HORN})({V_NO_HORN_BREVE}*{CODA}) + 7          --> $1{!HORN($2)}$3$0
+^({ONSET}{V_NO_MOD_W_ALL}*)({HORN})({V_NO_HORN_BREVE}*{CODA})   + 7          --> $1{HORN($2)}$3
+
+/* 5. Breve '8' ('a' -> 'ă') + Undo */
+^({ONSET}{O_PLAIN})({BREVE})({CODA})                            + 8          --> $1{BREVE($2)}$3
+^({ONSET}{V_NO_HORN_BREVE}*)({!BREVE})({V_NO_HORN_BREVE}*{CODA}) + 8         --> $1{!BREVE($2)}$3$0
+^({ONSET}{V_NO_A_FAM}*)({BREVE})({V_NO_A_FAM}*{CODA})           + 8          --> $1{BREVE($2)}$3
+
+/* 6. Tone Placement — Triphthongs (3 vowels) */
+^({ONSET})({U_PLAIN})({Y_PLAIN})({E_ANY})({CODA})               + {TONE_KEY} --> $1{!TONE($2)}{!TONE($3)}{TONE($4, $0)}$5
+^({ONSET})({V_NO_I})({V_ANY})({V_ANY})({CODA})                  + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}{!TONE($4)}$5
+^({ONSET_NO_G})({I_ANY})({V_ANY})({V_ANY})({CODA})              + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}{!TONE($4)}$5
+
+/* 7. Tone Placement — Closed 2-Vowel Syllables */
+^({ONSET})({V_NO_I})({V_MOD})({CODA_REQ})                       + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}$4
+^({ONSET_NO_G})({I_ANY})({V_MOD})({CODA_REQ})                   + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}$4
+^({ONSET})({V_MOD})({V_ANY})({CODA_REQ})                        + {TONE_KEY} --> $1{TONE($2, $0)}{!TONE($3)}$4
+^({ONSET})({V_NO_I})({V_ANY})({CODA_REQ})                       + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}$4
+^({ONSET_NO_G})({I_ANY})({V_ANY})({CODA_REQ})                   + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}$4
+
+/* 8. Tone Placement — Open 2-Vowel Syllables */
+^({ONSET})({V_MOD})({V_ANY})                                    + {TONE_KEY} --> $1{TONE($2, $0)}{!TONE($3)}
+^({ONSET})({V_NO_I})({V_MOD})                                   + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}
+^({ONSET_NO_G})({I_ANY})({V_MOD})                               + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}
+?modernTone ^({ONSET})({O_PLAIN})({AE_PLAIN})                   + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}
+?modernTone ^({ONSET})({U_PLAIN})({Y_PLAIN})                    + {TONE_KEY} --> $1{!TONE($2)}{TONE($3, $0)}
+^({ONSET})({V_NO_I})({V_ANY})                                   + {TONE_KEY} --> $1{TONE($2, $0)}{!TONE($3)}
+^({ONSET_NO_G})({I_ANY})({V_ANY})                               + {TONE_KEY} --> $1{TONE($2, $0)}{!TONE($3)}
+
+/* 9. Tone Placement — Single-Vowel Syllables */
+^({ONSET})({V_ANY})({CODA})                                     + {TONE_KEY} --> $1{TONE($2, $0)}$3
+
+/* 10. Deferred 'huơ' & Traditional "òa"/"óe"/"úy" Coda/Glide Reflow */
+^hu({!HORN_O})                                                  + {LETTER}   --> hư$1$0
+^({ONSET})(ó)([ae])                                             + [cmnptiy]  --> $1{!TONE($2)}{TONE_SAC($3)}$0
+^({ONSET})(ò)([ae])                                             + [cmnptiy]  --> $1{!TONE($2)}{TONE_HUYEN($3)}$0
+^({ONSET})(ỏ)([ae])                                             + [cmnptiy]  --> $1{!TONE($2)}{TONE_HOI($3)}$0
+^({ONSET})(õ)([ae])                                             + [cmnptiy]  --> $1{!TONE($2)}{TONE_NGA($3)}$0
+^({ONSET})(ọ)([ae])                                             + [cmnptiy]  --> $1{!TONE($2)}{TONE_NANG($3)}$0
+^({ONSET})(ú)(y)                                                + [cmnpt]    --> $1{!TONE($2)}{TONE_SAC($3)}$0
+^({ONSET})(ù)(y)                                                + [cmnpt]    --> $1{!TONE($2)}{TONE_HUYEN($3)}$0
+^({ONSET})(ủ)(y)                                                + [cmnpt]    --> $1{!TONE($2)}{TONE_HOI($3)}$0
+^({ONSET})(ũ)(y)                                                + [cmnpt]    --> $1{!TONE($2)}{TONE_NGA($3)}$0
+^({ONSET})(ụ)(y)                                                + [cmnpt]    --> $1{!TONE($2)}{TONE_NANG($3)}$0
+
+%%
+/* ============================================================================
+ * SECTION 3: Inline Self-Verification Vectors
+ * ============================================================================ */
+
+/* 1. Basic Tones (1..5) & Tone Placement */
+"a"       + '1' --> "á"
+"a"       + '2' --> "à"
+"a"       + '3' --> "ả"
+"a"       + '4' --> "ã"
+"a"       + '5' --> "ạ"
+"co"      + '1' --> "có"
+"meo"     + '2' --> "mèo"
+"hoa"     + '2' --> "hòa"
+"khoe"    + '3' --> "khỏe"
+"thuy"    + '1' --> "thúy"
+?modernTone "hoa"     + '2' --> "hoà"
+?modernTone "khoe"    + '3' --> "khoẻ"
+?modernTone "thuy"    + '1' --> "thuý"
+"hòa"     + 'n' --> "hoàn"
+"khóe"    + 't' --> "khoét"
+"túy"     + 't' --> "tuýt"
+"xòa"     + 'i' --> "xoài"
+"gia"     + '2' --> "già"
+"giau"    + '2' --> "giàu"
+"qua"     + '1' --> "quá"
+"quy"     + '1' --> "quý"
+?modernTone "qua"     + '1' --> "quá"
+?modernTone "quy"     + '1' --> "quý"
+"qui"     + '1' --> "quí"
+"khuyên"  + '1' --> "khuyến"
+"tiêp"    + '1' --> "tiếp"
+"viêt"    + '5' --> "việt"
+"hươc"    + '1' --> "hước"
+"hoach"   + '5' --> "hoạch"
+"tiêng"   + '1' --> "tiếng"
+"bênh"    + '5' --> "bệnh"
+
+/* 2. Circumflex '6' (a -> â, e -> ê, o -> ô) & Undo */
+"a"       + '6' --> "â"
+"e"       + '6' --> "ê"
+"o"       + '6' --> "ô"
+"A"       + '6' --> "Â"
+"E"       + '6' --> "Ê"
+"O"       + '6' --> "Ô"
+"san"     + '6' --> "sân"
+"sen"     + '6' --> "sên"
+"song"    + '6' --> "sông"
+"cau"     + '6' --> "câu"
+"tuan"    + '6' --> "tuân"
+"buon"    + '6' --> "buôn"
+"nghieng" + '6' --> "nghiêng"
+"â"       + '6' --> "a6"
+"Â"       + '6' --> "A6"
+"sông"    + '6' --> "song6"
+
+/* 3. Horn '7' (o -> ơ, u -> ư, uo/ưo -> ươ) & Undo */
+"o"       + '7' --> "ơ"
+"u"       + '7' --> "ư"
+"O"       + '7' --> "Ơ"
+"U"       + '7' --> "Ư"
+"pho"     + '7' --> "phơ"
+"huo"     + '7' --> "huơ"
+"thuo"    + '7' --> "thuơ"
+"huong"   + '7' --> "hương"
+"suong"   + '7' --> "sương"
+"truong"  + '7' --> "trương"
+"giuong"  + '7' --> "giương"
+"giương"  + '2' --> "giường"
+"ưo"      + '7' --> "ươ"
+"ƯO"      + '7' --> "ƯƠ"
+"tưo"     + '7' --> "tươ"
+"tưong"   + '7' --> "tương"
+"ngưoi"   + '7' --> "ngươi"
+"ưoc"     + '7' --> "ươc"
+"quo"     + '7' --> "quơ"
+"QUO"     + '7' --> "QUƠ"
+"huơ"     + 'n' --> "hươn"
+"HƯƠNG"   + '7' --> "HUONG7"
+"ơ"       + '7' --> "o7"
+"ư"       + '7' --> "u7"
+
+/* 4. Breve '8' (a -> ă) & Undo */
+"a"       + '8' --> "ă"
+"A"       + '8' --> "Ă"
+"an"      + '8' --> "ăn"
+"ngoan"   + '8' --> "ngoăn"
+"ă"       + '8' --> "a8"
+"ngoăn"   + '8' --> "ngoan8"
+
+/* 5. Consonant 'đ' ('9') & Undo */
+"d"       + '9' --> "đ"
+"D"       + '9' --> "Đ"
+"da"      + '9' --> "đa"
+"dan"     + '9' --> "đan"
+"đ"       + '9' --> "d9"
+"Đ"       + '9' --> "D9"
+"đan"     + '9' --> "dan9"
+
+/* 6. Tone Undo & '0' Tone Deletion */
+"có"      + '1' --> "co1"
+"CÓ"      + '1' --> "CO1"
+"thế"     + '0' --> "thê"
+"THẾ"     + '0' --> "THÊ"
+"gì"      + '0' --> "gi"
+
+/* 7. Autocorrection Flags (?uoHorn, ?ngToNgh, ?nghToNg) */
+"ư"       + 'o' --> "ưo"
+"tư"      + 'o' --> "tưo"
+?uoHorn "ư"       + 'o' --> "ươ"
+?uoHorn "Ư"       + 'O' --> "ƯƠ"
+?uoHorn "tư"      + 'o' --> "tươ"
+?uoHorn "TƯ"      + 'O' --> "TƯƠ"
+?uoHorn "như"     + 'o' --> "nhươ"
+?uoHorn "ngư"     + 'o' --> "ngươ"
+"ng"      + 'i' --> "ngi"
+"ng"      + 'e' --> "nge"
+?ngToNgh "ng"      + 'i' --> "nghi"
+?ngToNgh "NG"      + 'I' --> "NGHI"
+?ngToNgh "Ng"      + 'i' --> "Nghi"
+?ngToNgh "ng"      + 'e' --> "nghe"
+?ngToNgh "NG"      + 'E' --> "NGHE"
+?ngToNgh "Ng"      + 'e' --> "Nghe"
+?ngToNgh "ang"     + 'i' --> "angi"
+?ngToNgh "ang"     + 'e' --> "ange"
+"ngh"     + 'a' --> "ngha"
+"ngh"     + 'o' --> "ngho"
+"ngh"     + 'u' --> "nghu"
+?nghToNg "ngh"     + 'a' --> "nga"
+?nghToNg "ngh"     + 'o' --> "ngo"
+?nghToNg "ngh"     + 'u' --> "ngu"
+?nghToNg "NGH"     + 'A' --> "NGA"
+?nghToNg "NGH"     + 'O' --> "NGO"
+?nghToNg "NGH"     + 'U' --> "NGU"
+?nghToNg "Ngh"     + 'a' --> "Nga"
+?nghToNg "Ngh"     + 'o' --> "Ngo"
+?nghToNg "Ngh"     + 'u' --> "Ngu"

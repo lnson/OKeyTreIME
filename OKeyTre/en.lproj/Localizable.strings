@@ -1,0 +1,52 @@
+/* Menu Bar */
+"menu.accessibility_missing.title" = "⚠️ Accessibility Permission Missing";
+"menu.accessibility_missing.subtitle" = "Accessibility permission is required for the input method to work";
+"menu.input_source_warning.title" = "⚠️ Keyboard: %@";
+"menu.input_source_warning.subtitle" = "Recommended: English (U.S.) keyboard";
+"menu.input_style" = "Input Method";
+"menu.launch_at_login" = "Launch at Login";
+"menu.language" = "Language";
+"menu.settings" = "Settings...";
+"menu.quit" = "Quit";
+
+/* Shared Actions */
+"action.open_settings_now" = "Open Settings Now";
+"action.switch_to_us" = "Switch to U.S.";
+
+/* Language Options */
+"language.system" = "System Default";
+
+/* Settings Window & Sidebar */
+"app.name" = "ÔKêyTre";
+"settings.window_title" = "ÔKêyTre Settings";
+"settings.sidebar.version" = "Version %@";
+"settings.section.correction" = "Tones & Spelling";
+"settings.section.advanced" = "Advanced";
+
+/* Tone Placement Settings */
+"settings.orthography.header" = "Tone Placement";
+"settings.orthography.modern_tone.title" = "Use modern Vietnamese orthography (\"oà, oé, uý\")";
+"settings.orthography.modern_tone.description" = "Place tone marks on the second vowel in open \"oa\", \"oe\", and \"uy\" syllables (e.g., hoà, khoẻ, thuý instead of hòa, khỏe, thúy).";
+
+/* Auto-Correction Settings */
+"settings.correction.header" = "Spelling & Diphthongs";
+"settings.correction.uo_horn.title" = "Auto-correct \"ưo\" to \"ươ\"";
+"settings.correction.uo_horn.description" = "Automatically convert 'o' right after 'ư' into 'ơ' (e.g., tư + o → tươ, như + o → nhươ).";
+"settings.correction.ng_to_ngh.title" = "Auto-correct \"ng + i/e\" to \"nghi/nghe\"";
+"settings.correction.ng_to_ngh.description" = "Automatically insert 'h' when typing 'i' or 'e' right after initial consonant 'ng' (e.g., ng + i → nghi, ng + e → nghe).";
+"settings.correction.ngh_to_ng.title" = "Auto-correct \"ngh + a/o/u\" to \"nga/ngo/ngu\"";
+"settings.correction.ngh_to_ng.description" = "Automatically drop 'h' when typing 'a', 'o', or 'u' right after initial consonant 'ngh' (e.g., ngh + a → nga, ngh + o → ngo, ngh + u → ngu).";
+
+/* Advanced Settings */
+"settings.advanced.header" = "Keystroke Buffer";
+"settings.advanced.buffer_size.title" = "Character buffer size";
+"settings.advanced.buffer_size.description" = "Maximum number of characters retained in the buffer to support backspacing into previous words in apps that don't expose text around the caret (such as Terminal).";
+
+/* Alerts & System Input Sources */
+"input_source.unknown" = "Unknown";
+"alert.accessibility_granted.title" = "Activated Successfully!";
+"alert.accessibility_granted.message" = "The input method is ready!";
+"alert.non_english_keyboard.title" = "Non-English System Keyboard";
+"alert.non_english_keyboard.message" = "The current keyboard is \"%@\". For ÔKêyTre to work accurately without typing conflicts, you should switch to the U.S. or ABC keyboard.";
+"alert.non_english_keyboard.open_keyboard_settings" = "Open Keyboard Settings";
+"alert.non_english_keyboard.ignore" = "Ignore";

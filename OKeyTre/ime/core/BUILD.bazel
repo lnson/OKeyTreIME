@@ -1,0 +1,107 @@
+# Copyright (C) 2026 lnson
+# SPDX-License-Identifier: GPL-3.0-only
+
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["okeytre-engine.h"])
+
+# 1. Runtime Unicode & PikeVM Header Libraries
+cc_library(
+    name = "unicode_utils",
+    hdrs = ["unicode-utils.h"],
+    includes = ["."],
+    deps = ["@uni_algo"],
+)
+
+cc_test(
+    name = "unicode_utils_test",
+    size = "small",
+    srcs = ["unicode-utils_test.cc"],
+    deps = [
+        ":unicode_utils",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "pike_vm",
+    hdrs = ["pike-vm.h"],
+    includes = ["."],
+)
+
+# 2. Genrules to generate `*.generated.h` from `*.ime` via `//imec:imec`
+genrule(
+    name = "generate_telex_automaton",
+    srcs = ["//OKeyTre/ime/specs:telex.ime"],
+    outs = ["telex-automaton.generated.h"],
+    cmd = "$(location //imec:imec) --input=$(location //OKeyTre/ime/specs:telex.ime) --output=$@ --struct_name=TelexAutomaton",
+    tools = ["//imec:imec"],
+)
+
+genrule(
+    name = "generate_vni_automaton",
+    srcs = ["//OKeyTre/ime/specs:vni.ime"],
+    outs = ["vni-automaton.generated.h"],
+    cmd = "$(location //imec:imec) --input=$(location //OKeyTre/ime/specs:vni.ime) --output=$@ --struct_name=VNIAutomaton",
+    tools = ["//imec:imec"],
+)
+
+genrule(
+    name = "generate_viqr_automaton",
+    srcs = ["//OKeyTre/ime/specs:viqr.ime"],
+    outs = ["viqr-automaton.generated.h"],
+    cmd = "$(location //imec:imec) --input=$(location //OKeyTre/ime/specs:viqr.ime) --output=$@ --struct_name=VIQRAutomaton",
+    tools = ["//imec:imec"],
+)
+
+# 3. Stateful Runtime Buffer & Portable C++ Engine Library (`OKeyTreEngineLib`)
+cc_library(
+    name = "input_method_buffer",
+    srcs = ["input-method-buffer.cc"],
+    hdrs = [
+        "input-method-buffer.h",
+        ":telex-automaton.generated.h",
+        ":viqr-automaton.generated.h",
+        ":vni-automaton.generated.h",
+    ],
+    includes = ["."],
+    deps = [
+        ":pike_vm",
+        ":unicode_utils",
+    ],
+)
+
+cc_test(
+    name = "input_method_buffer_test",
+    size = "small",
+    srcs = ["input-method-buffer_test.cc"],
+    deps = [
+        ":input_method_buffer",
+        ":unicode_utils",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "OKeyTreEngineLib",
+    srcs = ["okeytre-engine.cc"],
+    hdrs = ["okeytre-engine.h"],
+    includes = ["."],
+    deps = [
+        ":input_method_buffer",
+        ":unicode_utils",
+    ],
+)
+
+cc_test(
+    name = "okeytre_engine_test",
+    size = "small",
+    srcs = ["okeytre-engine_test.cc"],
+    deps = [
+        ":OKeyTreEngineLib",
+        ":input_method_buffer",
+        "@googletest//:gtest_main",
+    ],
+)
