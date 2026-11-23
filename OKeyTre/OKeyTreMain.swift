@@ -4,6 +4,7 @@
 import AppKit
 import CoreText
 import Darwin
+import Foundation
 import SwiftUI
 import os
 
@@ -236,8 +237,7 @@ private struct MenuBarMenuContent: View {
         Divider()
 
         Button(appLanguage.localized("menu.settings")) {
-            openWindow(id: "settings")
-            NSApplication.shared.activate(ignoringOtherApps: true)
+            DockIconCoordinator.shared.showSettingsWindow(openWindow: openWindow)
         }
         .keyboardShortcut(",")
 
@@ -250,10 +250,260 @@ private struct MenuBarMenuContent: View {
     }
 }
 
+final class OKeyTreAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        DockIconCoordinator.shared.handleDockReopen()
+        return true
+    }
+}
+
+final class DockIconCoordinator {
+    static let shared = DockIconCoordinator()
+
+    private let currentPolicyProvider: () -> NSApplication.ActivationPolicy
+    private let setPolicyHandler: (NSApplication.ActivationPolicy) -> Void
+    private let isAppHiddenProvider: () -> Bool
+    private let activateAppHandler: () -> Void
+    private let onAccessoryRestored: () -> Void
+
+    private weak var settingsWindow: NSWindow?
+    nonisolated(unsafe) private var windowObserverTokens: [NSObjectProtocol] = []
+    private(set) var isSettingsWindowOpen = false
+    private var isOpeningSettings = false
+    private var openGeneration: UInt64 = 0
+
+    init(
+        currentPolicyProvider: @escaping () -> NSApplication.ActivationPolicy = {
+            NSApplication.shared.activationPolicy()
+        },
+        setPolicyHandler: @escaping (NSApplication.ActivationPolicy) -> Void = { policy in
+            _ = NSApplication.shared.setActivationPolicy(policy)
+        },
+        isAppHiddenProvider: @escaping () -> Bool = {
+            NSApplication.shared.isHidden
+        },
+        activateAppHandler: @escaping () -> Void = {
+            if NSApplication.shared.isHidden {
+                NSApplication.shared.unhide(nil)
+            }
+            NSApplication.shared.activate(ignoringOtherApps: true)
+        },
+        onAccessoryRestored: @escaping () -> Void = {
+            MenuBarStatusView.refreshStatusBarTooltip()
+        }
+    ) {
+        self.currentPolicyProvider = currentPolicyProvider
+        self.setPolicyHandler = setPolicyHandler
+        self.isAppHiddenProvider = isAppHiddenProvider
+        self.activateAppHandler = activateAppHandler
+        self.onAccessoryRestored = onAccessoryRestored
+    }
+
+    deinit {
+        for token in windowObserverTokens {
+            NotificationCenter.default.removeObserver(token)
+        }
+    }
+
+    static func resolvedSettingsOpenState(
+        isVisible: Bool,
+        isMiniaturized: Bool,
+        isAppHidden: Bool,
+        wasOpen: Bool,
+        isOpening: Bool
+    ) -> Bool {
+        if isOpening || isVisible || isMiniaturized {
+            return true
+        }
+        if isAppHidden && wasOpen {
+            return true
+        }
+        return false
+    }
+
+    func showSettingsWindow(openWindow: OpenWindowAction) {
+        showSettingsWindow {
+            openWindow(id: "settings")
+        }
+    }
+
+    func showSettingsWindow(openAction: () -> Void) {
+        openGeneration &+= 1
+        let generation = openGeneration
+        isOpeningSettings = true
+        isSettingsWindowOpen = true
+        applyActivationPolicy(.regular)
+        openAction()
+        bringSettingsWindowToFront()
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.openGeneration == generation else { return }
+            self.isOpeningSettings = false
+            guard self.isSettingsWindowOpen else {
+                self.syncWithWindowState()
+                return
+            }
+            self.bringSettingsWindowToFront()
+            self.syncWithWindowState()
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self,
+                  self.openGeneration == generation,
+                  self.isSettingsWindowOpen,
+                  self.settingsWindow?.isKeyWindow != true else {
+                return
+            }
+            self.bringSettingsWindowToFront()
+        }
+    }
+
+    func handleDockReopen() {
+        guard isSettingsWindowOpen || settingsWindow?.isVisible == true || settingsWindow?.isMiniaturized == true else {
+            return
+        }
+        bringSettingsWindowToFront()
+    }
+
+    func registerSettingsWindow(_ window: NSWindow) {
+        if settingsWindow !== window {
+            removeWindowObservers()
+            settingsWindow = window
+            window.isRestorable = false
+            attachObservers(to: window)
+        }
+        syncWithWindowState()
+        DispatchQueue.main.async { [weak self] in
+            self?.syncWithWindowState()
+        }
+    }
+
+    func noteSettingsWindowPresented() {
+        isSettingsWindowOpen = true
+        applyActivationPolicy(.regular)
+    }
+
+    func noteSettingsWindowWillClose() {
+        openGeneration &+= 1
+        isOpeningSettings = false
+        isSettingsWindowOpen = false
+        DispatchQueue.main.async { [weak self] in
+            self?.syncWithWindowState()
+        }
+    }
+
+    func syncWithWindowState() {
+        let isVisible = settingsWindow?.isVisible ?? false
+        let isMiniaturized = settingsWindow?.isMiniaturized ?? false
+        let isOpen = Self.resolvedSettingsOpenState(
+            isVisible: isVisible,
+            isMiniaturized: isMiniaturized,
+            isAppHidden: isAppHiddenProvider(),
+            wasOpen: isSettingsWindowOpen,
+            isOpening: isOpeningSettings
+        )
+        isSettingsWindowOpen = isOpen
+        applyActivationPolicy(isOpen ? .regular : .accessory)
+    }
+
+    private func bringSettingsWindowToFront() {
+        if let window = settingsWindow, window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        activateAppHandler()
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    private func applyActivationPolicy(_ policy: NSApplication.ActivationPolicy) {
+        guard currentPolicyProvider() != policy else { return }
+        setPolicyHandler(policy)
+        if policy == .accessory {
+            onAccessoryRestored()
+        }
+    }
+
+    private func attachObservers(to window: NSWindow) {
+        let center = NotificationCenter.default
+        let presentedNames: [Notification.Name] = [
+            NSWindow.didBecomeKeyNotification,
+            NSWindow.didBecomeMainNotification,
+            NSWindow.didMiniaturizeNotification,
+            NSWindow.didDeminiaturizeNotification,
+        ]
+        for name in presentedNames {
+            let token = center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.noteSettingsWindowPresented()
+                }
+            }
+            windowObserverTokens.append(token)
+        }
+
+        let occlusionToken = center.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.syncWithWindowState()
+            }
+        }
+        windowObserverTokens.append(occlusionToken)
+
+        let closeToken = center.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.noteSettingsWindowWillClose()
+            }
+        }
+        windowObserverTokens.append(closeToken)
+    }
+
+    private func removeWindowObservers() {
+        for token in windowObserverTokens {
+            NotificationCenter.default.removeObserver(token)
+        }
+        windowObserverTokens.removeAll()
+    }
+}
+
+private struct SettingsWindowObserver: NSViewRepresentable {
+    func makeNSView(context: Context) -> SettingsWindowTrackingView {
+        SettingsWindowTrackingView()
+    }
+
+    func updateNSView(_ nsView: SettingsWindowTrackingView, context: Context) {
+        if let window = nsView.window {
+            DockIconCoordinator.shared.registerSettingsWindow(window)
+        }
+    }
+}
+
+private final class SettingsWindowTrackingView: NSView {
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let window {
+            DockIconCoordinator.shared.registerSettingsWindow(window)
+        }
+    }
+}
+
 @main struct OKeyTreMain: App {
     private static let relaunchPidFlag = "--relaunched-from-pid"
     static let registerAccessibilityFlag = "--register-accessibility"
 
+    @NSApplicationDelegateAdaptor(OKeyTreAppDelegate.self) private var appDelegate
     @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
 
     init() {
@@ -436,6 +686,7 @@ private struct MenuBarMenuContent: View {
 
         Window(appLanguage.localized("settings.window_title"), id: "settings") {
             ContentView()
+                .background(SettingsWindowObserver().frame(width: 0, height: 0))
                 .environment(\.locale, appLanguage.locale)
         }
         .windowResizability(.contentSize)

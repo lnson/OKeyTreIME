@@ -1,6 +1,7 @@
 // Copyright (C) 2026 lnson
 // SPDX-License-Identifier: GPL-3.0-only
 
+import AppKit
 import CoreGraphics
 import Foundation
 import Testing
@@ -390,6 +391,118 @@ struct AppDefaultsTests {
         #expect(!leftAfterReset)
         let rightAfterReset = detector.shouldTriggerToggle(keyCode: KeyCodes.rightCommandKeyCode, flags: .maskCommand)
         #expect(rightAfterReset)
+    }
+
+    @Test("DockIconCoordinator shows Dock icon while Settings is open, minimized, or hidden and hides on close")
+    func dockIconActivationPolicyLifecycle() async throws {
+        // Pure open-state resolution across visible, minimized, hidden, and closed states.
+        #expect(
+            !DockIconCoordinator.resolvedSettingsOpenState(
+                isVisible: false,
+                isMiniaturized: false,
+                isAppHidden: false,
+                wasOpen: false,
+                isOpening: false
+            )
+        )
+        #expect(
+            DockIconCoordinator.resolvedSettingsOpenState(
+                isVisible: true,
+                isMiniaturized: false,
+                isAppHidden: false,
+                wasOpen: false,
+                isOpening: false
+            )
+        )
+        #expect(
+            DockIconCoordinator.resolvedSettingsOpenState(
+                isVisible: false,
+                isMiniaturized: true,
+                isAppHidden: false,
+                wasOpen: false,
+                isOpening: false
+            )
+        )
+        #expect(
+            DockIconCoordinator.resolvedSettingsOpenState(
+                isVisible: false,
+                isMiniaturized: false,
+                isAppHidden: true,
+                wasOpen: true,
+                isOpening: false
+            )
+        )
+        #expect(
+            !DockIconCoordinator.resolvedSettingsOpenState(
+                isVisible: false,
+                isMiniaturized: false,
+                isAppHidden: true,
+                wasOpen: false,
+                isOpening: false
+            )
+        )
+
+        var currentPolicy: NSApplication.ActivationPolicy = .accessory
+        var policyTransitions: [NSApplication.ActivationPolicy] = []
+        var isAppHidden = false
+        var activateCount = 0
+        var tooltipRefreshCount = 0
+
+        let coordinator = DockIconCoordinator(
+            currentPolicyProvider: { currentPolicy },
+            setPolicyHandler: { newPolicy in
+                currentPolicy = newPolicy
+                policyTransitions.append(newPolicy)
+            },
+            isAppHiddenProvider: { isAppHidden },
+            activateAppHandler: { activateCount += 1 },
+            onAccessoryRestored: { tooltipRefreshCount += 1 }
+        )
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: true
+        )
+        window.isReleasedWhenClosed = false
+        coordinator.registerSettingsWindow(window)
+
+        // Initially closed -> stays .accessory.
+        #expect(currentPolicy == .accessory)
+        #expect(!coordinator.isSettingsWindowOpen)
+
+        // Opening Settings switches to .regular and activates the app.
+        coordinator.showSettingsWindow {
+            window.orderFront(nil)
+        }
+        #expect(currentPolicy == .regular)
+        #expect(coordinator.isSettingsWindowOpen)
+        #expect(policyTransitions == [.regular])
+        #expect(activateCount >= 1)
+
+        // Hiding the app (Cmd+H) while Settings is open keeps Dock icon (.regular).
+        isAppHidden = true
+        window.orderOut(nil)
+        coordinator.syncWithWindowState()
+        #expect(currentPolicy == .regular)
+        #expect(coordinator.isSettingsWindowOpen)
+
+        // Clicking Dock icon while open/hidden activates app again.
+        let countBeforeReopen = activateCount
+        coordinator.handleDockReopen()
+        #expect(activateCount == countBeforeReopen + 1)
+
+        // Unhiding and closing the Settings window restores .accessory and refreshes menu bar tooltip.
+        isAppHidden = false
+        window.orderFront(nil)
+        window.close()
+        try await Task.sleep(for: .milliseconds(20))
+
+        #expect(currentPolicy == .accessory)
+        #expect(!coordinator.isSettingsWindowOpen)
+        #expect(policyTransitions == [.regular, .accessory])
+        #expect(tooltipRefreshCount == 1)
     }
 }
 
