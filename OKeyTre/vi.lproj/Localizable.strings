@@ -84,8 +84,8 @@
 "alert.non_english_keyboard.ignore" = "Bỏ qua";
 
 /* First-Time & Feature Update Showcase */
-"showcase.window_title" = "Chào mừng đến với ÔKêyTre";
-"showcase.title" = "Chào mừng đến với ÔKêyTre";
+"showcase.window_title" = "ÔKêyTre chào bạn";
+"showcase.title" = "ÔKêyTre chào bạn";
 "showcase.whats_new.title" = "Có gì mới trong ÔKêyTre %@";
 "showcase.badge.new" = "MỚI";
 "showcase.subtitle" = "Bộ gõ tiếng Việt nằm gọn trên thanh menu macOS với các phím tắt thông minh giúp gõ xen kẽ tiếng Việt và tiếng Anh tự nhiên.";

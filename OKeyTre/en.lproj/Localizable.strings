@@ -84,8 +84,8 @@
 "alert.non_english_keyboard.ignore" = "Ignore";
 
 /* First-Time & Feature Update Showcase */
-"showcase.window_title" = "Welcome to ÔKêyTre";
-"showcase.title" = "Welcome to ÔKêyTre";
+"showcase.window_title" = "Hey there!";
+"showcase.title" = "Hey there!";
 "showcase.whats_new.title" = "What's New in ÔKêyTre %@";
 "showcase.badge.new" = "NEW";
 "showcase.subtitle" = "ÔKêyTre lives quietly in your macOS menu bar with smart shortcuts for effortless bilingual Vietnamese and English typing.";
