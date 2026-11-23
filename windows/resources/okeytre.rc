@@ -1,0 +1,50 @@
+// Copyright (C) 2026 lnson
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Self-contained Win32 resource script (does not require external SDK INCLUDE
+// paths when invoked from Bazel genrules).
+
+#include "resource.h"
+
+#pragma code_page(65001)
+
+#define RT_MANIFEST_ID 24
+#define CREATEPROCESS_MANIFEST_ID 1
+#define VS_VERSION_INFO_ID 1
+#define VS_FFI_FILEFLAGSMASK_VAL 0x0000003FL
+#define VOS_NT_WINDOWS32_VAL 0x00040004L
+#define VFT_APP_VAL 0x00000001L
+#define VFT2_UNKNOWN_VAL 0x00000000L
+
+IDI_APP_ICON ICON "okeytre.ico"
+IDR_APP_LOGO_PNG RCDATA "okeytre-logo.png"
+CREATEPROCESS_MANIFEST_ID RT_MANIFEST_ID "okeytre.manifest"
+
+VS_VERSION_INFO_ID VERSIONINFO
+  FILEVERSION OKT_VERSION_MAJOR, OKT_VERSION_MINOR, OKT_VERSION_PATCH, OKT_VERSION_BUILD
+  PRODUCTVERSION OKT_VERSION_MAJOR, OKT_VERSION_MINOR, OKT_VERSION_PATCH, OKT_VERSION_BUILD
+  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK_VAL
+  FILEFLAGS 0x0L
+  FILEOS VOS_NT_WINDOWS32_VAL
+  FILETYPE VFT_APP_VAL
+  FILESUBTYPE VFT2_UNKNOWN_VAL
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"
+    BEGIN
+      VALUE "CompanyName", "OKeyTre"
+      VALUE "FileDescription", "ÔKêyTre Vietnamese Input Method"
+      VALUE "FileVersion", OKT_VERSION_STRING
+      VALUE "InternalName", "OKeyTre"
+      VALUE "LegalCopyright", "Copyright (C) 2026 lnson"
+      VALUE "OriginalFilename", "OKeyTre.exe"
+      VALUE "ProductName", "ÔKêyTre"
+      VALUE "ProductVersion", OKT_VERSION_STRING
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1200
+  END
+END

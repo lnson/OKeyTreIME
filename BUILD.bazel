@@ -33,6 +33,7 @@ swift_library(
         "MemberImportVisibility",
     ],
     swiftc_inputs = ["//OKeyTre/ime/core:okeytre-engine.h"],
+    target_compatible_with = ["@platforms//os:macos"],
     deps = ["//OKeyTre/ime/core:OKeyTreEngineLib"],
 )
 
@@ -48,7 +49,15 @@ macos_application(
     infoplists = ["BazelInfo.plist"],
     minimum_os_version = MINIMUM_OS_VERSION,
     strings = glob(["OKeyTre/*.lproj/*.strings"]),
+    target_compatible_with = ["@platforms//os:macos"],
     deps = [":OKeyTreLib"],
+)
+
+# Windows Native Desktop Application (`OKeyTre.exe`)
+alias(
+    name = "OKeyTreWindows",
+    actual = "//windows:OKeyTre",
+    target_compatible_with = ["@platforms//os:windows"],
 )
 
 # Unit Test Library & Runner (`OKeyTreTests`)
@@ -61,12 +70,14 @@ swift_library(
         "-enable-upcoming-feature",
         "MemberImportVisibility",
     ],
+    target_compatible_with = ["@platforms//os:macos"],
     deps = [":OKeyTreLib"],
 )
 
 macos_unit_test(
     name = "OKeyTreTestsSuite",
     minimum_os_version = MINIMUM_OS_VERSION,
+    target_compatible_with = ["@platforms//os:macos"],
     test_host = ":OKeyTreApp",
     deps = [":OKeyTreTestsLib"],
 )

@@ -1,0 +1,221 @@
+# Copyright (C) 2026 lnson
+# SPDX-License-Identifier: GPL-3.0-only
+
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# ---------------------------------------------------------------------------
+# 1. Portable Core Windows UI Logic & Unit Tests
+#    (Compiles and passes tests on Windows, macOS, and Linux.)
+# ---------------------------------------------------------------------------
+
+cc_library(
+    name = "app_version",
+    srcs = ["app-version.cc"],
+    hdrs = ["app-version.h"],
+)
+
+cc_test(
+    name = "app_version_test",
+    size = "small",
+    srcs = ["app-version_test.cc"],
+    deps = [
+        ":app_version",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "localization",
+    srcs = ["localization.cc"],
+    hdrs = ["localization.h"],
+)
+
+cc_test(
+    name = "localization_test",
+    size = "small",
+    srcs = ["localization_test.cc"],
+    deps = [
+        ":localization",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "shortcut_detectors",
+    srcs = ["shortcut-detectors.cc"],
+    hdrs = ["shortcut-detectors.h"],
+)
+
+cc_test(
+    name = "shortcut_detectors_test",
+    size = "small",
+    srcs = ["shortcut-detectors_test.cc"],
+    deps = [
+        ":shortcut_detectors",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "settings_store",
+    srcs = ["settings-store.cc"],
+    hdrs = ["settings-store.h"],
+    linkopts = select({
+        "@platforms//os:windows": ["advapi32.lib"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        ":app_version",
+        ":localization",
+    ],
+)
+
+cc_test(
+    name = "settings_store_test",
+    size = "small",
+    srcs = ["settings-store_test.cc"],
+    deps = [
+        ":settings_store",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "update_parser",
+    srcs = ["update-parser.cc"],
+    hdrs = ["update-parser.h"],
+    deps = [":app_version"],
+)
+
+cc_test(
+    name = "update_parser_test",
+    size = "small",
+    srcs = ["update-parser_test.cc"],
+    deps = [
+        ":update_parser",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "ime_controller",
+    srcs = ["ime-controller.cc"],
+    hdrs = ["ime-controller.h"],
+    deps = [
+        ":settings_store",
+        "//OKeyTre/ime/core:OKeyTreEngineLib",
+    ],
+)
+
+cc_test(
+    name = "ime_controller_test",
+    size = "small",
+    srcs = ["ime-controller_test.cc"],
+    deps = [
+        ":ime_controller",
+        "@googletest//:gtest_main",
+    ],
+)
+
+# ---------------------------------------------------------------------------
+# 2. Native Win32 Resource Compilation & Desktop Application (`OKeyTre.exe`)
+# ---------------------------------------------------------------------------
+
+genrule(
+    name = "okeytre_resources",
+    srcs = [
+        "resources/okeytre.ico",
+        "resources/okeytre-logo.png",
+        "resources/okeytre.manifest",
+        "resources/okeytre.rc",
+        "resources/resource.h",
+    ],
+    outs = ["okeytre.res"],
+    cmd = "echo 'Windows resource compilation requires Windows' >&2 && exit 1",
+    cmd_bat = (
+        "powershell -NoProfile -ExecutionPolicy Bypass -Command \"" +
+        "$$rc = (Get-Command rc.exe -ErrorAction SilentlyContinue).Source; " +
+        "if (-not $$rc) { $$rc = (Get-ChildItem 'C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.*\\x64\\rc.exe' | Sort-Object FullName -Descending | Select-Object -First 1).FullName }; " +
+        "if (-not $$rc) { throw 'Windows SDK rc.exe not found' }; " +
+        "& $$rc /nologo /c65001 /i windows/resources /fo '$@' '$(location resources/okeytre.rc)'; " +
+        "exit $$LASTEXITCODE\""
+    ),
+    target_compatible_with = ["@platforms//os:windows"],
+)
+
+WINDOWS_COPTS = [
+    "/DUNICODE",
+    "/D_UNICODE",
+    "/DWINVER=0x0A00",
+    "/D_WIN32_WINNT=0x0A00",
+    "/DNTDDI_VERSION=0x0A000008",
+]
+
+cc_library(
+    name = "okeytre_win_ui",
+    srcs = [
+        "app.cc",
+        "caret-text-reader.cc",
+        "input-source-manager.cc",
+        "key-hook-manager.cc",
+        "launch-at-login.cc",
+        "settings-window.cc",
+        "showcase-window.cc",
+        "tray-icon.cc",
+        "ui-theme.cc",
+        "update-manager.cc",
+    ],
+    hdrs = [
+        "app.h",
+        "caret-text-reader.h",
+        "input-source-manager.h",
+        "key-hook-manager.h",
+        "launch-at-login.h",
+        "resources/resource.h",
+        "settings-window.h",
+        "showcase-window.h",
+        "tray-icon.h",
+        "ui-theme.h",
+        "update-manager.h",
+    ],
+    copts = WINDOWS_COPTS,
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [
+        ":app_version",
+        ":ime_controller",
+        ":localization",
+        ":settings_store",
+        ":shortcut_detectors",
+        ":update_parser",
+        "//OKeyTre/ime/core:OKeyTreEngineLib",
+    ],
+)
+
+cc_binary(
+    name = "OKeyTre",
+    srcs = ["main.cc"],
+    additional_linker_inputs = [":okeytre_resources"],
+    copts = WINDOWS_COPTS,
+    linkopts = [
+        "/SUBSYSTEM:WINDOWS",
+        "/ENTRY:wWinMainCRTStartup",
+        "$(location :okeytre_resources)",
+        "advapi32.lib",
+        "comctl32.lib",
+        "dwmapi.lib",
+        "gdi32.lib",
+        "gdiplus.lib",
+        "ole32.lib",
+        "oleaut32.lib",
+        "shell32.lib",
+        "shlwapi.lib",
+        "uiautomationcore.lib",
+        "user32.lib",
+        "uxtheme.lib",
+        "winhttp.lib",
+    ],
+    target_compatible_with = ["@platforms//os:windows"],
+    deps = [":okeytre_win_ui"],
+)
