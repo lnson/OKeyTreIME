@@ -161,6 +161,7 @@ final class KeyTapManager: ObservableObject {
     private nonisolated static let sharedPortBox = TapPortBox()
 
     @Published private(set) var inputMethodStyle: InputMethodStyle
+    @Published private(set) var restoreInvalidWords: Bool
 
     var isVietnameseEnabled: Bool {
         inputMethodStyle.isVietnameseEnabled
@@ -242,9 +243,19 @@ final class KeyTapManager: ObservableObject {
         set { inputMethodBuffer.nghToNg = newValue }
     }
 
-    var restoreInvalidWords: Bool {
-        get { inputMethodBuffer.restoreInvalidWords }
-        set { inputMethodBuffer.restoreInvalidWords = newValue }
+    var restoreInvalidWordsBinding: Binding<Bool> {
+        Binding(
+            get: { self.restoreInvalidWords },
+            set: { self.setRestoreInvalidWords($0) }
+        )
+    }
+
+    func setRestoreInvalidWords(_ enabled: Bool, defaults: UserDefaults = .standard) {
+        if restoreInvalidWords != enabled {
+            restoreInvalidWords = enabled
+        }
+        inputMethodBuffer.restoreInvalidWords = enabled
+        defaults.set(enabled, forKey: InputMethodBuffer.restoreInvalidWordsDefaultsKey)
     }
 
     var maxBufferSize: Int {
@@ -257,8 +268,10 @@ final class KeyTapManager: ObservableObject {
         observeWorkspace: Bool = true
     ) {
         let (selected, lastActive) = Self.resolvedStyles(from: defaults)
+        let resolvedRestoreInvalid = InputMethodBuffer.resolvedRestoreInvalidWords(from: defaults)
         let storedMaxSize = defaults.integer(forKey: InputMethodBuffer.maxBufferSizeDefaultsKey)
         self.inputMethodStyle = selected
+        self.restoreInvalidWords = resolvedRestoreInvalid
         self.lastActiveStyle = lastActive
         self.inputMethodBuffer = InputMethodBuffer(
             style: selected,
@@ -266,7 +279,7 @@ final class KeyTapManager: ObservableObject {
             uoHorn: defaults.bool(forKey: InputMethodBuffer.uoHornDefaultsKey),
             ngToNgh: defaults.bool(forKey: InputMethodBuffer.ngToNghDefaultsKey),
             nghToNg: defaults.bool(forKey: InputMethodBuffer.nghToNgDefaultsKey),
-            restoreInvalidWords: InputMethodBuffer.resolvedRestoreInvalidWords(from: defaults),
+            restoreInvalidWords: resolvedRestoreInvalid,
             maxBufferSize: storedMaxSize > 0 ? storedMaxSize : InputMethodBuffer.defaultMaxBufferSize
         )
 

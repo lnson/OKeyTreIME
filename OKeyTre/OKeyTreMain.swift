@@ -225,6 +225,11 @@ private struct MenuBarMenuContent: View {
 
         Divider()
 
+        Toggle(
+            appLanguage.localized("menu.restore_invalid_words"),
+            isOn: keyTapManager.restoreInvalidWordsBinding
+        )
+
         Toggle(appLanguage.localized("menu.launch_at_login"), isOn: launchAtLoginManager.binding)
 
         Picker(appLanguage.localized("menu.language"), selection: $appLanguage) {

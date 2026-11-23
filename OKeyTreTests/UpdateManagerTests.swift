@@ -630,6 +630,10 @@ struct AppDefaultsTests {
         let manager = KeyTapManager(defaults: defaults, observeWorkspace: false)
         #expect(!manager.restoreInvalidWords)
 
+        manager.setRestoreInvalidWords(true, defaults: defaults)
+        #expect(manager.restoreInvalidWords)
+        #expect(defaults.bool(forKey: InputMethodBuffer.restoreInvalidWordsDefaultsKey))
+
         buffer.reset()
         buffer.restoreInvalidWords = false
         let typedDisabled = simulateTyping("lexi ", into: buffer)

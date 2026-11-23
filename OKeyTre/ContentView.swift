@@ -253,9 +253,8 @@ private struct GeneralSettingsPane: View {
 
 private struct CorrectionSettingsPane: View {
     @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
+    @ObservedObject private var keyTapManager = KeyTapManager.shared
     @AppStorage(InputMethodBuffer.modernToneDefaultsKey) private var modernTone = InputMethodBuffer.defaultModernTone
-    @AppStorage(InputMethodBuffer.restoreInvalidWordsDefaultsKey)
-    private var restoreInvalidWords = InputMethodBuffer.defaultRestoreInvalidWords
     @AppStorage(InputMethodBuffer.uoHornDefaultsKey) private var uoHorn = false
     @AppStorage(InputMethodBuffer.ngToNghDefaultsKey) private var ngToNgh = false
     @AppStorage(InputMethodBuffer.nghToNgDefaultsKey) private var nghToNg = false
@@ -280,7 +279,7 @@ private struct CorrectionSettingsPane: View {
             }
 
             Section {
-                Toggle(isOn: $restoreInvalidWords) {
+                Toggle(isOn: keyTapManager.restoreInvalidWordsBinding) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(appLanguage.localized("settings.english.restore_invalid.title"))
                             .font(.body)
@@ -288,9 +287,6 @@ private struct CorrectionSettingsPane: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                }
-                .onChange(of: restoreInvalidWords) { _, newValue in
-                    KeyTapManager.shared.restoreInvalidWords = newValue
                 }
             } header: {
                 Text(appLanguage.localized("settings.english.header"))

@@ -6,6 +6,7 @@
 "menu.input_style" = "Input Method";
 "menu.input_style.off" = "Off";
 "menu.tooltip.mode" = "ÔKêyTre: %@";
+"menu.restore_invalid_words" = "Auto-Restore Non-Vietnamese Words";
 "menu.launch_at_login" = "Launch at Login";
 "menu.auto_check_updates" = "Auto-Check for Updates";
 "menu.update_available.title" = "✨ New Version Available: %@";
@@ -53,9 +54,9 @@
 "settings.orthography.modern_tone.title" = "Use modern Vietnamese orthography (\"oà, oé, uý\")";
 "settings.orthography.modern_tone.description" = "Place tone marks on the second vowel in open \"oa\", \"oe\", and \"uy\" syllables (e.g., hoà, khoẻ, thuý instead of hòa, khỏe, thúy).";
 
-/* English & Non-Vietnamese Word Restoration */
-"settings.english.header" = "English & Non-Vietnamese Words";
-"settings.english.restore_invalid.title" = "Auto-restore invalid Vietnamese words";
+/* Non-Vietnamese Word Restoration */
+"settings.english.header" = "Non-Vietnamese Words";
+"settings.english.restore_invalid.title" = "Auto-restore non-Vietnamese words";
 "settings.english.restore_invalid.description" = "Automatically restore the raw typed characters when ending a word (with Space or punctuation) that contains combinations impossible in Vietnamese (e.g., window, user, text, lexi).";
 
 /* Auto-Correction Settings */

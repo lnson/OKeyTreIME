@@ -6,6 +6,7 @@
 "menu.input_style" = "Kiểu gõ";
 "menu.input_style.off" = "Tắt";
 "menu.tooltip.mode" = "ÔKêyTre: %@";
+"menu.restore_invalid_words" = "Tự động khôi phục từ không phải tiếng Việt";
 "menu.launch_at_login" = "Khởi động cùng hệ thống";
 "menu.auto_check_updates" = "Tự động kiểm tra cập nhật";
 "menu.update_available.title" = "✨ Đã có phiên bản mới: %@";
@@ -53,8 +54,8 @@
 "settings.orthography.modern_tone.title" = "Đặt dấu theo chính tả kiểu mới (\"oà, oé, uý\")";
 "settings.orthography.modern_tone.description" = "Đặt dấu thanh lên nguyên âm thứ hai trong các vần mở \"oa\", \"oe\", \"uy\" (ví dụ: hoà, khoẻ, thuý thay vì hòa, khỏe, thúy).";
 
-/* English & Non-Vietnamese Word Restoration */
-"settings.english.header" = "Từ tiếng Anh & Ngoại lai";
+/* Non-Vietnamese Word Restoration */
+"settings.english.header" = "Từ không phải tiếng Việt";
 "settings.english.restore_invalid.title" = "Tự động khôi phục từ không phải tiếng Việt";
 "settings.english.restore_invalid.description" = "Tự động trả về chuỗi phím gốc ngay khi kết thúc từ (bằng dấu cách hoặc dấu câu) nếu từ đó chứa tổ hợp âm không thể có trong tiếng Việt (ví dụ: window, user, text, lexi).";
 
