@@ -612,37 +612,6 @@
       color: var(--ink-muted);
     }
 
-    .code-block {
-      margin-top: 10px;
-      background: var(--code-bg);
-      color: var(--code-ink);
-      border-radius: 10px;
-      padding: 11px 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 0.88rem;
-      overflow-x: auto;
-    }
-
-    .copy-btn {
-      background: rgba(255, 255, 255, 0.12);
-      color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 6px;
-      padding: 4px 10px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-
-    .copy-btn:hover {
-      background: rgba(255, 255, 255, 0.22);
-    }
-
     /* FAQ */
     .faq-list {
       display: grid;
@@ -1006,24 +975,6 @@
           <li class="step">
             <div class="step-num" aria-hidden="true">2</div>
             <div>
-              <h3 lang="vi">Cho phép mở lần đầu (ứng dụng mã nguồn mở)</h3>
-              <h3 lang="en">Allow first launch (open-source build)</h3>
-              <p lang="vi">
-                Vì ứng dụng được ký ad-hoc (không qua tài khoản trả phí của Apple), hãy vào <strong>System Settings → Privacy &amp; Security → Open Anyway</strong>, hoặc chạy lệnh sau trong Terminal:
-              </p>
-              <p lang="en">
-                Because the app is ad-hoc signed rather than Apple-notarized, allow it via <strong>System Settings → Privacy &amp; Security → Open Anyway</strong>, or run this once in Terminal:
-              </p>
-              <div class="code-block">
-                <span id="xattr-cmd">xattr -cr /Applications/OKeyTre.app</span>
-                <button type="button" class="copy-btn" id="copy-btn">Copy</button>
-              </div>
-            </div>
-          </li>
-
-          <li class="step">
-            <div class="step-num" aria-hidden="true">3</div>
-            <div>
               <h3 lang="vi">Cấp quyền Trợ năng &amp; dùng bàn phím U.S./ABC</h3>
               <h3 lang="en">Grant Accessibility &amp; use the U.S./ABC layout</h3>
               <p lang="vi">
@@ -1240,18 +1191,6 @@
           e.preventDefault();
           const lang = btn.getAttribute("data-set-lang");
           setLang(lang, { persist: true, updateUrl: true, updateCanonical: true });
-        });
-      });
-
-      const copyBtn = document.getElementById("copy-btn");
-      const cmdText = document.getElementById("xattr-cmd").textContent;
-      copyBtn.addEventListener("click", () => {
-        navigator.clipboard.writeText(cmdText).then(() => {
-          const prev = copyBtn.textContent;
-          copyBtn.textContent = "Copied!";
-          setTimeout(() => {
-            copyBtn.textContent = prev;
-          }, 1500);
         });
       });
     })();

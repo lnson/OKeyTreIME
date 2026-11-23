@@ -44,6 +44,7 @@ Options:
   --skip-tests               Skip running C++ & imec unit tests before building
   --open                     Reveal the generated .dmg in Finder when finished
   --publish                  Publish tag + .dmg to GitHub Releases (uses `gh` CLI or GITHUB_TOKEN)
+  --publish-only             Publish existing build/OKeyTre-v<version>.dmg without rebuilding/notarizing
   --prerelease               Mark the GitHub Release as a pre-release (used with --publish)
   -h, --help                 Show this help message
 EOF
@@ -58,6 +59,7 @@ SIGN_IDENTITY=""
 RUN_TESTS=1
 REVEAL_IN_FINDER=0
 PUBLISH_RELEASE=0
+PUBLISH_ONLY=0
 PRERELEASE=0
 
 while [[ $# -gt 0 ]]; do
@@ -92,6 +94,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     --publish)
       PUBLISH_RELEASE=1
+      shift
+      ;;
+    --publish-only)
+      PUBLISH_RELEASE=1
+      PUBLISH_ONLY=1
       shift
       ;;
     --prerelease)
@@ -166,89 +173,100 @@ APP_BUNDLE="$STAGING_DIR/OKeyTre.app"
 APP_BIN="$APP_BUNDLE/Contents/MacOS/OKeyTre"
 APP_PLIST="$APP_BUNDLE/Contents/Info.plist"
 
-echo "==> Preparing ÔKêyTre ${TAG} (architectures: ${CPUS})"
-
-if [[ "$RUN_TESTS" -eq 1 ]]; then
-  echo "==> Running C++ engine & compiler tests..."
-  bazel test //OKeyTre/ime/core/... //imec/...
-fi
-
-echo "==> Building optimized stripped release bundle..."
-bazel build --config=release --macos_cpus="$CPUS" //:OKeyTreApp
-
-echo "==> Extracting and staging OKeyTre.app..."
-rm -rf "$STAGING_DIR"
-mkdir -p "$STAGING_DIR"
-ditto -x -k "$REPO_ROOT/bazel-bin/OKeyTreApp.zip" "$STAGING_DIR/"
-
-# Normalize Bazel's 1980-01-01 zip timestamps before signing.
-find "$APP_BUNDLE" -exec touch {} +
-
-if [[ "$USE_DEVELOPER_ID" -eq 1 ]]; then
-  echo "==> Signing OKeyTre.app with Hardened Runtime (${SIGN_IDENTITY})..."
-  codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
-else
-  echo "==> Applying clean ad-hoc code signature..."
-  codesign --force --deep --sign - "$APP_BUNDLE"
-fi
-codesign --verify --deep --strict "$APP_BUNDLE"
-
-echo "==> Running binary & bundle checks..."
-BUILT_VERSION="$("$PLIST_BUDDY" -c "Print :CFBundleShortVersionString" "$APP_PLIST")"
-if [[ "$BUILT_VERSION" != "$VERSION" ]]; then
-  echo "error: built Info.plist version '$BUILT_VERSION' does not match expected '$VERSION'" >&2
-  exit 1
-fi
-
-CODESIGN_INFO="$(codesign -dvvv "$APP_BUNDLE" 2>&1)"
-if [[ "$USE_DEVELOPER_ID" -eq 0 ]]; then
-  if ! grep -q "^Signature=adhoc$" <<<"$CODESIGN_INFO"; then
-    echo "error: expected ad-hoc signature, got:" >&2
-    echo "$CODESIGN_INFO" >&2
-    exit 1
-  fi
-  if ! grep -q "^TeamIdentifier=not set$" <<<"$CODESIGN_INFO"; then
-    echo "error: TeamIdentifier is set in ad-hoc binary signature:" >&2
-    echo "$CODESIGN_INFO" >&2
-    exit 1
-  fi
-fi
-
-if strings "$APP_BIN" | grep -q "/Users/"; then
-  echo "error: local '/Users/...' path found in stripped binary '$APP_BIN'!" >&2
-  exit 1
-fi
-
-ARCHS="$(lipo -archs "$APP_BIN")"
-echo "    Verified architectures : $ARCHS"
-echo "    Verified bundle version: $BUILT_VERSION"
-if [[ "$USE_DEVELOPER_ID" -eq 1 ]]; then
-  echo "    Verified code signature: $SIGN_IDENTITY"
-else
-  echo "    Verified code signature: adhoc"
-fi
-
-echo "==> Packaging compressed disk image: ${DMG_PATH#$REPO_ROOT/}"
-ln -sf /Applications "$STAGING_DIR/Applications"
-rm -f "$DMG_PATH"
-hdiutil create -volname "ÔKêyTre" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH" >/dev/null
-
 NOTARIZED=0
-if [[ "$USE_DEVELOPER_ID" -eq 1 ]]; then
-  echo "==> Signing disk image..."
-  codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_PATH"
-
-  if [[ "$SKIP_NOTARIZE" -eq 0 ]]; then
-    echo "==> Submitting $(basename "$DMG_PATH") to Apple Notary Service (profile: ${NOTARY_PROFILE})..."
-    echo "    (If this fails with missing profile, run once:"
-    echo "     xcrun notarytool store-credentials \"${NOTARY_PROFILE}\" --apple-id YOUR_EMAIL --team-id YOUR_TEAM_ID --password APP_SPECIFIC_PASSWORD)"
-    xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
-
-    echo "==> Stapling notarization ticket to $(basename "$DMG_PATH")..."
-    xcrun stapler staple "$DMG_PATH"
-    xcrun stapler validate "$DMG_PATH"
-    spctl -a -vvv -t open --context context:primary-signature "$DMG_PATH"
+if [[ "$PUBLISH_ONLY" -eq 1 ]]; then
+  if [[ ! -f "$DMG_PATH" ]]; then
+    echo "error: expected existing disk image at '${DMG_PATH#$REPO_ROOT/}', but it was not found." >&2
+    exit 1
+  fi
+  echo "==> Reusing existing disk image: ${DMG_PATH#$REPO_ROOT/}"
+  if xcrun stapler validate "$DMG_PATH" >/dev/null 2>&1; then
     NOTARIZED=1
+  fi
+else
+  echo "==> Preparing ÔKêyTre ${TAG} (architectures: ${CPUS})"
+
+  if [[ "$RUN_TESTS" -eq 1 ]]; then
+    echo "==> Running C++ engine & compiler tests..."
+    bazel test //OKeyTre/ime/core/... //imec/...
+  fi
+
+  echo "==> Building optimized stripped release bundle..."
+  bazel build --config=release --macos_cpus="$CPUS" //:OKeyTreApp
+
+  echo "==> Extracting and staging OKeyTre.app..."
+  rm -rf "$STAGING_DIR"
+  mkdir -p "$STAGING_DIR"
+  ditto -x -k "$REPO_ROOT/bazel-bin/OKeyTreApp.zip" "$STAGING_DIR/"
+
+  # Normalize Bazel's 1980-01-01 zip timestamps before signing.
+  find "$APP_BUNDLE" -exec touch {} +
+
+  if [[ "$USE_DEVELOPER_ID" -eq 1 ]]; then
+    echo "==> Signing OKeyTre.app with Hardened Runtime (${SIGN_IDENTITY})..."
+    codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+  else
+    echo "==> Applying clean ad-hoc code signature..."
+    codesign --force --deep --sign - "$APP_BUNDLE"
+  fi
+  codesign --verify --deep --strict "$APP_BUNDLE"
+
+  echo "==> Running binary & bundle checks..."
+  BUILT_VERSION="$("$PLIST_BUDDY" -c "Print :CFBundleShortVersionString" "$APP_PLIST")"
+  if [[ "$BUILT_VERSION" != "$VERSION" ]]; then
+    echo "error: built Info.plist version '$BUILT_VERSION' does not match expected '$VERSION'" >&2
+    exit 1
+  fi
+
+  CODESIGN_INFO="$(codesign -dvvv "$APP_BUNDLE" 2>&1)"
+  if [[ "$USE_DEVELOPER_ID" -eq 0 ]]; then
+    if ! grep -q "^Signature=adhoc$" <<<"$CODESIGN_INFO"; then
+      echo "error: expected ad-hoc signature, got:" >&2
+      echo "$CODESIGN_INFO" >&2
+      exit 1
+    fi
+    if ! grep -q "^TeamIdentifier=not set$" <<<"$CODESIGN_INFO"; then
+      echo "error: TeamIdentifier is set in ad-hoc binary signature:" >&2
+      echo "$CODESIGN_INFO" >&2
+      exit 1
+    fi
+  fi
+
+  if strings "$APP_BIN" | grep -q "/Users/"; then
+    echo "error: local '/Users/...' path found in stripped binary '$APP_BIN'!" >&2
+    exit 1
+  fi
+
+  ARCHS="$(lipo -archs "$APP_BIN")"
+  echo "    Verified architectures : $ARCHS"
+  echo "    Verified bundle version: $BUILT_VERSION"
+  if [[ "$USE_DEVELOPER_ID" -eq 1 ]]; then
+    echo "    Verified code signature: $SIGN_IDENTITY"
+  else
+    echo "    Verified code signature: adhoc"
+  fi
+
+  echo "==> Packaging compressed disk image: ${DMG_PATH#$REPO_ROOT/}"
+  ln -sf /Applications "$STAGING_DIR/Applications"
+  rm -f "$DMG_PATH"
+  hdiutil create -volname "ÔKêyTre" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH" >/dev/null
+
+  if [[ "$USE_DEVELOPER_ID" -eq 1 ]]; then
+    echo "==> Signing disk image..."
+    codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_PATH"
+
+    if [[ "$SKIP_NOTARIZE" -eq 0 ]]; then
+      echo "==> Submitting $(basename "$DMG_PATH") to Apple Notary Service (profile: ${NOTARY_PROFILE})..."
+      echo "    (If this fails with missing profile, run once:"
+      echo "     xcrun notarytool store-credentials \"${NOTARY_PROFILE}\" --apple-id YOUR_EMAIL --team-id YOUR_TEAM_ID --password APP_SPECIFIC_PASSWORD)"
+      xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+
+      echo "==> Stapling notarization ticket to $(basename "$DMG_PATH")..."
+      xcrun stapler staple "$DMG_PATH"
+      xcrun stapler validate "$DMG_PATH"
+      spctl -a -vvv -t open --context context:primary-signature "$DMG_PATH"
+      NOTARIZED=1
+    fi
   fi
 fi
 
