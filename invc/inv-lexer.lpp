@@ -1,0 +1,385 @@
+%{
+// Copyright (C) 2026 lnson
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Flex lexical analyzer for `.inv` inversion-matcher specifications.
+
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#pragma clang diagnostic ignored "-Wsign-compare"
+#pragma clang diagnostic ignored "-Wdeprecated-register"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <string_view>
+
+#include "absl/strings/substitute.h"
+#include "inv-ast.h"
+#include "inv-parser.yacc.h"
+
+#define YY_DECL int invc_yylex(YYSTYPE* yylval_param, okeytre::InvParseContext* ctx)
+#define YY_USER_ACTION ctx->last_token_line = ctx->line;
+
+static int InvcYyInputWrapper();
+static uint16_t InvcReadUtf8Char(const char* text, int len) {
+  const uint8_t b0 = static_cast<uint8_t>(text[0]);
+  if (b0 < 0x80) {
+    return b0;
+  }
+  char buf[4] = {static_cast<char>(b0), 0, 0, 0};
+  int needed = 1;
+  if ((b0 & 0xE0) == 0xC0) {
+    needed = 2;
+  } else if ((b0 & 0xF0) == 0xE0) {
+    needed = 3;
+  } else if ((b0 & 0xF8) == 0xF0) {
+    needed = 4;
+  }
+
+  const int have = (len <= needed) ? len : needed;
+  for (int i = 1; i < have; ++i) {
+    buf[i] = text[i];
+  }
+  for (int i = have; i < needed; ++i) {
+    const int c = InvcYyInputWrapper();
+    if (c == EOF || c == 0) {
+      break;
+    }
+    buf[i] = static_cast<char>(c);
+  }
+  const std::u16string u16 =
+      okeytre::InvUtf8ToU16(std::string_view(buf, static_cast<size_t>(needed)));
+  return u16.size() == 1 ? static_cast<uint16_t>(u16[0]) : 0xFFFD;
+}
+%}
+
+%option noyywrap
+%option nounput
+%option nodefault
+%option 8bit
+%option prefix="invc_yy"
+
+%x IN_COMMENT
+%x NAME_DEF
+%x EXPR_DEF
+%x SEC_PATTERNS
+%x PATTERN_BODY
+%x SEC_TESTS
+%x TEST_ARG
+
+UTF8_NONASCII ([\300-\337][\200-\277]|[\340-\357][\200-\277]{2}|[\360-\367][\200-\277]{3})
+IDENT         [A-Za-z_][A-Za-z0-9_]*
+
+%%
+
+  /* ------------------------------------------------------------------------
+   * Comments across all active lexer states
+   * ------------------------------------------------------------------------ */
+<INITIAL,NAME_DEF,EXPR_DEF,SEC_PATTERNS,PATTERN_BODY,SEC_TESTS,TEST_ARG>"/*" {
+  ctx->comment_start_line = ctx->line;
+  ctx->comment_caller_state = YY_START;
+  BEGIN(IN_COMMENT);
+}
+
+<IN_COMMENT>{
+  "*/"              { BEGIN(ctx->comment_caller_state); }
+  \n                { ctx->line++; }
+  {UTF8_NONASCII}|. { /* skip comment content */ }
+  <<EOF>>           {
+    ctx->SetError(ctx->comment_start_line,
+                  "unterminated /* ... */ block comment");
+    return ITOK_LEX_ERROR;
+  }
+}
+
+<INITIAL,NAME_DEF,EXPR_DEF,SEC_PATTERNS,PATTERN_BODY,SEC_TESTS,TEST_ARG>("//"|"#")[^\n]* {
+  /* skip line comment up to newline */
+}
+
+  /* ------------------------------------------------------------------------
+   * Section 1: Definitions (%name "...", MACRO <regex>)
+   * ------------------------------------------------------------------------ */
+<INITIAL>{
+  [ \t\r]+          { /* skip whitespace */ }
+  \n                { ctx->line++; }
+  "%%"              {
+    ctx->section_count++;
+    BEGIN(SEC_PATTERNS);
+    yylval_param->line = ctx->line;
+    return ITOK_SECTION_SEP;
+  }
+  "%name"           {
+    BEGIN(NAME_DEF);
+    yylval_param->line = ctx->line;
+    return ITOK_DIR_NAME;
+  }
+  "%"[^\t\r\n ]*    {
+    ctx->SetError(
+        ctx->line,
+        absl::Substitute("unknown directive in section 1: '$0'", yytext));
+    return ITOK_LEX_ERROR;
+  }
+  {IDENT}           {
+    BEGIN(EXPR_DEF);
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx =
+        ctx->InternString(std::string(yytext, static_cast<size_t>(yyleng)));
+    return ITOK_IDENT;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(
+        ctx->line,
+        absl::Substitute("expected macro definition or directive, got '$0'",
+                         yytext));
+    return ITOK_LEX_ERROR;
+  }
+  <<EOF>>           {
+    if (ctx->section_count < 1) {
+      ctx->SetError(
+          ctx->line,
+          "missing '%%' delimiter separating definitions and patterns");
+      return ITOK_LEX_ERROR;
+    }
+    yyterminate();
+  }
+}
+
+<NAME_DEF>{
+  [ \t\r]+          { /* skip */ }
+  \"([^\"\\\n]|\\.)*\" {
+    int32_t idx = 0;
+    if (!ctx->DecodeQuotedString(yytext, static_cast<size_t>(yyleng), ctx->line,
+                                 idx)) {
+      return ITOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = idx;
+    return ITOK_STRING;
+  }
+  \n                {
+    const int32_t ln = ctx->line;
+    ctx->line++;
+    BEGIN(INITIAL);
+    yylval_param->line = ln;
+    return ITOK_EOL;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(ctx->line, "expected double-quoted string in '%name'");
+    return ITOK_LEX_ERROR;
+  }
+}
+
+  /* ------------------------------------------------------------------------
+   * Section 2: Disallowed Patterns ([^]<regex>[$])
+   * ------------------------------------------------------------------------ */
+<SEC_PATTERNS>{
+  [ \t\r]+          { /* skip */ }
+  \n                { ctx->line++; }
+  "%%"              {
+    ctx->section_count++;
+    if (ctx->section_count > 2) {
+      ctx->SetError(ctx->line, "unexpected extra '%%' section divider");
+      return ITOK_LEX_ERROR;
+    }
+    BEGIN(SEC_TESTS);
+    yylval_param->line = ctx->line;
+    return ITOK_SECTION_SEP;
+  }
+  "^"               {
+    BEGIN(PATTERN_BODY);
+    yylval_param->line = ctx->line;
+    return ITOK_CARET;
+  }
+  {UTF8_NONASCII}|. {
+    yyless(0);
+    BEGIN(PATTERN_BODY);
+  }
+}
+
+<EXPR_DEF>\n {
+  const int32_t ln = ctx->line;
+  ctx->line++;
+  BEGIN(INITIAL);
+  yylval_param->line = ln;
+  return ITOK_EOL;
+}
+
+<PATTERN_BODY>\n {
+  const int32_t ln = ctx->line;
+  ctx->line++;
+  BEGIN(SEC_PATTERNS);
+  yylval_param->line = ln;
+  return ITOK_EOL;
+}
+
+<PATTERN_BODY>"$" {
+  yylval_param->line = ctx->line;
+  return ITOK_DOLLAR;
+}
+
+<EXPR_DEF>"$" {
+  ctx->SetError(ctx->line, "unescaped metacharacter '$' inside macro body");
+  return ITOK_LEX_ERROR;
+}
+
+<EXPR_DEF,PATTERN_BODY>{
+  [ \t\r]+          { /* skip whitespace */ }
+  "^"               {
+    ctx->SetError(ctx->line, "unescaped metacharacter '^' inside pattern body");
+    return ITOK_LEX_ERROR;
+  }
+  "(?:"             { yylval_param->line = ctx->line; return ITOK_LPAREN_NC; }
+  "("               { yylval_param->line = ctx->line; return ITOK_LPAREN; }
+  ")"               { yylval_param->line = ctx->line; return ITOK_RPAREN; }
+  "|"               { yylval_param->line = ctx->line; return ITOK_PIPE; }
+  "*"               { yylval_param->line = ctx->line; return ITOK_STAR; }
+  "+"               { yylval_param->line = ctx->line; return ITOK_PLUS; }
+  "?"               { yylval_param->line = ctx->line; return ITOK_QUEST; }
+  "."               { yylval_param->line = ctx->line; return ITOK_DOT; }
+  "["("^"?"]")?(\\.|[^\]\\\n])*"]" {
+    int32_t idx = 0;
+    if (!ctx->DecodeCharClass(yytext, static_cast<size_t>(yyleng), ctx->line,
+                              idx)) {
+      return ITOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = idx;
+    return ITOK_CHAR_CLASS;
+  }
+  "["               {
+    ctx->SetError(ctx->line, "unterminated '[' character class");
+    return ITOK_LEX_ERROR;
+  }
+  "]"               {
+    ctx->SetError(ctx->line, "unescaped metacharacter ']' inside pattern body");
+    return ITOK_LEX_ERROR;
+  }
+  "{"{IDENT}"}"     {
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = ctx->InternString(
+        std::string(yytext + 1, static_cast<size_t>(yyleng - 2)));
+    return ITOK_BRACE_REF;
+  }
+  "{"[^}\n]*"}"     {
+    ctx->SetError(ctx->line, "invalid macro reference '{...}'");
+    return ITOK_LEX_ERROR;
+  }
+  "{"               {
+    ctx->SetError(ctx->line, "unclosed '{' in pattern");
+    return ITOK_LEX_ERROR;
+  }
+  "}"               {
+    ctx->SetError(ctx->line, "unescaped metacharacter '}' inside pattern body");
+    return ITOK_LEX_ERROR;
+  }
+  "\\s"             {
+    okeytre::CharClassPred ws;
+    ws.kind = okeytre::CharClassPred::Kind::kPositive;
+    ws.chars = {0x0020, 0x0009, 0x000A, 0x000D};
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = ctx->InternPredicate(std::move(ws));
+    return ITOK_CHAR_CLASS;
+  }
+  "\\"({UTF8_NONASCII}|[^\n]) {
+    const uint16_t ch = InvcReadUtf8Char(yytext + 1, yyleng - 1);
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = okeytre::InvParseContext::UnescapeChar(ch);
+    return ITOK_UCHAR;
+  }
+  "\\"              {
+    ctx->SetError(ctx->line, "dangling '\\' at end of pattern");
+    return ITOK_LEX_ERROR;
+  }
+  {UTF8_NONASCII}|. {
+    yylval_param->line = ctx->line;
+    yylval_param->char_val = InvcReadUtf8Char(yytext, yyleng);
+    return ITOK_UCHAR;
+  }
+}
+
+  /* ------------------------------------------------------------------------
+   * Section 3: Compile-Time Assertions (reject "word" | accept "word")
+   * ------------------------------------------------------------------------ */
+<SEC_TESTS>{
+  [ \t\r]+          { /* skip */ }
+  \n                { ctx->line++; }
+  "%%"              {
+    ctx->SetError(ctx->line, "unexpected extra '%%' section divider");
+    return ITOK_LEX_ERROR;
+  }
+  "reject"          {
+    BEGIN(TEST_ARG);
+    yylval_param->line = ctx->line;
+    return ITOK_REJECT;
+  }
+  "accept"          {
+    BEGIN(TEST_ARG);
+    yylval_param->line = ctx->line;
+    return ITOK_ACCEPT;
+  }
+  {IDENT}           {
+    ctx->SetError(
+        ctx->line,
+        absl::Substitute(
+            "expected 'reject \"word\"' or 'accept \"word\"', got '$0'",
+            yytext));
+    return ITOK_LEX_ERROR;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(
+        ctx->line,
+        absl::Substitute("unexpected token in section 3: '$0'", yytext));
+    return ITOK_LEX_ERROR;
+  }
+}
+
+<TEST_ARG>{
+  [ \t\r]+          { /* skip */ }
+  \"([^\"\\\n]|\\.)*\" {
+    int32_t idx = 0;
+    if (!ctx->DecodeQuotedString(yytext, static_cast<size_t>(yyleng), ctx->line,
+                                 idx)) {
+      return ITOK_LEX_ERROR;
+    }
+    yylval_param->line = ctx->line;
+    yylval_param->node_idx = idx;
+    return ITOK_STRING;
+  }
+  \n                {
+    const int32_t ln = ctx->line;
+    ctx->line++;
+    BEGIN(SEC_TESTS);
+    yylval_param->line = ln;
+    return ITOK_EOL;
+  }
+  {UTF8_NONASCII}|. {
+    ctx->SetError(ctx->line,
+                  "expected double-quoted word literal in assertion");
+    return ITOK_LEX_ERROR;
+  }
+}
+
+%%
+
+static int InvcYyInputWrapper() {
+  return yyinput();
+}
+
+static YY_BUFFER_STATE g_invc_active_buffer = nullptr;
+
+void InvcLexerBeginScan(const char* utf8_source) {
+  g_invc_active_buffer = invc_yy_scan_string(utf8_source);
+  BEGIN(INITIAL);
+}
+
+void InvcLexerEndScan() {
+  if (g_invc_active_buffer != nullptr) {
+    invc_yy_delete_buffer(g_invc_active_buffer);
+    g_invc_active_buffer = nullptr;
+  }
+}

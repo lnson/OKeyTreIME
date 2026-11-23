@@ -1,0 +1,273 @@
+// Copyright (C) 2026 lnson
+// SPDX-License-Identifier: GPL-3.0-only
+
+/* ============================================================================
+ * Vietnamese Inversion / Disallowed Word Combinations (`.inv`)
+ * Compiled ahead-of-time by `//invc:invc` into a minimized C++ DFA.
+ * Any word matching at least one pattern in Section 2 cannot exist in standard
+ * Vietnamese orthography (excluding intentional 2-3 letter `đ` abbreviations).
+ * ============================================================================ */
+%name "Vietnamese Inversion Word Combinations"
+
+/* 1. Character Classes & Phonological Macros */
+C_ANY           [bcdđghklmnpqrstvx]
+C_NO_G          [bcdđhklmnpqrstvx]
+C_NO_H          [bcdđgklmnpqrstvx]
+C_NO_N          [bcdđghklmpqrstvx]
+C_NO_GH         [bcdđklmnpqrstvx]
+C_NO_HR         [bcdđgklmnpqstvx]
+C_NO_NC         [bdđghklmpqrstvx]
+NON_Q_ONSET     ([bcdđghklmnprstvx]{C_ANY}*)?
+NON_Q_GI_ONSET  ([bcdđhklmnprstvx]|ch|gh|kh|ng|ngh|nh|ph|th|tr)?
+
+A_ANY           [aáàảãạ]
+AB_ANY          [ăắằẳẵặ]
+AC_ANY          [âấầẩẫậ]
+E_ANY           [eéèẻẽẹ]
+EC_ANY          [êếềểễệ]
+I_ANY           [iíìỉĩị]
+O_ANY           [oóòỏõọ]
+OC_ANY          [ôốồổỗộ]
+OH_ANY          [ơớờởỡợ]
+U_ANY           [uúùủũụ]
+UH_ANY          [ưứừửữự]
+Y_ANY           [yýỳỷỹỵ]
+
+V_ANY           ({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY})
+V_NO_EC         ({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY})
+V_NO_OH         ({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY})
+V_NO_I          ({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY})
+V_NO_O          ({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{I_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY})
+V_NO_U          ({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY}|{Y_ANY})
+V_NO_Y          ({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY})
+V_NO_IU         ({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY}|{Y_ANY})
+V_NO_IYO        ({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY})
+V_NO_AUEC       ({AB_ANY}|{AC_ANY}|{E_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY}|{Y_ANY})
+V_PLAIN         [aăâeêioôơuưy]
+V_TONED         [áàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]
+V_NON_STOP_TONE [àảãằẳẵầẩẫèẻẽềểễìỉĩòỏõồổỗờởỡùủũừửữỳỷỹ]
+
+STOP_CODA       (ch|[cpt])
+
+%%
+/* ============================================================================
+ * SECTION 2: Unaccepted Regex Combinations
+ * ============================================================================ */
+
+/* 1. Any non-Vietnamese letter/digit/symbol (e.g. f, j, w, z, 0-9, + ^ ~ `) */
+[^aăâbcdđeêghiklmnoôơpqrstuưvxyáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]
+
+/* 2. Consonant-only tokens (preserving 2-3 letter 'đ' chat abbreviations: đc, đk, đt, ĐN) */
+^[bcdghklmnpqrstvx]{C_ANY}*$
+^đ$
+^đ{C_ANY}{C_ANY}{C_ANY}+$
+
+/* 3. Multi-syllable words, 4+ consecutive vowels, or 2+ tone marks in one word */
+{V_ANY}{C_ANY}+{V_ANY}
+{V_ANY}{V_ANY}{V_ANY}{V_ANY}
+{V_TONED}{V_ANY}*{V_TONED}
+
+/* 4. Invalid initial consonant clusters (only ch, gh, kh, ng, ngh, nh, ph, th, tr allowed) */
+^{C_ANY}{C_ANY}{C_ANY}{C_ANY}
+^(?:{C_NO_N}{C_ANY}{C_ANY}|n{C_NO_G}{C_ANY}|ng{C_NO_H}){V_ANY}
+^[bdđhlmqrsvx]{C_ANY}{V_ANY}
+^[cpk]{C_NO_H}{V_ANY}
+^g{C_NO_H}{V_ANY}
+^n{C_NO_GH}{V_ANY}
+^t{C_NO_HR}{V_ANY}
+
+/* 5. Orthographic onset distribution (c/k, g/gh, ng/ngh, q/qu, gi, y) */
+^c({E_ANY}|{EC_ANY}|{I_ANY}|{Y_ANY})
+^k({A_ANY}|{AB_ANY}|{AC_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY})
+^(?:g|ng)({E_ANY}|{EC_ANY})
+^ng{I_ANY}
+^(?:gh|ngh)({A_ANY}|{AB_ANY}|{AC_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY})
+^q$
+^q[^u]
+^qu$
+^qu{C_ANY}
+^qu({O_ANY}|{U_ANY}|{UH_ANY})
+^qu{V_ANY}{V_ANY}{V_ANY}
+^g[íìỉĩị]{V_ANY}
+^gi({I_ANY}|{Y_ANY})
+^(?:[bdđgpr]|ch|gh|kh|ng|ngh|nh|ph){Y_ANY}
+
+/* 6. Invalid final consonant codas (only m, n, ng, nh, p, t, c, ch allowed) */
+{V_ANY}{C_ANY}{C_ANY}{C_ANY}+$
+{V_ANY}[bdđghklqrsvx]$
+{V_ANY}(?:{C_NO_NC}{C_ANY}|n{C_NO_GH}|c{C_NO_H})$
+
+/* 7. Stop codas (p, t, c, ch) without sắc or nặng tone (e.g. mêt, bôt, tẽt, kêp) */
+{V_NON_STOP_TONE}{V_ANY}*{STOP_CODA}$
+^{C_ANY}*{V_PLAIN}+{STOP_CODA}$
+
+/* 8. Open checked vowels/diphthongs after a non-empty onset (e.g. lă, să, ră) */
+^{C_ANY}+({AB_ANY}|{AC_ANY})$
+^{NON_Q_GI_ONSET}{C_ANY}({I_ANY}{EC_ANY}|{U_ANY}{OC_ANY}|{UH_ANY}{OH_ANY}|{O_ANY}{AB_ANY}|{U_ANY}{AC_ANY}|{U_ANY}{Y_ANY}{EC_ANY})$
+^gi({AB_ANY}|{AC_ANY}|{I_ANY}{EC_ANY}|{U_ANY}{OC_ANY}|{UH_ANY}{OH_ANY})$
+
+/* 9. Invalid 2-vowel combinations */
+{AB_ANY}{V_ANY}
+{AC_ANY}({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY})
+{A_ANY}({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY})
+{E_ANY}({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{I_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY})
+{EC_ANY}({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY}|{Y_ANY})
+^{NON_Q_GI_ONSET}{I_ANY}({AB_ANY}|{AC_ANY}|{E_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY}|{Y_ANY})
+{O_ANY}({AC_ANY}|{EC_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY})
+{O_ANY}{O_ANY}$
+{O_ANY}{O_ANY}(?:[mnpt]|nh|ch)$
+{OC_ANY}({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY})
+{OH_ANY}({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY}|{Y_ANY})
+^{NON_Q_ONSET}{U_ANY}({AB_ANY}|{E_ANY}|{O_ANY}|{U_ANY}|{UH_ANY})
+{UH_ANY}({AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{O_ANY}|{OC_ANY}|{UH_ANY}|{Y_ANY})
+{Y_ANY}({AB_ANY}|{AC_ANY}|{E_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY}|{Y_ANY})
+^{C_ANY}*{Y_ANY}({A_ANY}|{U_ANY})
+^qu{Y_ANY}({A_ANY}|{U_ANY})
+^{C_ANY}+{Y_ANY}{EC_ANY}
+
+/* 10. Invalid 3-vowel combinations */
+^{NON_Q_GI_ONSET}({A_ANY}|{AB_ANY}|{AC_ANY}|{E_ANY}|{EC_ANY}|{OC_ANY}|{OH_ANY}){V_ANY}{V_ANY}
+^{NON_Q_GI_ONSET}({I_ANY}|{Y_ANY})(?:{V_NO_EC}{V_ANY}|{EC_ANY}{V_NO_U})
+^{NON_Q_GI_ONSET}{UH_ANY}(?:{V_NO_OH}{V_ANY}|{OH_ANY}{V_NO_IU})
+^{NON_Q_GI_ONSET}{O_ANY}(?:{A_ANY}{V_NO_IYO}|{E_ANY}{V_NO_O}|({AB_ANY}|{AC_ANY}|{EC_ANY}|{I_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{U_ANY}|{UH_ANY}|{Y_ANY}){V_ANY})
+^{NON_Q_GI_ONSET}{U_ANY}(?:{OC_ANY}{V_NO_I}|{OH_ANY}{V_NO_U}|{AC_ANY}{V_NO_Y}|{Y_ANY}{V_NO_AUEC}|({A_ANY}|{AB_ANY}|{E_ANY}|{EC_ANY}|{I_ANY}|{O_ANY}|{U_ANY}|{UH_ANY}){V_ANY})
+
+/* 11. Invalid vowel + coda combinations (open-only diphthongs/triphthongs & palatal/velar restrictions) */
+(?:{A_ANY}|{O_ANY}|{OC_ANY}|{OH_ANY}|{UH_ANY}){I_ANY}{C_ANY}
+^{NON_Q_ONSET}{U_ANY}{I_ANY}{C_ANY}
+(?:{A_ANY}|{AC_ANY}){Y_ANY}{C_ANY}
+{V_ANY}{U_ANY}{C_ANY}
+(?:{A_ANY}|{E_ANY}){O_ANY}{C_ANY}
+^{NON_Q_GI_ONSET}{I_ANY}{A_ANY}{C_ANY}
+(?:{UH_ANY}|{Y_ANY}){A_ANY}{C_ANY}
+^{NON_Q_ONSET}{U_ANY}{A_ANY}{C_ANY}
+{U_ANY}{OH_ANY}{C_ANY}
+^qu(?:{V_NO_Y}{V_ANY}|{Y_ANY}{V_NO_EC}){C_ANY}
+^{NON_Q_ONSET}{Y_ANY}{C_ANY}
+{I_ANY}(?:ng|c)$
+{OH_ANY}(?:nh|ch)$
+^{C_ANY}*{OH_ANY}(?:ng|c)$
+^gi{OH_ANY}(?:ng|c)$
+
+%%
+/* ============================================================================
+ * SECTION 3: Compile-Time Self-Verification Vectors
+ * ============================================================================ */
+
+/* Rejected non-Vietnamese / mangled English combinations */
+reject "lẽi"
+reject "ẽit"
+reject "tẽt"
+reject "nẽt"
+reject "mêt"
+reject "bôt"
+reject "kêp"
+reject "dêp"
+reject "lôp"
+reject "rôt"
+reject "bôk"
+reject "lôk"
+reject "gôd"
+reject "tôl"
+reject "úer"
+reject "úe"
+reject "trúe"
+reject "yỏu"
+reject "ỏu"
+reject "hỏu"
+reject "tỏu"
+reject "hóue"
+reject "sỏuce"
+reject "ghót"
+reject "lă"
+reject "să"
+reject "ră"
+reject "rồtop"
+reject "bèore"
+reject "rétore"
+reject "macó"
+reject "filé"
+reject "viéw"
+reject "utf8"
+reject "e2e"
+reject "nưóc"
+reject "tưong"
+reject "ưo"
+reject "ngưòi"
+reject "múic"
+reject "ưing"
+reject "cáe"
+reject "cảe"
+
+/* Accepted valid Vietnamese words, rare syllables, and 'đ' abbreviations */
+accept "tiếng"
+accept "Việt"
+accept "một"
+accept "mới"
+accept "nghiếng"
+accept "thuyền"
+accept "khuỷu"
+accept "ngoằn"
+accept "ngoắt"
+accept "ngoáo"
+accept "ngoéo"
+accept "hoạch"
+accept "oanh"
+accept "xoong"
+accept "oóc"
+accept "hươu"
+accept "rượu"
+accept "quốc"
+accept "quyết"
+accept "quỳnh"
+accept "quýt"
+accept "quít"
+accept "quơ"
+accept "quẩy"
+accept "quẹo"
+accept "khuếch"
+accept "khuấy"
+accept "khuâng"
+accept "khuya"
+accept "huỳnh"
+accept "huỵch"
+accept "tuýt"
+accept "gì"
+accept "gìn"
+accept "giữa"
+accept "giường"
+accept "giếng"
+accept "gieo"
+accept "giễu"
+accept "giặt"
+accept "thuở"
+accept "huơ"
+accept "hòa"
+accept "hoà"
+accept "khỏe"
+accept "khoẻ"
+accept "thúy"
+accept "thuý"
+accept "rồ"
+accept "yêu"
+accept "yên"
+accept "ý"
+accept "ươ"
+accept "iê"
+accept "uô"
+accept "ă"
+accept "â"
+accept "đc"
+accept "đk"
+accept "ĐN"
+accept "hương"
+accept "nước"
+accept "ước"
+accept "được"
+accept "người"
+accept "giang"
+accept "giáp"
+accept "quang"
+accept "thích"
+accept "mình"
+accept "cao"

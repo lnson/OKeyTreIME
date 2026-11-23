@@ -5,6 +5,7 @@ package(default_visibility = ["//visibility:public"])
 
 exports_files([
     "telex.ime",
+    "vietnamese.inv",
     "viqr.ime",
     "vni.ime",
 ])
@@ -13,6 +14,7 @@ filegroup(
     name = "all_specs",
     srcs = [
         "telex.ime",
+        "vietnamese.inv",
         "viqr.ime",
         "vni.ime",
     ],

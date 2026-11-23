@@ -1,0 +1,97 @@
+# Copyright (C) 2026 lnson
+# SPDX-License-Identifier: GPL-3.0-only
+
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# 1. Flex & Bison codegen for inv-lexer.lpp and inv-parser.ypp
+genrule(
+    name = "generate_inv_lexer",
+    srcs = ["inv-lexer.lpp"],
+    outs = ["inv-lexer.yy.cc"],
+    cmd = "/usr/bin/flex -o $@ $(location inv-lexer.lpp)",
+)
+
+genrule(
+    name = "generate_inv_parser",
+    srcs = ["inv-parser.ypp"],
+    outs = [
+        "inv-parser.yacc.cc",
+        "inv-parser.yacc.h",
+    ],
+    cmd = "/usr/bin/bison -y --defines=$(location inv-parser.yacc.h) -o $(location inv-parser.yacc.cc) $(location inv-parser.ypp)",
+)
+
+# 2. `.inv` AST, Minimized Inversion DFA Compiler & C++ Codegen Libraries
+cc_library(
+    name = "inv_ast",
+    srcs = [
+        "inv-ast.cc",
+        ":inv-lexer.yy.cc",
+        ":inv-parser.yacc.cc",
+        ":inv-parser.yacc.h",
+    ],
+    hdrs = [
+        "inv-ast.h",
+        "inv-compiler.h",
+    ],
+    includes = ["."],
+    deps = [
+        "//OKeyTre/ime/core:unicode_utils",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+        "@simdutf",
+    ],
+)
+
+cc_library(
+    name = "inv_compiler",
+    srcs = ["inv-compiler.cc"],
+    hdrs = ["inv-compiler.h"],
+    includes = ["."],
+    deps = [
+        ":inv_ast",
+        "//OKeyTre/ime/core:unicode_utils",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+    ],
+)
+
+cc_test(
+    name = "inv_compiler_test",
+    size = "small",
+    srcs = ["inv-compiler_test.cc"],
+    deps = [
+        ":inv_compiler",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+        "@googletest//:gtest_main",
+    ],
+)
+
+# 3. Ahead-of-Time `.inv` -> `.generated.h` C++ compiler CLI (`invc`)
+cc_binary(
+    name = "invc",
+    srcs = ["invc-main.cc"],
+    deps = [
+        ":inv_compiler",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:status_macros",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+    ],
+)

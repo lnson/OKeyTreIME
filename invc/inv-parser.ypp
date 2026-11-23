@@ -1,0 +1,271 @@
+%{
+// Copyright (C) 2026 lnson
+// SPDX-License-Identifier: GPL-3.0-only
+
+// Bison LALR(1) grammar for `.inv` inversion-matcher specifications.
+
+#pragma clang diagnostic ignored "-Wunused-function"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#pragma clang diagnostic ignored "-Wsign-compare"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
+
+#include <cstddef>
+#include <cstdint>
+#include <utility>
+#include <vector>
+
+#include "inv-ast.h"
+#include "unicode-utils.h"
+
+int invc_yylex(YYSTYPE* yylval_param, okeytre::InvParseContext* ctx);
+
+void invc_yyerror(okeytre::InvParseContext* ctx, const char* msg) {
+  if (ctx != nullptr && !ctx->has_error) {
+    ctx->SetError(ctx->last_token_line,
+                  msg != nullptr ? msg : "syntax error in .inv specification");
+  }
+}
+%}
+
+%pure-parser
+%name-prefix="invc_yy"
+%lex-param   { okeytre::InvParseContext* ctx }
+%parse-param { okeytre::InvParseContext* ctx }
+
+%token ITOK_SECTION_SEP
+%token ITOK_DIR_NAME
+%token ITOK_IDENT
+%token ITOK_STRING
+%token ITOK_UCHAR
+%token ITOK_CHAR_CLASS
+%token ITOK_BRACE_REF
+%token ITOK_LPAREN
+%token ITOK_LPAREN_NC
+%token ITOK_RPAREN
+%token ITOK_PIPE
+%token ITOK_STAR
+%token ITOK_PLUS
+%token ITOK_QUEST
+%token ITOK_DOT
+%token ITOK_CARET
+%token ITOK_DOLLAR
+%token ITOK_REJECT
+%token ITOK_ACCEPT
+%token ITOK_EOL
+%token ITOK_LEX_ERROR
+
+%start inv_spec
+
+%%
+
+inv_spec
+    : section1_defs ITOK_SECTION_SEP section2_patterns opt_section3
+    ;
+
+opt_section3
+    : /* empty */
+    | ITOK_SECTION_SEP section3_assertions
+    ;
+
+/* ============================================================================
+ * SECTION 1: Definitions (%name "...", MACRO <regex>)
+ * ============================================================================ */
+
+section1_defs
+    : /* empty */
+    | section1_defs section1_def
+    ;
+
+section1_def
+    : ITOK_DIR_NAME ITOK_STRING ITOK_EOL {
+      ctx->spec.name = ctx->strings[static_cast<size_t>($2.node_idx)];
+    }
+    | ITOK_IDENT expr_alt ITOK_EOL {
+      if (!ctx->AddMacroDecl($1.node_idx, $2.node_idx, $1.line)) {
+        YYABORT;
+      }
+    }
+    ;
+
+/* ============================================================================
+ * SECTION 2: Disallowed Patterns ([^]<regex>[$])
+ * ============================================================================ */
+
+section2_patterns
+    : pattern_rule
+    | section2_patterns pattern_rule
+    ;
+
+opt_caret
+    : /* empty */ {
+      $$.bool_val = false;
+      $$.line = ctx->line;
+    }
+    | ITOK_CARET {
+      $$.bool_val = true;
+      $$.line = $1.line;
+    }
+    ;
+
+opt_dollar
+    : /* empty */ {
+      $$.bool_val = false;
+    }
+    | ITOK_DOLLAR {
+      $$.bool_val = true;
+    }
+    ;
+
+pattern_rule
+    : opt_caret expr_alt opt_dollar ITOK_EOL {
+      if (!ctx->AddPatternRule($1.bool_val, $2.node_idx, $3.bool_val,
+                               $4.line)) {
+        YYABORT;
+      }
+    }
+    ;
+
+/* ============================================================================
+ * Pattern Expressions (shared by Section 1 macros and Section 2 patterns)
+ * ============================================================================ */
+
+expr_alt
+    : expr_branch_list {
+      std::vector<okeytre::InvExprNode>& branches =
+          ctx->expr_lists[static_cast<size_t>($1.list_idx)];
+      $$.line = $1.line;
+      $$.node_idx = ctx->InternExpr(
+          okeytre::InvExprNode::MakeAlt(std::move(branches), $1.line));
+    }
+    ;
+
+expr_branch_list
+    : expr_concat {
+      $$.line = $1.line;
+      $$.list_idx =
+          ctx->NewExprList(ctx->expr_nodes[static_cast<size_t>($1.node_idx)]);
+    }
+    | expr_branch_list ITOK_PIPE expr_concat {
+      ctx->expr_lists[static_cast<size_t>($1.list_idx)].push_back(
+          ctx->expr_nodes[static_cast<size_t>($3.node_idx)]);
+      $$.line = $1.line;
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+expr_concat
+    : /* empty */ {
+      $$.line = ctx->line;
+      $$.node_idx = ctx->InternExpr(okeytre::InvExprNode::MakeEmpty(ctx->line));
+    }
+    | expr_seq_list {
+      std::vector<okeytre::InvExprNode>& seq =
+          ctx->expr_lists[static_cast<size_t>($1.list_idx)];
+      $$.line = $1.line;
+      $$.node_idx = ctx->InternExpr(
+          okeytre::InvExprNode::MakeConcat(std::move(seq), $1.line));
+    }
+    ;
+
+expr_seq_list
+    : expr_quant {
+      $$.line = $1.line;
+      $$.list_idx =
+          ctx->NewExprList(ctx->expr_nodes[static_cast<size_t>($1.node_idx)]);
+    }
+    | expr_seq_list expr_quant {
+      ctx->expr_lists[static_cast<size_t>($1.list_idx)].push_back(
+          ctx->expr_nodes[static_cast<size_t>($2.node_idx)]);
+      $$.line = $1.line;
+      $$.list_idx = $1.list_idx;
+    }
+    ;
+
+expr_quant
+    : expr_atom {
+      $$.line = $1.line;
+      $$.node_idx = $1.node_idx;
+    }
+    | expr_quant ITOK_STAR {
+      $$.line = $1.line;
+      $$.node_idx = ctx->InternExpr(okeytre::InvExprNode::MakeQuantified(
+          okeytre::InvExprNode::Kind::kStar,
+          ctx->expr_nodes[static_cast<size_t>($1.node_idx)], $2.line));
+    }
+    | expr_quant ITOK_PLUS {
+      $$.line = $1.line;
+      $$.node_idx = ctx->InternExpr(okeytre::InvExprNode::MakeQuantified(
+          okeytre::InvExprNode::Kind::kPlus,
+          ctx->expr_nodes[static_cast<size_t>($1.node_idx)], $2.line));
+    }
+    | expr_quant ITOK_QUEST {
+      $$.line = $1.line;
+      $$.node_idx = ctx->InternExpr(okeytre::InvExprNode::MakeQuantified(
+          okeytre::InvExprNode::Kind::kQuest,
+          ctx->expr_nodes[static_cast<size_t>($1.node_idx)], $2.line));
+    }
+    ;
+
+expr_atom
+    : ITOK_UCHAR {
+      okeytre::CharClassPred pred;
+      pred.kind = okeytre::CharClassPred::Kind::kPositive;
+      pred.chars.insert(okeytre::ToLower($1.char_val));
+      $$.line = $1.line;
+      $$.node_idx = ctx->InternExpr(
+          okeytre::InvExprNode::MakeCharClass(std::move(pred), $1.line));
+    }
+    | ITOK_DOT {
+      okeytre::CharClassPred pred;
+      pred.kind = okeytre::CharClassPred::Kind::kAny;
+      $$.line = $1.line;
+      $$.node_idx = ctx->InternExpr(
+          okeytre::InvExprNode::MakeCharClass(std::move(pred), $1.line));
+    }
+    | ITOK_CHAR_CLASS {
+      $$.line = $1.line;
+      $$.node_idx = ctx->InternExpr(okeytre::InvExprNode::MakeCharClass(
+          ctx->predicates[static_cast<size_t>($1.node_idx)], $1.line));
+    }
+    | ITOK_BRACE_REF {
+      $$.line = $1.line;
+      $$.node_idx = ctx->InternExpr(okeytre::InvExprNode::MakeMacroRef(
+          ctx->strings[static_cast<size_t>($1.node_idx)], $1.line));
+    }
+    | ITOK_LPAREN expr_alt ITOK_RPAREN {
+      $$.line = $1.line;
+      $$.node_idx = $2.node_idx;
+    }
+    | ITOK_LPAREN_NC expr_alt ITOK_RPAREN {
+      $$.line = $1.line;
+      $$.node_idx = $2.node_idx;
+    }
+    ;
+
+/* ============================================================================
+ * SECTION 3: Compile-Time Verification Assertions
+ * ============================================================================ */
+
+section3_assertions
+    : /* empty */
+    | section3_assertions assertion_decl
+    ;
+
+assertion_decl
+    : ITOK_REJECT ITOK_STRING ITOK_EOL {
+      if (!ctx->AddAssertion(true, $2.node_idx, $1.line)) {
+        YYABORT;
+      }
+    }
+    | ITOK_ACCEPT ITOK_STRING ITOK_EOL {
+      if (!ctx->AddAssertion(false, $2.node_idx, $1.line)) {
+        YYABORT;
+      }
+    }
+    ;
+
+%%
