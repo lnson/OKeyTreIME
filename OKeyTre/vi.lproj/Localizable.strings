@@ -5,6 +5,8 @@
 "menu.input_source_warning.subtitle" = "Nên dùng bàn phím tiếng Anh (U.S.)";
 "menu.input_style" = "Kiểu gõ";
 "menu.launch_at_login" = "Khởi động cùng hệ thống";
+"menu.auto_check_updates" = "Tự động kiểm tra cập nhật";
+"menu.update_available.title" = "✨ Đã có phiên bản mới: %@";
 "menu.language" = "Ngôn ngữ";
 "menu.settings" = "Cài đặt...";
 "menu.quit" = "Thoát";
@@ -12,6 +14,8 @@
 /* Shared Actions */
 "action.open_settings_now" = "Mở cài đặt ngay";
 "action.switch_to_us" = "Chuyển sang U.S.";
+"action.download_update" = "Tải bản cập nhật...";
+"action.skip_version" = "Bỏ qua phiên bản này";
 
 /* Language Options */
 "language.system" = "Theo hệ thống";
@@ -20,6 +24,10 @@
 "app.name" = "ÔKêyTre";
 "settings.window_title" = "Cài đặt ÔKêyTre";
 "settings.sidebar.version" = "Phiên bản %@";
+"settings.sidebar.check_updates" = "Kiểm tra cập nhật";
+"settings.sidebar.checking_updates" = "Đang kiểm tra...";
+"settings.sidebar.up_to_date" = "Đã là bản mới nhất";
+"settings.sidebar.update_available" = "Cập nhật bản %@";
 "settings.section.correction" = "Bỏ dấu & Chính tả";
 "settings.section.advanced" = "Dành cho chuyên gia";
 

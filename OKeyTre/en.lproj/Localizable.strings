@@ -5,6 +5,8 @@
 "menu.input_source_warning.subtitle" = "Recommended: English (U.S.) keyboard";
 "menu.input_style" = "Input Method";
 "menu.launch_at_login" = "Launch at Login";
+"menu.auto_check_updates" = "Auto-Check for Updates";
+"menu.update_available.title" = "✨ New Version Available: %@";
 "menu.language" = "Language";
 "menu.settings" = "Settings...";
 "menu.quit" = "Quit";
@@ -12,6 +14,8 @@
 /* Shared Actions */
 "action.open_settings_now" = "Open Settings Now";
 "action.switch_to_us" = "Switch to U.S.";
+"action.download_update" = "Download Update...";
+"action.skip_version" = "Skip This Version";
 
 /* Language Options */
 "language.system" = "System Default";
@@ -20,6 +24,10 @@
 "app.name" = "ÔKêyTre";
 "settings.window_title" = "ÔKêyTre Settings";
 "settings.sidebar.version" = "Version %@";
+"settings.sidebar.check_updates" = "Check for Updates";
+"settings.sidebar.checking_updates" = "Checking...";
+"settings.sidebar.up_to_date" = "Up to date";
+"settings.sidebar.update_available" = "Update to %@";
 "settings.section.correction" = "Tones & Spelling";
 "settings.section.advanced" = "Advanced";
 

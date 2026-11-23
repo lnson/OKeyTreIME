@@ -22,11 +22,25 @@ private struct MenuBarMenuContent: View {
     @ObservedObject var inputSourceManager = InputSourceManager.shared
     @ObservedObject var permissionManager = PermissionManager.shared
     @ObservedObject var launchAtLoginManager = LaunchAtLoginManager.shared
+    @ObservedObject var updateManager = UpdateManager.shared
     @AppStorage(InputMethodBuffer.inputMethodDefaultsKey) private var selectedStyle: InputMethodStyle = .telex
     @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        if let release = updateManager.visibleAvailableRelease {
+            Section {
+                Text(appLanguage.localized("menu.update_available.title", release.displayVersion))
+                Button(appLanguage.localized("action.download_update")) {
+                    updateManager.openReleasePage(release)
+                }
+                Button(appLanguage.localized("action.skip_version")) {
+                    updateManager.skipRelease(release)
+                }
+            }
+            Divider()
+        }
+
         if !permissionManager.isAccessibilityGranted {
             Section {
                 Text(appLanguage.localized("menu.accessibility_missing.title"))
@@ -109,6 +123,7 @@ private struct MenuBarMenuContent: View {
 
         UserDefaults.standard.register(defaults: [
             InputMethodBuffer.modernToneDefaultsKey: InputMethodBuffer.defaultModernTone,
+            UpdateManager.autoCheckDefaultsKey: UpdateManager.defaultAutoCheck,
         ])
 
         NSApplication.shared.setActivationPolicy(.accessory)
@@ -119,6 +134,7 @@ private struct MenuBarMenuContent: View {
             LaunchAtLoginManager.shared.enableByDefaultIfNeeded()
             PermissionManager.shared.requestAccessibility()
             InputSourceManager.shared.checkAndWarnOnStartup()
+            UpdateManager.shared.startAutomaticChecksIfNeeded()
         }
     }
 
