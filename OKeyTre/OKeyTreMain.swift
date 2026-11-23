@@ -106,10 +106,15 @@ private struct MenuBarMenuContent: View {
 
 @main struct OKeyTreMain: App {
     private static let relaunchPidFlag = "--relaunched-from-pid"
+    static let registerAccessibilityFlag = "--register-accessibility"
 
     @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
 
     init() {
+        if CommandLine.arguments.contains(Self.registerAccessibilityFlag) {
+            PermissionManager.runAccessibilityRegistrationHelperAndExit()
+        }
+
         let env = ProcessInfo.processInfo.environment
         let isPreview = env["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
         let isRunningTests = env["XCTestConfigurationFilePath"] != nil

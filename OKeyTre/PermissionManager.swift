@@ -90,15 +90,16 @@ final class PermissionManager: ObservableObject {
 
     func openAccessibilitySettings() {
         showSuccessAlertOnGrant = true
-        promptAccessibilityRegistration()
-
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                // Only open System Settings directly if macOS suppressed its own native
-                // `universalAccessAuthWarn` prompt (i.e. when an entry already exists in TCC).
-                if !Self.isSystemAccessibilityPromptVisible() {
-                    NSWorkspace.shared.open(url)
-                }
+        promptAccessibilityRegistrationInFreshInstance {
+            guard let url = URL(
+                string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+            ) else {
+                return
+            }
+            // Only open System Settings directly if macOS suppressed its own native
+            // `universalAccessAuthWarn` prompt (i.e. when an entry already exists in TCC).
+            if !Self.isSystemAccessibilityPromptVisible() {
+                NSWorkspace.shared.open(url)
             }
         }
     }
@@ -264,11 +265,51 @@ final class PermissionManager: ObservableObject {
         return !testedAny
     }
 
+    nonisolated static func runAccessibilityRegistrationHelperAndExit() -> Never {
+        let options = [
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+        ] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+        _ = RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.25))
+        Darwin._exit(0)
+    }
+
     private func promptAccessibilityRegistration() {
         let options = [
             kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
         ] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
+    }
+
+    /// Spawns a short-lived LaunchServices instance of `OKeyTre.app` with `--register-accessibility`
+    /// so `AXIsProcessTrustedWithOptions(prompt: true)` executes with a fresh `launchd` audit token
+    /// and uncached `HIServices` trust state (re-inserting the app into System Settings → Accessibility
+    /// even if the user removed `–` the row while this process was already running).
+    private func promptAccessibilityRegistrationInFreshInstance(
+        completion: @escaping @MainActor () -> Void
+    ) {
+        promptAccessibilityRegistration()
+
+        let bundleURL = Bundle.main.bundleURL
+        guard bundleURL.pathExtension == "app" else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                completion()
+            }
+            return
+        }
+
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        config.activates = false
+        config.addsToRecentItems = false
+        config.arguments = [OKeyTreMain.registerAccessibilityFlag]
+
+        NSWorkspace.shared.openApplication(at: bundleURL, configuration: config) { _, _ in
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(400))
+                completion()
+            }
+        }
     }
 
     private static func isSystemAccessibilityPromptVisible() -> Bool {
