@@ -2,17 +2,16 @@
 # Copyright (C) 2026 lnson
 # SPDX-License-Identifier: GPL-3.0-only
 #
-# Builds, privacy-audits, ad-hoc signs, and packages ÔKêyTre as a Universal
-# macOS release disk image (`build/OKeyTre-v<version>.dmg`).
+# Builds, signs, optionally notarizes + staples, and packages ÔKêyTre as a
+# Universal macOS release disk image (`build/OKeyTre-v<version>.dmg`).
 #
 # Usage:
 #   ./scripts/release-dmg.sh [version] [options]
 #
 # Examples:
-#   ./scripts/release-dmg.sh                # Build DMG using current version in BazelInfo.plist
-#   ./scripts/release-dmg.sh 0.2            # Bump version to 0.2 (and increment build number), then build DMG
-#   ./scripts/release-dmg.sh v0.2.1 --open  # Bump to 0.2.1, build DMG, and reveal in Finder
-#   ./scripts/release-dmg.sh 0.2 --publish  # Also create & upload GitHub Release (requires `gh` CLI or GITHUB_TOKEN)
+#   ./scripts/release-dmg.sh                  # Auto-detect Developer ID + notarize (or ad-hoc if --adhoc)
+#   ./scripts/release-dmg.sh 0.2 --open       # Bump version to 0.2, build + sign + notarize DMG, reveal in Finder
+#   ./scripts/release-dmg.sh 0.2 --publish    # Also create & upload GitHub Release
 
 set -euo pipefail
 
@@ -26,27 +25,36 @@ PLIST_PATH="$REPO_ROOT/BazelInfo.plist"
 PBXPROJ_PATH="$REPO_ROOT/OKeyTre.xcodeproj/project.pbxproj"
 PLIST_BUDDY="/usr/libexec/PlistBuddy"
 GITHUB_REPO="lnson/OKeyTreIME"
+DEFAULT_NOTARY_PROFILE="okeytre-notary"
 
 usage() {
   cat <<'EOF'
 Usage: ./scripts/release-dmg.sh [version] [options]
 
 Arguments:
-  version            Optional target version (e.g. 0.2, v0.2.0). If provided,
-                     updates BazelInfo.plist and OKeyTre.xcodeproj automatically.
+  version                    Optional target version (e.g. 0.2, v0.2.0). If provided,
+                             updates BazelInfo.plist and OKeyTre.xcodeproj automatically.
 
 Options:
-  --arm64-only       Build for Apple Silicon (arm64) only instead of Universal (arm64 + x86_64)
-  --skip-tests       Skip running C++ & imec unit tests before building
-  --open             Reveal the generated .dmg in Finder when finished
-  --publish          Publish tag + .dmg to GitHub Releases (uses `gh` CLI or GITHUB_TOKEN)
-  --prerelease       Mark the GitHub Release as a pre-release (used with --publish)
-  -h, --help         Show this help message
+  --adhoc                    Force anonymous ad-hoc signing instead of Developer ID signing
+  --skip-notarize            Sign with Developer ID (if available) without Apple notarization
+  --notary-profile <name>    Keychain profile name for `xcrun notarytool` (default: okeytre-notary)
+  --sign-identity <id>       Explicit codesign identity (default: auto-detect Developer ID Application)
+  --arm64-only               Build for Apple Silicon (arm64) only instead of Universal (arm64 + x86_64)
+  --skip-tests               Skip running C++ & imec unit tests before building
+  --open                     Reveal the generated .dmg in Finder when finished
+  --publish                  Publish tag + .dmg to GitHub Releases (uses `gh` CLI or GITHUB_TOKEN)
+  --prerelease               Mark the GitHub Release as a pre-release (used with --publish)
+  -h, --help                 Show this help message
 EOF
 }
 
 TARGET_VERSION=""
 CPUS="arm64,x86_64"
+FORCE_ADHOC=0
+SKIP_NOTARIZE=0
+NOTARY_PROFILE="$DEFAULT_NOTARY_PROFILE"
+SIGN_IDENTITY=""
 RUN_TESTS=1
 REVEAL_IN_FINDER=0
 PUBLISH_RELEASE=0
@@ -54,6 +62,22 @@ PRERELEASE=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --adhoc)
+      FORCE_ADHOC=1
+      shift
+      ;;
+    --skip-notarize)
+      SKIP_NOTARIZE=1
+      shift
+      ;;
+    --notary-profile)
+      NOTARY_PROFILE="${2:?missing value for --notary-profile}"
+      shift 2
+      ;;
+    --sign-identity)
+      SIGN_IDENTITY="${2:?missing value for --sign-identity}"
+      shift 2
+      ;;
     --arm64-only)
       CPUS="arm64"
       shift
@@ -95,6 +119,18 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Auto-detect Developer ID Application certificate unless --adhoc was requested.
+if [[ "$FORCE_ADHOC" -eq 0 && -z "$SIGN_IDENTITY" ]]; then
+  SIGN_IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
+    | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p' \
+    | head -n 1)"
+fi
+
+USE_DEVELOPER_ID=0
+if [[ "$FORCE_ADHOC" -eq 0 && -n "$SIGN_IDENTITY" ]]; then
+  USE_DEVELOPER_ID=1
+fi
 
 CURRENT_VERSION="$("$PLIST_BUDDY" -c "Print :CFBundleShortVersionString" "$PLIST_PATH")"
 CURRENT_BUILD="$("$PLIST_BUDDY" -c "Print :CFBundleVersion" "$PLIST_PATH")"
@@ -148,11 +184,16 @@ ditto -x -k "$REPO_ROOT/bazel-bin/OKeyTreApp.zip" "$STAGING_DIR/"
 # Normalize Bazel's 1980-01-01 zip timestamps before signing.
 find "$APP_BUNDLE" -exec touch {} +
 
-echo "==> Applying clean ad-hoc code signature..."
-codesign --force --deep --sign - "$APP_BUNDLE"
+if [[ "$USE_DEVELOPER_ID" -eq 1 ]]; then
+  echo "==> Signing OKeyTre.app with Hardened Runtime (${SIGN_IDENTITY})..."
+  codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$APP_BUNDLE"
+else
+  echo "==> Applying clean ad-hoc code signature..."
+  codesign --force --deep --sign - "$APP_BUNDLE"
+fi
 codesign --verify --deep --strict "$APP_BUNDLE"
 
-echo "==> Running release & privacy checks..."
+echo "==> Running binary & bundle checks..."
 BUILT_VERSION="$("$PLIST_BUDDY" -c "Print :CFBundleShortVersionString" "$APP_PLIST")"
 if [[ "$BUILT_VERSION" != "$VERSION" ]]; then
   echo "error: built Info.plist version '$BUILT_VERSION' does not match expected '$VERSION'" >&2
@@ -160,15 +201,17 @@ if [[ "$BUILT_VERSION" != "$VERSION" ]]; then
 fi
 
 CODESIGN_INFO="$(codesign -dvvv "$APP_BUNDLE" 2>&1)"
-if ! grep -q "^Signature=adhoc$" <<<"$CODESIGN_INFO"; then
-  echo "error: expected ad-hoc signature, got:" >&2
-  echo "$CODESIGN_INFO" >&2
-  exit 1
-fi
-if ! grep -q "^TeamIdentifier=not set$" <<<"$CODESIGN_INFO"; then
-  echo "error: TeamIdentifier is set in binary signature (potential privacy leak!):" >&2
-  echo "$CODESIGN_INFO" >&2
-  exit 1
+if [[ "$USE_DEVELOPER_ID" -eq 0 ]]; then
+  if ! grep -q "^Signature=adhoc$" <<<"$CODESIGN_INFO"; then
+    echo "error: expected ad-hoc signature, got:" >&2
+    echo "$CODESIGN_INFO" >&2
+    exit 1
+  fi
+  if ! grep -q "^TeamIdentifier=not set$" <<<"$CODESIGN_INFO"; then
+    echo "error: TeamIdentifier is set in ad-hoc binary signature:" >&2
+    echo "$CODESIGN_INFO" >&2
+    exit 1
+  fi
 fi
 
 if strings "$APP_BIN" | grep -q "/Users/"; then
@@ -179,33 +222,66 @@ fi
 ARCHS="$(lipo -archs "$APP_BIN")"
 echo "    Verified architectures : $ARCHS"
 echo "    Verified bundle version: $BUILT_VERSION"
-echo "    Verified code signature: adhoc (no Team ID / personal identity)"
+if [[ "$USE_DEVELOPER_ID" -eq 1 ]]; then
+  echo "    Verified code signature: $SIGN_IDENTITY"
+else
+  echo "    Verified code signature: adhoc"
+fi
 
 echo "==> Packaging compressed disk image: ${DMG_PATH#$REPO_ROOT/}"
 ln -sf /Applications "$STAGING_DIR/Applications"
 rm -f "$DMG_PATH"
 hdiutil create -volname "ÔKêyTre" -srcfolder "$STAGING_DIR" -ov -format UDZO "$DMG_PATH" >/dev/null
-rm -rf "$STAGING_DIR"
+
+NOTARIZED=0
+if [[ "$USE_DEVELOPER_ID" -eq 1 ]]; then
+  echo "==> Signing disk image..."
+  codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_PATH"
+
+  if [[ "$SKIP_NOTARIZE" -eq 0 ]]; then
+    echo "==> Submitting $(basename "$DMG_PATH") to Apple Notary Service (profile: ${NOTARY_PROFILE})..."
+    echo "    (If this fails with missing profile, run once:"
+    echo "     xcrun notarytool store-credentials \"${NOTARY_PROFILE}\" --apple-id YOUR_EMAIL --team-id YOUR_TEAM_ID --password APP_SPECIFIC_PASSWORD)"
+    xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+
+    echo "==> Stapling notarization ticket to $(basename "$DMG_PATH")..."
+    xcrun stapler staple "$DMG_PATH"
+    xcrun stapler validate "$DMG_PATH"
+    spctl -a -vvv -t open --context context:primary-signature "$DMG_PATH"
+    NOTARIZED=1
+  fi
+fi
 
 DMG_SIZE="$(du -h "$DMG_PATH" | awk '{print $1}')"
 DMG_SHA256="$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')"
 
-RELEASE_NOTES=$(cat <<EOF
+if [[ "$NOTARIZED" -eq 1 ]]; then
+  RELEASE_NOTES=$(cat <<EOF
 ### Installation (macOS 14.0+, Apple Silicon & Intel)
 1. Open \`$(basename "$DMG_PATH")\` and drag **OKeyTre** into **Applications**.
-2. Because the app is ad-hoc signed (not Apple-notarized), allow it on first launch via **System Settings → Privacy & Security → Open Anyway**, or run:
+2. Launch **ÔKêyTre** and grant **Accessibility** permission when prompted.
+EOF
+)
+else
+  RELEASE_NOTES=$(cat <<EOF
+### Installation (macOS 14.0+, Apple Silicon & Intel)
+1. Open \`$(basename "$DMG_PATH")\` and drag **OKeyTre** into **Applications**.
+2. Allow first launch via **System Settings → Privacy & Security → Open Anyway**, or run:
    \`\`\`zsh
    xattr -cr /Applications/OKeyTre.app
    \`\`\`
 3. Grant **Accessibility** permission when prompted so ÔKêyTre can process keystrokes.
 EOF
 )
+fi
 
 echo ""
 echo "✅ Built release DMG successfully!"
-echo "   File   : ${DMG_PATH#$REPO_ROOT/} (${DMG_SIZE})"
-echo "   Tag    : ${TAG}"
-echo "   SHA-256: ${DMG_SHA256}"
+echo "   File     : ${DMG_PATH#$REPO_ROOT/} (${DMG_SIZE})"
+echo "   Tag      : ${TAG}"
+echo "   Signed   : $([[ "$USE_DEVELOPER_ID" -eq 1 ]] && echo "$SIGN_IDENTITY" || echo "adhoc")"
+echo "   Notarized: $([[ "$NOTARIZED" -eq 1 ]] && echo "yes (stapled)" || echo "no")"
+echo "   SHA-256  : ${DMG_SHA256}"
 
 if [[ "$PUBLISH_RELEASE" -eq 1 ]]; then
   echo ""

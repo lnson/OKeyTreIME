@@ -3,13 +3,152 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ÔKêyTre — Bộ gõ tiếng Việt hiện đại cho macOS</title>
+  <title>ÔKêyTre (OKeyTre) — Bộ gõ tiếng Việt nhanh, nhẹ cho macOS</title>
   <meta
     name="description"
-    content="ÔKêyTre — Bộ gõ tiếng Việt nhanh, gọn nhẹ trên menu bar macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa chữ thông minh và khôi phục tiếng Anh tức thì."
+    id="meta-description"
+    content="ÔKêyTre (OKeyTre) là bộ gõ tiếng Việt mã nguồn mở nhanh, gọn nhẹ trên thanh menu macOS (Apple Silicon &amp; Intel). Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ tại con trỏ và khôi phục tiếng Anh tức thì."
   />
-  <link rel="icon" type="image/png" href="favicon.png" />
-  <link rel="apple-touch-icon" href="icon.png" />
+  <meta
+    name="keywords"
+    content="ÔKêyTre, OKeyTre, bộ gõ tiếng Việt cho Mac, bộ gõ tiếng Việt macOS, gõ tiếng Việt MacBook, gõ tiếng Việt Apple Silicon, Telex, VNI, VIQR, Vietnamese input method macOS, Vietnamese keyboard Mac, Vietnamese IME Mac"
+  />
+  <meta name="author" content="lnson" />
+  <meta name="application-name" content="ÔKêyTre" />
+  <meta name="apple-mobile-web-app-title" content="ÔKêyTre" />
+  <meta name="theme-color" content="#fbf6eb" />
+  <meta
+    name="robots"
+    content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+  />
+
+  <link rel="canonical" id="canonical-link" href="https://lnson.github.io/OKeyTreIME/" />
+  <link rel="alternate" hreflang="vi" href="https://lnson.github.io/OKeyTreIME/" />
+  <link rel="alternate" hreflang="en" href="https://lnson.github.io/OKeyTreIME/?lang=en" />
+  <link rel="alternate" hreflang="x-default" href="https://lnson.github.io/OKeyTreIME/" />
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="ÔKêyTre" />
+  <meta
+    property="og:title"
+    id="og-title"
+    content="ÔKêyTre (OKeyTre) — Bộ gõ tiếng Việt nhanh, nhẹ cho macOS"
+  />
+  <meta
+    property="og:description"
+    id="og-description"
+    content="Bộ gõ tiếng Việt mã nguồn mở trên thanh menu macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ thông minh tại con trỏ và khôi phục tiếng Anh tức thì."
+  />
+  <meta property="og:url" id="og-url" content="https://lnson.github.io/OKeyTreIME/" />
+  <meta property="og:locale" id="og-locale" content="vi_VN" />
+  <meta property="og:locale:alternate" content="en_US" />
+  <meta property="og:image" content="https://lnson.github.io/OKeyTreIME/icon.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="512" />
+  <meta property="og:image:height" content="512" />
+  <meta property="og:image:alt" content="ÔKêyTre — Bộ gõ tiếng Việt cho macOS" />
+
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card" content="summary" />
+  <meta
+    name="twitter:title"
+    id="twitter-title"
+    content="ÔKêyTre (OKeyTre) — Bộ gõ tiếng Việt nhanh, nhẹ cho macOS"
+  />
+  <meta
+    name="twitter:description"
+    id="twitter-description"
+    content="Bộ gõ tiếng Việt mã nguồn mở trên thanh menu macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ thông minh tại con trỏ và khôi phục tiếng Anh tức thì."
+  />
+  <meta name="twitter:image" content="https://lnson.github.io/OKeyTreIME/icon.png" />
+
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="icon.png" />
+
+  <!-- Structured Data (SoftwareApplication + FAQPage) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://lnson.github.io/OKeyTreIME/#software",
+        "name": "ÔKêyTre",
+        "alternateName": "OKeyTre",
+        "url": "https://lnson.github.io/OKeyTreIME/",
+        "image": "https://lnson.github.io/OKeyTreIME/icon.png",
+        "description": "ÔKêyTre (OKeyTre) is a fast, lightweight, open-source Vietnamese input method (IME) for the macOS menu bar supporting Telex, VNI, and VIQR with free-order diacritics, smart cursor word editing, and instant English restore.",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "macOS 14.0 or later (Apple Silicon & Intel)",
+        "softwareVersion": "0.1.3",
+        "inLanguage": ["vi", "en"],
+        "isAccessibleForFree": true,
+        "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+        "downloadUrl": "https://github.com/lnson/OKeyTreIME/releases/latest",
+        "releaseNotes": "https://github.com/lnson/OKeyTreIME/releases",
+        "codeRepository": "https://github.com/lnson/OKeyTreIME",
+        "author": {
+          "@type": "Person",
+          "name": "lnson",
+          "url": "https://github.com/lnson"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "featureList": [
+          "Telex, VNI, and VIQR Vietnamese input methods",
+          "Free-order diacritics and tone mark placement",
+          "Instant raw English restore via Left Shift + Right Shift",
+          "Quick Vietnamese on/off toggle via Left Command + Right Command",
+          "Smart word editing at cursor and across lines",
+          "Configurable modern tone placement (oà, uỳ) and spelling auto-correction"
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://lnson.github.io/OKeyTreIME/#faq-schema",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "ÔKêyTre hỗ trợ những phiên bản macOS và dòng máy Mac nào?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "ÔKêyTre chạy nguyên bản (Universal binary) trên cả chip Apple Silicon (M1, M2, M3, M4) và Intel, yêu cầu macOS Sonoma 14.0 trở lên."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Làm sao để tắt nhanh bộ gõ hoặc gõ từ tiếng Anh khi đang bật ÔKêyTre?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Nhấn đồng thời ⌘ Trái + ⌘ Phải (Left ⌘ + Right ⌘) hoặc chọn Tắt (Off) trên thanh menu để tắt/bật bộ gõ tiếng Việt. Để khôi phục riêng từ đang gõ về tiếng Anh gốc, nhấn đồng thời ⇧ Trái + ⇧ Phải (Left ⇧ + Right ⇧)."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "ÔKêyTre khác gì so với bộ gõ tiếng Việt mặc định trên macOS?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "ÔKêyTre khắc phục tình trạng gạch chân (underline) gây nuốt chữ hoặc nhảy ký tự trên trình duyệt và IDE, đồng thời bổ sung bỏ dấu tự do, sửa từ tại con trỏ, khôi phục tiếng Anh tức thì bằng hai phím Shift và tuỳ chỉnh quy tắc đặt dấu."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "ÔKêyTre có an toàn và thu thập dữ liệu bàn phím không?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "ÔKêyTre hoàn toàn miễn phí, mã nguồn mở theo giấy phép GNU GPL-3.0, xử lý phím gõ 100% cục bộ trên máy Mac và không thu thập hay gửi bất kỳ dữ liệu bàn phím nào ra ngoài."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
   <style>
     :root {
       --bg: #fbf6eb;
@@ -111,6 +250,24 @@
       display: flex;
       align-items: center;
       gap: 12px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-right: 4px;
+    }
+
+    .nav-link {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--ink-muted);
+      transition: color 0.15s ease;
+    }
+
+    .nav-link:hover {
+      color: var(--bamboo);
     }
 
     .lang-switch {
@@ -422,6 +579,7 @@
     .steps {
       display: grid;
       gap: 22px;
+      list-style: none;
     }
 
     .step {
@@ -444,7 +602,7 @@
       justify-content: center;
     }
 
-    .step h4 {
+    .step h3 {
       font-size: 1.04rem;
       margin-bottom: 4px;
     }
@@ -485,6 +643,66 @@
       background: rgba(255, 255, 255, 0.22);
     }
 
+    /* FAQ */
+    .faq-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .faq-item {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+
+    .faq-item summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 18px 22px;
+      font-weight: 600;
+      font-size: 1.02rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--ink);
+    }
+
+    .faq-item summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .faq-item summary::after {
+      content: "+";
+      font-size: 1.25rem;
+      font-weight: 500;
+      line-height: 1;
+      color: var(--bamboo);
+      flex-shrink: 0;
+      transition: transform 0.15s ease;
+    }
+
+    .faq-item[open] summary::after {
+      transform: rotate(45deg);
+    }
+
+    .faq-answer {
+      padding: 0 22px 18px;
+      font-size: 0.95rem;
+      color: var(--ink-muted);
+    }
+
+    .faq-answer code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.86em;
+      background: var(--bg-subtle);
+      padding: 1px 6px;
+      border-radius: 5px;
+      color: var(--bamboo);
+    }
+
     /* Footer */
     footer {
       border-top: 1px solid var(--border);
@@ -508,6 +726,12 @@
       }
     }
 
+    @media (max-width: 680px) {
+      .nav-links {
+        display: none;
+      }
+    }
+
     @media (max-width: 600px) {
       .hero {
         padding: 46px 0 36px;
@@ -524,15 +748,29 @@
 </head>
 <body>
   <header>
-    <div class="container nav-inner">
-      <a href="#" class="brand">
-        <img src="icon.png" alt="ÔKêyTre icon" />
+    <nav class="container nav-inner" aria-label="Main navigation">
+      <a href="./" class="brand">
+        <img src="icon.png" alt="ÔKêyTre — Bộ gõ tiếng Việt cho macOS" width="34" height="34" />
         <span>ÔKêyTre</span>
       </a>
       <div class="nav-actions">
+        <div class="nav-links">
+          <a class="nav-link" href="#features">
+            <span lang="vi">Tính năng</span>
+            <span lang="en">Features</span>
+          </a>
+          <a class="nav-link" href="#install">
+            <span lang="vi">Cài đặt</span>
+            <span lang="en">Install</span>
+          </a>
+          <a class="nav-link" href="#faq">
+            <span lang="vi">Hỏi đáp</span>
+            <span lang="en">FAQ</span>
+          </a>
+        </div>
         <div class="lang-switch" role="group" aria-label="Language switch">
-          <button type="button" class="lang-btn active" data-set-lang="vi">VI</button>
-          <button type="button" class="lang-btn" data-set-lang="en">EN</button>
+          <a href="?lang=vi" hreflang="vi" class="lang-btn active" data-set-lang="vi">VI</a>
+          <a href="?lang=en" hreflang="en" class="lang-btn" data-set-lang="en">EN</a>
         </div>
         <a
           class="gh-link"
@@ -555,13 +793,21 @@
           <span>GitHub</span>
         </a>
       </div>
-    </div>
+    </nav>
   </header>
 
   <main class="container">
     <!-- Hero -->
     <section class="hero">
-      <img class="hero-icon" src="icon.png" alt="ÔKêyTre app icon" />
+      <img
+        class="hero-icon"
+        src="icon.png"
+        alt="Biểu tượng ứng dụng bộ gõ tiếng Việt ÔKêyTre cho macOS"
+        width="116"
+        height="116"
+        fetchpriority="high"
+        decoding="async"
+      />
       <div>
         <span class="badge" lang="vi">Mã nguồn mở · macOS 14.0+ (Apple Silicon &amp; Intel)</span>
         <span class="badge" lang="en">Open Source · macOS 14.0+ (Apple Silicon &amp; Intel)</span>
@@ -656,8 +902,8 @@
       </p>
 
       <div class="features-grid">
-        <div class="card">
-          <div class="card-icon">⌨️</div>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">⌨️</div>
           <h3 lang="vi">Telex, VNI &amp; VIQR</h3>
           <h3 lang="en">Telex, VNI &amp; VIQR</h3>
           <p lang="vi">
@@ -666,10 +912,10 @@
           <p lang="en">
             Full support for all three standard Vietnamese input styles. Type tone marks and vowel modifiers anywhere in a syllable, or strip marks cleanly.
           </p>
-        </div>
+        </article>
 
-        <div class="card">
-          <div class="card-icon">⇧</div>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">⇧</div>
           <h3 lang="vi">Gõ tiếng Anh &amp; tắt/bật tức thì</h3>
           <h3 lang="en">Instant English &amp; On/Off Toggle</h3>
           <p lang="vi">
@@ -678,10 +924,10 @@
           <p lang="en">
             Press <code>Left ⇧ + Right ⇧</code> together to restore the current word to raw characters, or press <code>Left ⌘ + Right ⌘</code> (or select <code>Off</code> in the menu bar) to toggle Vietnamese input off and on.
           </p>
-        </div>
+        </article>
 
-        <div class="card">
-          <div class="card-icon">I</div>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">I</div>
           <h3 lang="vi">Sửa từ thông minh tại con trỏ</h3>
           <h3 lang="en">Smart Cursor Word Editing</h3>
           <p lang="vi">
@@ -690,10 +936,10 @@
           <p lang="en">
             Backspace into earlier words on the same line (even in Terminal), or click directly inside any word in Accessibility-enabled apps to edit it.
           </p>
-        </div>
+        </article>
 
-        <div class="card">
-          <div class="card-icon">✓</div>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">✓</div>
           <h3 lang="vi">Tuỳ chỉnh chính tả &amp; quy tắc dấu</h3>
           <h3 lang="en">Configurable Orthography</h3>
           <p lang="vi">
@@ -702,10 +948,10 @@
           <p lang="en">
             Toggle each rule individually: modern tone placement (<code>oà, uỳ</code> vs <code>òa, ùy</code>), <code>ng + i/e → nghi/nghe</code>, <code>ngh + a/o/u → nga/ngo/ngu</code>, and <code>ưo → ươ</code>.
           </p>
-        </div>
+        </article>
 
-        <div class="card">
-          <div class="card-icon">⌘</div>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">⌘</div>
           <h3 lang="vi">Tích hợp chuẩn macOS</h3>
           <h3 lang="en">Native macOS Integration</h3>
           <p lang="vi">
@@ -714,10 +960,10 @@
           <p lang="en">
             Lives entirely in the menu bar, supports Launch at Login, and automatically pauses when switching away from U.S./ABC layouts to prevent conflicts.
           </p>
-        </div>
+        </article>
 
-        <div class="card">
-          <div class="card-icon">⚡</div>
+        <article class="card">
+          <div class="card-icon" aria-hidden="true">⚡</div>
           <h3 lang="vi">Nhẹ, nhanh &amp; riêng tư</h3>
           <h3 lang="en">Fast, Lightweight &amp; Private</h3>
           <p lang="vi">
@@ -726,7 +972,7 @@
           <p lang="en">
             Launches instantly, uses minimal system resources, and responds smoothly without lag. Runs completely offline on your Mac with zero data collection.
           </p>
-        </div>
+        </article>
       </div>
     </section>
 
@@ -742,12 +988,12 @@
       </p>
 
       <div class="install-box">
-        <div class="steps">
-          <div class="step">
-            <div class="step-num">1</div>
+        <ol class="steps">
+          <li class="step">
+            <div class="step-num" aria-hidden="true">1</div>
             <div>
-              <h4 lang="vi">Tải về và kéo vào Applications</h4>
-              <h4 lang="en">Download and drag to Applications</h4>
+              <h3 lang="vi">Tải về và kéo vào Applications</h3>
+              <h3 lang="en">Download and drag to Applications</h3>
               <p lang="vi">
                 Tải file <code>.dmg</code> mới nhất từ trang <a href="https://github.com/lnson/OKeyTreIME/releases/latest">GitHub Releases</a>, mở lên và kéo <strong>OKeyTre</strong> vào thư mục <strong>Applications</strong>.
               </p>
@@ -755,13 +1001,13 @@
                 Download the latest <code>.dmg</code> from <a href="https://github.com/lnson/OKeyTreIME/releases/latest">GitHub Releases</a>, open it, and drag <strong>OKeyTre</strong> into <strong>Applications</strong>.
               </p>
             </div>
-          </div>
+          </li>
 
-          <div class="step">
-            <div class="step-num">2</div>
+          <li class="step">
+            <div class="step-num" aria-hidden="true">2</div>
             <div>
-              <h4 lang="vi">Cho phép mở lần đầu (ứng dụng mã nguồn mở)</h4>
-              <h4 lang="en">Allow first launch (open-source build)</h4>
+              <h3 lang="vi">Cho phép mở lần đầu (ứng dụng mã nguồn mở)</h3>
+              <h3 lang="en">Allow first launch (open-source build)</h3>
               <p lang="vi">
                 Vì ứng dụng được ký ad-hoc (không qua tài khoản trả phí của Apple), hãy vào <strong>System Settings → Privacy &amp; Security → Open Anyway</strong>, hoặc chạy lệnh sau trong Terminal:
               </p>
@@ -773,13 +1019,13 @@
                 <button type="button" class="copy-btn" id="copy-btn">Copy</button>
               </div>
             </div>
-          </div>
+          </li>
 
-          <div class="step">
-            <div class="step-num">3</div>
+          <li class="step">
+            <div class="step-num" aria-hidden="true">3</div>
             <div>
-              <h4 lang="vi">Cấp quyền Trợ năng &amp; dùng bàn phím U.S./ABC</h4>
-              <h4 lang="en">Grant Accessibility &amp; use the U.S./ABC layout</h4>
+              <h3 lang="vi">Cấp quyền Trợ năng &amp; dùng bàn phím U.S./ABC</h3>
+              <h3 lang="en">Grant Accessibility &amp; use the U.S./ABC layout</h3>
               <p lang="vi">
                 Mở <strong>ÔKêyTre</strong>, cấp quyền <strong>Accessibility (Trợ năng)</strong> khi được hỏi và chọn bàn phím hệ thống là <strong>U.S.</strong> hoặc <strong>ABC</strong> để bắt đầu gõ!
               </p>
@@ -787,8 +1033,82 @@
                 Launch <strong>ÔKêyTre</strong>, grant <strong>Accessibility</strong> permission when prompted, and select the macOS <strong>U.S.</strong> or <strong>ABC</strong> keyboard layout to start typing!
               </p>
             </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq">
+      <h2 class="section-title" lang="vi">Câu hỏi thường gặp</h2>
+      <h2 class="section-title" lang="en">Frequently Asked Questions</h2>
+      <p class="section-sub" lang="vi">
+        Giải đáp nhanh những thắc mắc phổ biến khi cài đặt và sử dụng bộ gõ tiếng Việt ÔKêyTre trên Mac.
+      </p>
+      <p class="section-sub" lang="en">
+        Quick answers to common questions about installing and typing Vietnamese with ÔKêyTre on macOS.
+      </p>
+
+      <div class="faq-list">
+        <details class="faq-item" open>
+          <summary>
+            <span lang="vi">ÔKêyTre hỗ trợ những phiên bản macOS và dòng máy Mac nào?</span>
+            <span lang="en">Which macOS versions and Mac models does ÔKêyTre support?</span>
+          </summary>
+          <div class="faq-answer">
+            <p lang="vi">
+              ÔKêyTre được biên dịch dưới dạng Universal binary chạy nguyên bản trên cả chip <strong>Apple Silicon (M1, M2, M3, M4)</strong> lẫn <strong>Intel</strong>, tương thích từ <strong>macOS Sonoma 14.0</strong> trở lên.
+            </p>
+            <p lang="en">
+              ÔKêyTre ships as a Universal binary running natively on both <strong>Apple Silicon (M1, M2, M3, M4)</strong> and <strong>Intel</strong> Macs with <strong>macOS Sonoma 14.0</strong> or later.
+            </p>
           </div>
-        </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>
+            <span lang="vi">Làm sao để tắt nhanh bộ gõ hoặc gõ từ tiếng Anh khi đang bật ÔKêyTre?</span>
+            <span lang="en">How do I quickly toggle Vietnamese input off or type raw English words?</span>
+          </summary>
+          <div class="faq-answer">
+            <p lang="vi">
+              Nhấn đồng thời <code>⌘ Trái + ⌘ Phải</code> (hoặc chọn <code>Tắt</code> trên thanh menu) để tắt/bật nhanh bộ gõ tiếng Việt. Khi chỉ muốn trả riêng từ đang gõ về ký tự tiếng Anh gốc mà không tắt bộ gõ, hãy nhấn đồng thời <code>⇧ Trái + ⇧ Phải</code>.
+            </p>
+            <p lang="en">
+              Press <code>Left ⌘ + Right ⌘</code> together (or choose <code>Off</code> in the menu bar) to toggle Vietnamese input off and on. To restore only the current word to raw English characters without turning off Vietnamese mode, press <code>Left ⇧ + Right ⇧</code>.
+            </p>
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>
+            <span lang="vi">ÔKêyTre khác gì so với bộ gõ tiếng Việt mặc định trên macOS?</span>
+            <span lang="en">How does ÔKêyTre differ from the built-in macOS Vietnamese keyboard?</span>
+          </summary>
+          <div class="faq-answer">
+            <p lang="vi">
+              ÔKêyTre không dùng vùng gạch chân tạm (pre-edit underline) của bộ gõ mặc định vốn hay gây lỗi nuốt chữ hoặc nhân đôi ký tự trên thanh địa chỉ trình duyệt, Spotlight và IDE. Ngoài ra ÔKêyTre hỗ trợ bỏ dấu tự do, sửa từ ngay tại con trỏ, khôi phục tiếng Anh bằng <code>⇧ + ⇧</code> và tuỳ chỉnh quy tắc chính tả.
+            </p>
+            <p lang="en">
+              ÔKêyTre avoids the pre-edit underline buffer used by the stock macOS IME that often causes swallowed or duplicated characters in browser address bars, Spotlight, and IDEs, while adding free-order diacritics, smart cursor word editing, instant <code>⇧ + ⇧</code> English restore, and configurable orthography rules.
+            </p>
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>
+            <span lang="vi">ÔKêyTre có an toàn và riêng tư không? Vì sao cần quyền Trợ năng?</span>
+            <span lang="en">Is ÔKêyTre safe and private, and why does it require Accessibility access?</span>
+          </summary>
+          <div class="faq-answer">
+            <p lang="vi">
+              ÔKêyTre là phần mềm miễn phí, mã nguồn mở theo giấy phép <strong>GNU GPL-3.0</strong>, xử lý phím gõ 100% cục bộ trên máy Mac và không thu thập hay gửi bất kỳ dữ liệu bàn phím nào ra ngoài. Quyền <strong>Accessibility (Trợ năng)</strong> là yêu cầu bắt buộc của macOS để ứng dụng có thể biến đổi tổ hợp phím thành chữ tiếng Việt có dấu.
+            </p>
+            <p lang="en">
+              ÔKêyTre is 100% free and open source under <strong>GNU GPL-3.0</strong>, processes keystrokes strictly offline on your Mac, and never collects or transmits typing data. macOS requires <strong>Accessibility</strong> permission so the app can transform raw keystrokes into accented Vietnamese characters.
+            </p>
+          </div>
+        </details>
       </div>
     </section>
   </main>
@@ -812,36 +1132,115 @@
 
   <script>
     (function () {
+      const BASE_URL = "https://lnson.github.io/OKeyTreIME/";
+      const META = {
+        vi: {
+          title: "ÔKêyTre (OKeyTre) — Bộ gõ tiếng Việt nhanh, nhẹ cho macOS",
+          description:
+            "ÔKêyTre (OKeyTre) là bộ gõ tiếng Việt mã nguồn mở nhanh, gọn nhẹ trên thanh menu macOS (Apple Silicon & Intel). Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ tại con trỏ và khôi phục tiếng Anh tức thì.",
+          ogDescription:
+            "Bộ gõ tiếng Việt mã nguồn mở trên thanh menu macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ thông minh tại con trỏ và khôi phục tiếng Anh tức thì.",
+          locale: "vi_VN",
+          canonical: BASE_URL,
+        },
+        en: {
+          title: "ÔKêyTre (OKeyTre) — Fast, Native Vietnamese Input Method for macOS",
+          description:
+            "ÔKêyTre (OKeyTre) is a fast, lightweight, open-source Vietnamese input method (IME) for the macOS menu bar (Apple Silicon & Intel) supporting Telex, VNI, VIQR, free-order diacritics, and smart cursor editing.",
+          ogDescription:
+            "Open-source Vietnamese IME for the macOS menu bar with Telex, VNI, VIQR, free-order diacritics, smart cursor word editing, and instant English restore.",
+          locale: "en_US",
+          canonical: BASE_URL + "?lang=en",
+        },
+      };
+
       const root = document.documentElement;
       const buttons = document.querySelectorAll("[data-set-lang]");
 
-      function setLang(lang) {
+      function setMetaAttr(id, attr, value) {
+        const el = document.getElementById(id);
+        if (el) el.setAttribute(attr, value);
+      }
+
+      function setLang(lang, options) {
+        const opts = options || {};
+        const info = META[lang] || META.vi;
         root.setAttribute("data-lang", lang);
         root.setAttribute("lang", lang);
-        document.title =
-          lang === "vi"
-            ? "ÔKêyTre — Bộ gõ tiếng Việt hiện đại cho macOS"
-            : "ÔKêyTre — Modern Vietnamese Input Method for macOS";
+        document.title = info.title;
+
+        setMetaAttr("meta-description", "content", info.description);
+        setMetaAttr("og-title", "content", info.title);
+        setMetaAttr("og-description", "content", info.ogDescription);
+        setMetaAttr("og-locale", "content", info.locale);
+        setMetaAttr("twitter-title", "content", info.title);
+        setMetaAttr("twitter-description", "content", info.ogDescription);
+
+        if (opts.updateCanonical) {
+          setMetaAttr("canonical-link", "href", info.canonical);
+          setMetaAttr("og-url", "content", info.canonical);
+        }
+
         buttons.forEach((btn) => {
-          btn.classList.toggle("active", btn.getAttribute("data-set-lang") === lang);
+          const active = btn.getAttribute("data-set-lang") === lang;
+          btn.classList.toggle("active", active);
+          btn.setAttribute("aria-current", active ? "true" : "false");
         });
-        try {
-          localStorage.setItem("okeytre-lang", lang);
-        } catch (_) {}
+
+        if (opts.persist) {
+          try {
+            localStorage.setItem("okeytre-lang", lang);
+          } catch (_) {}
+        }
+
+        if (opts.updateUrl && window.location.protocol !== "file:") {
+          try {
+            const url = new URL(window.location.href);
+            if (lang === "en") {
+              url.searchParams.set("lang", "en");
+            } else {
+              url.searchParams.delete("lang");
+            }
+            window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+          } catch (_) {}
+        }
       }
+
+      let urlLang = null;
+      try {
+        const param = new URLSearchParams(window.location.search).get("lang");
+        if (param === "en" || param === "vi") urlLang = param;
+      } catch (_) {}
 
       let saved = null;
       try {
         saved = localStorage.getItem("okeytre-lang");
       } catch (_) {}
-      if (saved === "en" || saved === "vi") {
+
+      const isCrawler = /bot|crawl|spider|slurp|mediapartners|lighthouse/i.test(
+        navigator.userAgent || ""
+      );
+
+      if (urlLang) {
+        setLang(urlLang, { updateCanonical: true });
+      } else if (saved === "en" || saved === "vi") {
         setLang(saved);
-      } else if (navigator.language && !navigator.language.toLowerCase().startsWith("vi")) {
+      } else if (
+        !isCrawler &&
+        navigator.language &&
+        !navigator.language.toLowerCase().startsWith("vi")
+      ) {
         setLang("en");
+      } else {
+        setLang("vi");
       }
 
       buttons.forEach((btn) => {
-        btn.addEventListener("click", () => setLang(btn.getAttribute("data-set-lang")));
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          const lang = btn.getAttribute("data-set-lang");
+          setLang(lang, { persist: true, updateUrl: true, updateCanonical: true });
+        });
       });
 
       const copyBtn = document.getElementById("copy-btn");
