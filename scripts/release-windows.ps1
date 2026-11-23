@@ -1,8 +1,8 @@
-# Copyright (C) 2026 lnson
+﻿# Copyright (C) 2026 lnson
 # SPDX-License-Identifier: GPL-3.0-only
 #
 # Builds, optionally Authenticode-signs, verifies, packages, and publishes
-# ÔKêyTre for Windows (`build\OKeyTre-v<version>-windows-x64.zip`).
+# OKeyTre for Windows (`build\OKeyTre-v<version>-windows-x64.zip`).
 #
 # Usage:
 #   .\scripts\release-windows.ps1 [Version] [options]
@@ -36,6 +36,7 @@ $RepoRoot = Split-Path -Parent $ScriptDir
 Set-Location $RepoRoot
 
 $GitHubRepo = "lnson/OKeyTreIME"
+$AppDisplayName = "$([char]0x00D4)K$([char]0x00EA)yTre"
 $ResourceHeaderPath = Join-Path $RepoRoot "windows\resources\resource.h"
 $ManifestPath = Join-Path $RepoRoot "windows\resources\okeytre.manifest"
 $AppVersionPath = Join-Path $RepoRoot "windows\app-version.h"
@@ -157,7 +158,7 @@ if ($PublishOnly) {
         throw "OKeyTre.exe is currently running from bazel-bin (PID $($runningBazelExe.Id)). Quit it from the system tray before building a release."
     }
 
-    Write-Host "==> Preparing ÔKêyTre $Tag (Windows x64, static VC++ runtime)"
+    Write-Host "==> Preparing OKeyTre $Tag (Windows x64, static VC++ runtime)"
 
     if (-not $SkipTests) {
         Write-Host "==> Running C++ engine, compiler, and Windows logic unit tests..."
@@ -251,7 +252,7 @@ if ($Publish) {
     $releaseNotes = @"
 ### Installation (Windows 10/11 x64)
 1. Download and extract ``$assetName``.
-2. Run **OKeyTre.exe** (if Windows SmartScreen appears on first launch, choose **More info → Run anyway**).
+2. Run **OKeyTre.exe** (if Windows SmartScreen appears on first launch, choose **More info -> Run anyway**).
 3. Use **Left Ctrl + Right Ctrl** to toggle Vietnamese On/Off and **Left Shift + Right Shift** to restore raw typed words.
 "@
 
@@ -260,11 +261,11 @@ if ($Publish) {
         Write-Host "==> Publishing $assetName to GitHub Release $Tag ($GitHubRepo)..."
         & $gh release view $Tag --repo $GitHubRepo 2>$null | Out-Null
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "    Release $Tag already exists — uploading/updating asset..."
+            Write-Host "    Release $Tag already exists - uploading/updating asset..."
             & $gh release upload $Tag $ZipPath --repo $GitHubRepo --clobber
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         } else {
-            $ghArgs = @("release", "create", $Tag, $ZipPath, "--repo", $GitHubRepo, "--target", $headSha, "--title", "ÔKêyTre $Tag", "--notes", $releaseNotes)
+            $ghArgs = @("release", "create", $Tag, $ZipPath, "--repo", $GitHubRepo, "--target", $headSha, "--title", "$AppDisplayName $Tag", "--notes", $releaseNotes)
             if ($Prerelease) { $ghArgs += "--prerelease" } else { $ghArgs += "--latest" }
             & $gh @ghArgs
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -282,7 +283,7 @@ if ($Publish) {
         $release = $null
         try {
             $release = Invoke-RestMethod -Method Get -Uri "https://api.github.com/repos/$GitHubRepo/releases/tags/$Tag" -Headers $headers
-            Write-Host "    Release $Tag already exists — replacing existing asset if present..."
+            Write-Host "    Release $Tag already exists - replacing existing asset if present..."
             foreach ($existingAsset in $release.assets) {
                 if ($existingAsset.name -eq $assetName) {
                     Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/$GitHubRepo/releases/assets/$($existingAsset.id)" -Headers $headers | Out-Null
@@ -292,7 +293,7 @@ if ($Publish) {
             $payload = @{
                 tag_name         = $Tag
                 target_commitish = $headSha
-                name             = "ÔKêyTre $Tag"
+                name             = "$AppDisplayName $Tag"
                 body             = $releaseNotes
                 draft            = $false
                 prerelease       = [bool]$Prerelease
