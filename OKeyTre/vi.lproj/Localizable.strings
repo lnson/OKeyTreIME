@@ -36,7 +36,7 @@
 
 /* General & Update Settings */
 "settings.general.system.header" = "Hệ thống";
-"settings.general.input_style.description" = "Nhấn đồng thời Command Trái + Command Phải để chuyển nhanh giữa Tắt và kiểu gõ đang dùng.";
+"settings.general.input_style.description" = "Nhấn đồng thời ⌘ Trái + ⌘ Phải để chuyển nhanh giữa Tắt và kiểu gõ đang dùng.";
 "settings.general.launch_at_login.description" = "Tự động mở ÔKêyTre trên thanh menu khi đăng nhập vào macOS.";
 "settings.general.language.description" = "Chọn ngôn ngữ hiển thị cho thanh menu và cửa sổ cài đặt.";
 "settings.updates.header" = "Cập nhật";

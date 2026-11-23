@@ -36,7 +36,7 @@
 
 /* General & Update Settings */
 "settings.general.system.header" = "System";
-"settings.general.input_style.description" = "Press Left Command + Right Command simultaneously to quickly toggle between Off and your active input method.";
+"settings.general.input_style.description" = "Press Left ⌘ + Right ⌘ simultaneously to quickly toggle between Off and your active input method.";
 "settings.general.launch_at_login.description" = "Automatically start ÔKêyTre in the menu bar when you log in to macOS.";
 "settings.general.language.description" = "Choose the display language for menus and settings.";
 "settings.updates.header" = "Updates";

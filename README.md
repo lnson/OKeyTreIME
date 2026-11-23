@@ -11,7 +11,8 @@
 ### 1. Kiểu gõ
 - **Hỗ trợ nhiều kiểu gõ**, gồm có **Telex**, **VNI** và **VIQR**.
 - **Bỏ dấu tự do**: Cho phép gõ dấu thanh và dấu mũ/móc ở bất kỳ vị trí nào trong âm tiết.
-- **Khôi phục nhanh từ gốc (gõ tiếng Anh)**: Nhấn đồng thời **Shift Trái + Shift Phải** để khôi phục từ hiện tại về đúng chuỗi kí tự đang gõ và tạm ngưng biến đổi tiếng Việt cho đến khi sang từ mới.
+- **Bật/tắt nhanh bộ gõ**: Chọn **Tắt** ngay trên menu thanh trạng thái (hoặc trong **Cài đặt → Thường gặp**), hay nhấn đồng thời **⌘ Trái + ⌘ Phải** để chuyển nhanh giữa **Tắt** và kiểu gõ tiếng Việt đang dùng.
+- **Khôi phục nhanh từ gốc (gõ tiếng Anh)**: Nhấn đồng thời **⇧ Trái + ⇧ Phải** để khôi phục từ hiện tại về đúng chuỗi kí tự đang gõ và tạm ngưng biến đổi tiếng Việt cho đến khi sang từ mới.
 - **Tối ưu hoá việc sửa lỗi chính tả**: Bạn có thể quay lại để sửa chữ trên cùng một dòng. Với các ứng dụng có trợ năng, bạn có thể sửa từ bất kì bằng việc đặt con trỏ vào từ đó.
 
 ### 2. Tự động sửa lỗi chính tả:
@@ -38,7 +39,8 @@ Bản quyền (C) 2026 `lnson`. Phân phối theo giấy phép [GNU General Publ
 ### 1. Input Methods
 - **Multiple input styles**, including **Telex**, **VNI**, and **VIQR**.
 - **Free-order diacritics**: Type tone marks and vowel modifiers at any position within a syllable.
-- **Instant raw-word restore (English typing)**: Press **Left Shift + Right Shift** simultaneously to restore the current word to its raw typed characters and pause Vietnamese transformations until the next word.
+- **Quickly turn Vietnamese input off/on**: Choose **Off** from the menu bar menu (or **Settings → General**), or press **Left ⌘ + Right ⌘** simultaneously to toggle between **Off** and your active Vietnamese input style.
+- **Instant raw-word restore (English typing)**: Press **Left ⇧ + Right ⇧** simultaneously to restore the current word to its raw typed characters and pause Vietnamese transformations until the next word.
 - **Streamlined word editing**: Move back to edit words on the same line. In Accessibility-enabled apps, you can edit any word simply by placing the cursor inside it.
 
 ### 2. Auto-Correction
