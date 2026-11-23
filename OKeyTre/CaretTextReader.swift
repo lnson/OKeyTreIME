@@ -54,8 +54,17 @@ enum CaretTextReader {
         return false
     }
 
+    private static let isAutomatedEnvironment: Bool = {
+        let env = ProcessInfo.processInfo.environment
+        return env["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+            || env["XCTestConfigurationFilePath"] != nil
+            || env["XCTestBundlePath"] != nil
+            || env["XCTestSessionIdentifier"] != nil
+    }()
+
     /// Resolves the currently focused UI element, including fallbacks for Apple Pages/iWork and Chromium-based applications.
     static func getFocusedElement() -> AXUIElement? {
+        guard !isAutomatedEnvironment else { return nil }
         var focusedRef: CFTypeRef?
         if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
            let focusedVal = focusedRef {

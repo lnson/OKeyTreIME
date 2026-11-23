@@ -151,7 +151,7 @@ private struct SidebarFooter: View {
 
 private struct CorrectionSettingsPane: View {
     @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
-    @AppStorage(InputMethodBuffer.modernToneDefaultsKey) private var modernTone = false
+    @AppStorage(InputMethodBuffer.modernToneDefaultsKey) private var modernTone = InputMethodBuffer.defaultModernTone
     @AppStorage(InputMethodBuffer.uoHornDefaultsKey) private var uoHorn = false
     @AppStorage(InputMethodBuffer.ngToNghDefaultsKey) private var ngToNgh = false
     @AppStorage(InputMethodBuffer.nghToNgDefaultsKey) private var nghToNg = false

@@ -107,11 +107,16 @@ private struct MenuBarMenuContent: View {
             Self.relaunchViaLaunchServicesIfNeeded(env: env)
         }
 
+        UserDefaults.standard.register(defaults: [
+            InputMethodBuffer.modernToneDefaultsKey: InputMethodBuffer.defaultModernTone,
+        ])
+
         NSApplication.shared.setActivationPolicy(.accessory)
         _ = KeyTapManager.shared
 
         if !isPreview && !isRunningTests {
             Self.terminateExistingInstances()
+            LaunchAtLoginManager.shared.enableByDefaultIfNeeded()
             PermissionManager.shared.requestAccessibility()
             InputSourceManager.shared.checkAndWarnOnStartup()
         }

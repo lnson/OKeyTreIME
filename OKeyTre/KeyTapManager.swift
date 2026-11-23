@@ -108,7 +108,7 @@ class KeyTapManager {
         let storedMaxSize = defaults.integer(forKey: InputMethodBuffer.maxBufferSizeDefaultsKey)
         return InputMethodBuffer(
             style: style,
-            modernTone: defaults.bool(forKey: InputMethodBuffer.modernToneDefaultsKey),
+            modernTone: InputMethodBuffer.resolvedModernTone(from: defaults),
             uoHorn: defaults.bool(forKey: InputMethodBuffer.uoHornDefaultsKey),
             ngToNgh: defaults.bool(forKey: InputMethodBuffer.ngToNghDefaultsKey),
             nghToNg: defaults.bool(forKey: InputMethodBuffer.nghToNgDefaultsKey),

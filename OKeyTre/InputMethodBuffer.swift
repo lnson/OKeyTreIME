@@ -60,6 +60,8 @@ final class InputMethodBuffer {
     static let inputMethodDefaultsKey = "inputMethodStyle"
     /// UserDefaults key controlling modern Vietnamese tone placement (`oà, oé, uý` vs `òa, óe, úy`).
     static let modernToneDefaultsKey = "modernTone"
+    /// Default setting for modern Vietnamese tone placement (`oà, oé, uý`).
+    static let defaultModernTone = true
     /// UserDefaults key controlling the `ư + o -> ươ` (`?uoHorn`) rule.
     static let uoHornDefaultsKey = "uoHorn"
     /// UserDefaults key controlling the `ng + [ie] -> ngh[ie]` (`?ngToNgh`) rule.
@@ -114,9 +116,16 @@ final class InputMethodBuffer {
         set { okeytre_buffer_set_ngh_to_ng(rawBuffer, newValue) }
     }
 
+    static func resolvedModernTone(from defaults: UserDefaults = .standard) -> Bool {
+        if let value = defaults.object(forKey: modernToneDefaultsKey) as? Bool {
+            return value
+        }
+        return defaultModernTone
+    }
+
     init(
         style: InputMethodStyle = .telex,
-        modernTone: Bool = false,
+        modernTone: Bool = InputMethodBuffer.defaultModernTone,
         uoHorn: Bool = false,
         ngToNgh: Bool = false,
         nghToNg: Bool = false,
