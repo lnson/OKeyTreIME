@@ -11,6 +11,7 @@
 "menu.auto_check_updates" = "Auto-Check for Updates";
 "menu.update_available.title" = "✨ New Version Available: %@";
 "menu.language" = "Language";
+"menu.showcase" = "Feature Showcase...";
 "menu.settings" = "Settings...";
 "menu.quit" = "Quit";
 
@@ -81,3 +82,25 @@
 "alert.non_english_keyboard.message" = "The current keyboard is \"%@\". For ÔKêyTre to work accurately without typing conflicts, you should switch to the U.S. or ABC keyboard.";
 "alert.non_english_keyboard.open_keyboard_settings" = "Open Keyboard Settings";
 "alert.non_english_keyboard.ignore" = "Ignore";
+
+/* First-Time & Feature Update Showcase */
+"showcase.window_title" = "Welcome to ÔKêyTre";
+"showcase.title" = "Welcome to ÔKêyTre";
+"showcase.whats_new.title" = "What's New in ÔKêyTre %@";
+"showcase.badge.new" = "NEW";
+"showcase.subtitle" = "ÔKêyTre lives quietly in your macOS menu bar with smart shortcuts for effortless bilingual Vietnamese and English typing.";
+"showcase.status.accessibility_title" = "Accessibility Permission Required";
+"showcase.status.accessibility_desc" = "Grant Accessibility access in System Settings so ÔKêyTre can transform keystrokes into Vietnamese.";
+"showcase.status.ready" = "Ready to type! Try the shortcuts in the box below.";
+"showcase.card.diacritics.title" = "Free-order diacritics";
+"showcase.card.diacritics.desc" = "Type tone marks and vowel modifiers anywhere in a syllable, or press z to strip marks.";
+"showcase.card.auto_restore.title" = "Auto-restore non-Vietnamese";
+"showcase.card.auto_restore.desc" = "Words impossible in Vietnamese revert to raw characters automatically on Space or punctuation.";
+"showcase.card.dual_shift.title" = "Instant raw-word restore";
+"showcase.card.dual_shift.desc" = "Press both Shift keys together (mid-word or right after Space) to restore raw characters.";
+"showcase.card.toggle.title" = "Quick on/off toggle";
+"showcase.card.toggle.desc" = "Press both Command keys together to switch between Off and your active input style.";
+"showcase.card.toggle.result" = "Off / On";
+"showcase.practice.label" = "Try typing right here";
+"showcase.practice.placeholder" = "Try typing: tieengs vieetj cho user...";
+"showcase.action.get_started" = "Get Started";

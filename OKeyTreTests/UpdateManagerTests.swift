@@ -639,5 +639,92 @@ struct AppDefaultsTests {
         let typedDisabled = simulateTyping("lexi ", into: buffer)
         #expect(typedDisabled == "lẽi ")
     }
+
+    @Test("ShowcaseManager presents on first install and feature-milestone upgrades, skips bug-fix releases, and coordinates Dock icon")
+    func firstLaunchShowcaseAndDockLifecycle() async throws {
+        let suiteName = "com.okeytre.tests.showcase.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var presentedModes: [ShowcaseManager.PresentationMode] = []
+
+        // 1. Fresh install on milestone 0.3 -> presents `.firstInstall` once and records "0.3".
+        let initialShowcase = ShowcaseManager(
+            defaults: defaults,
+            milestoneVersionString: "0.3"
+        ) { mode in
+            presentedModes.append(mode)
+        }
+        #expect(initialShowcase.resolveLaunchPresentation() == .firstInstall)
+        #expect(initialShowcase.presentOnLaunchIfNeeded())
+        #expect(presentedModes == [.firstInstall])
+        #expect(defaults.string(forKey: ShowcaseManager.lastSeenShowcaseVersionDefaultsKey) == "0.3")
+
+        // 2. Subsequent launch or pure bug-fix release (e.g. app 0.3.1 keeping milestone "0.3") -> skipped!
+        let bugfixShowcase = ShowcaseManager(
+            defaults: defaults,
+            milestoneVersionString: "0.3"
+        ) { mode in
+            presentedModes.append(mode)
+        }
+        #expect(!bugfixShowcase.shouldPresentOnLaunch())
+        #expect(!bugfixShowcase.presentOnLaunchIfNeeded())
+        #expect(presentedModes.count == 1)
+
+        // 3. New feature release bumping milestone to "0.4" -> presents `.featureUpdate(version: "0.4")` once!
+        let featureUpgradeShowcase = ShowcaseManager(
+            defaults: defaults,
+            milestoneVersionString: "0.4"
+        ) { mode in
+            presentedModes.append(mode)
+        }
+        #expect(featureUpgradeShowcase.resolveLaunchPresentation() == .featureUpdate(version: "0.4"))
+        #expect(featureUpgradeShowcase.presentOnLaunchIfNeeded())
+        #expect(presentedModes == [.firstInstall, .featureUpdate(version: "0.4")])
+        #expect(defaults.string(forKey: ShowcaseManager.lastSeenShowcaseVersionDefaultsKey) == "0.4")
+        #expect(!featureUpgradeShowcase.presentOnLaunchIfNeeded())
+
+        // 4. Upgrading from a pre-showcase release (e.g. 0.2.1 with existing UserDefaults keys) -> `.featureUpdate`.
+        let legacySuite = "com.okeytre.tests.showcase.legacy.\(UUID().uuidString)"
+        let legacyDefaults = try #require(UserDefaults(suiteName: legacySuite))
+        defer { legacyDefaults.removePersistentDomain(forName: legacySuite) }
+        legacyDefaults.set(true, forKey: LaunchAtLoginManager.hasConfiguredDefaultsKey)
+
+        let legacyUpgradeShowcase = ShowcaseManager(
+            defaults: legacyDefaults,
+            milestoneVersionString: "0.3"
+        )
+        #expect(legacyUpgradeShowcase.resolveLaunchPresentation() == .featureUpdate(version: "0.3"))
+
+        // 5. DockIconCoordinator keeps .regular while Showcase window is open and restores .accessory on close.
+        var currentPolicy: NSApplication.ActivationPolicy = .accessory
+        let coordinator = DockIconCoordinator(
+            currentPolicyProvider: { currentPolicy },
+            setPolicyHandler: { currentPolicy = $0 },
+            isAppHiddenProvider: { false },
+            activateAppHandler: {},
+            onAccessoryRestored: {}
+        )
+
+        let showcaseWindow = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 545),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: true
+        )
+        showcaseWindow.isReleasedWhenClosed = false
+        coordinator.registerShowcaseWindow(showcaseWindow)
+
+        coordinator.showShowcaseWindow {
+            showcaseWindow.orderFront(nil)
+        }
+        #expect(currentPolicy == .regular)
+        #expect(coordinator.isShowcaseWindowOpen)
+
+        showcaseWindow.close()
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(currentPolicy == .accessory)
+        #expect(!coordinator.isShowcaseWindowOpen)
+    }
 }
 

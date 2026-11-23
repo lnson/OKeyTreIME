@@ -11,6 +11,7 @@
 "menu.auto_check_updates" = "Tự động kiểm tra cập nhật";
 "menu.update_available.title" = "✨ Đã có phiên bản mới: %@";
 "menu.language" = "Ngôn ngữ";
+"menu.showcase" = "Giới thiệu tính năng...";
 "menu.settings" = "Cài đặt...";
 "menu.quit" = "Thoát";
 
@@ -81,3 +82,25 @@
 "alert.non_english_keyboard.message" = "Bàn phím hiện tại là \"%@\". Để ÔKêyTre hoạt động chính xác và không bị xung đột gõ, bạn nên chuyển sang bàn phím U.S. hoặc ABC.";
 "alert.non_english_keyboard.open_keyboard_settings" = "Mở Cài đặt Bàn phím";
 "alert.non_english_keyboard.ignore" = "Bỏ qua";
+
+/* First-Time & Feature Update Showcase */
+"showcase.window_title" = "Chào mừng đến với ÔKêyTre";
+"showcase.title" = "Chào mừng đến với ÔKêyTre";
+"showcase.whats_new.title" = "Có gì mới trong ÔKêyTre %@";
+"showcase.badge.new" = "MỚI";
+"showcase.subtitle" = "Bộ gõ tiếng Việt nằm gọn trên thanh menu macOS với các phím tắt thông minh giúp gõ xen kẽ tiếng Việt và tiếng Anh tự nhiên.";
+"showcase.status.accessibility_title" = "Cần cấp quyền Trợ năng (Accessibility)";
+"showcase.status.accessibility_desc" = "Cấp quyền Trợ năng trong Cài đặt Hệ thống để ÔKêyTre có thể gõ dấu tiếng Việt.";
+"showcase.status.ready" = "Sẵn sàng gõ tiếng Việt! Hãy thử ngay tại ô bên dưới.";
+"showcase.card.diacritics.title" = "Bỏ dấu tự do";
+"showcase.card.diacritics.desc" = "Gõ dấu thanh và dấu mũ/móc ở bất kỳ vị trí nào trong âm tiết, nhấn z để xoá dấu.";
+"showcase.card.auto_restore.title" = "Tự động khôi phục từ ngoại ngữ";
+"showcase.card.auto_restore.desc" = "Tự động trả từ không phải tiếng Việt về ký tự gốc ngay khi nhấn dấu cách hoặc dấu câu.";
+"showcase.card.dual_shift.title" = "Khôi phục từ gốc tức thì";
+"showcase.card.dual_shift.desc" = "Nhấn đồng thời hai phím Shift (trong lúc gõ hoặc ngay sau dấu cách) để trả về từ gốc.";
+"showcase.card.toggle.title" = "Bật / tắt nhanh bộ gõ";
+"showcase.card.toggle.desc" = "Nhấn đồng thời hai phím Command để chuyển nhanh giữa Tắt và kiểu gõ đang chọn.";
+"showcase.card.toggle.result" = "Tắt / Bật";
+"showcase.practice.label" = "Gõ thử ngay tại đây";
+"showcase.practice.placeholder" = "Thử gõ: tieengs vieetj cho user...";
+"showcase.action.get_started" = "Bắt đầu sử dụng";

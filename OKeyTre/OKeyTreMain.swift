@@ -241,6 +241,10 @@ private struct MenuBarMenuContent: View {
 
         Divider()
 
+        Button(appLanguage.localized("menu.showcase")) {
+            ShowcaseManager.shared.showWindow()
+        }
+
         Button(appLanguage.localized("menu.settings")) {
             DockIconCoordinator.shared.showSettingsWindow(openWindow: openWindow)
         }
@@ -272,10 +276,15 @@ final class DockIconCoordinator {
     private let onAccessoryRestored: () -> Void
 
     private weak var settingsWindow: NSWindow?
+    private weak var showcaseWindow: NSWindow?
     nonisolated(unsafe) private var windowObserverTokens: [NSObjectProtocol] = []
+    nonisolated(unsafe) private var showcaseObserverTokens: [NSObjectProtocol] = []
     private(set) var isSettingsWindowOpen = false
+    private(set) var isShowcaseWindowOpen = false
     private var isOpeningSettings = false
+    private var isOpeningShowcase = false
     private var openGeneration: UInt64 = 0
+    private var showcaseOpenGeneration: UInt64 = 0
 
     init(
         currentPolicyProvider: @escaping () -> NSApplication.ActivationPolicy = {
@@ -306,6 +315,9 @@ final class DockIconCoordinator {
 
     deinit {
         for token in windowObserverTokens {
+            NotificationCenter.default.removeObserver(token)
+        }
+        for token in showcaseObserverTokens {
             NotificationCenter.default.removeObserver(token)
         }
     }
@@ -364,10 +376,61 @@ final class DockIconCoordinator {
     }
 
     func handleDockReopen() {
-        guard isSettingsWindowOpen || settingsWindow?.isVisible == true || settingsWindow?.isMiniaturized == true else {
+        let settingsActive = isSettingsWindowOpen
+            || settingsWindow?.isVisible == true
+            || settingsWindow?.isMiniaturized == true
+        let showcaseActive = isShowcaseWindowOpen
+            || showcaseWindow?.isVisible == true
+            || showcaseWindow?.isMiniaturized == true
+        guard settingsActive || showcaseActive else {
             return
         }
-        bringSettingsWindowToFront()
+        if settingsActive {
+            bringSettingsWindowToFront()
+        }
+        if showcaseActive {
+            bringShowcaseWindowToFront()
+        }
+    }
+
+    func showShowcaseWindow(openAction: () -> Void) {
+        showcaseOpenGeneration &+= 1
+        let generation = showcaseOpenGeneration
+        isOpeningShowcase = true
+        isShowcaseWindowOpen = true
+        applyActivationPolicy(.regular)
+        openAction()
+        bringShowcaseWindowToFront()
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.showcaseOpenGeneration == generation else { return }
+            self.isOpeningShowcase = false
+            guard self.isShowcaseWindowOpen else {
+                self.syncWithWindowState()
+                return
+            }
+            self.bringShowcaseWindowToFront()
+            self.syncWithWindowState()
+        }
+    }
+
+    func registerShowcaseWindow(_ window: NSWindow) {
+        if showcaseWindow !== window {
+            removeShowcaseObservers()
+            showcaseWindow = window
+            window.isRestorable = false
+            attachShowcaseObservers(to: window)
+        }
+        syncWithWindowState()
+    }
+
+    func noteShowcaseWindowWillClose() {
+        showcaseOpenGeneration &+= 1
+        isOpeningShowcase = false
+        isShowcaseWindowOpen = false
+        DispatchQueue.main.async { [weak self] in
+            self?.syncWithWindowState()
+        }
     }
 
     func registerSettingsWindow(_ window: NSWindow) {
@@ -398,17 +461,38 @@ final class DockIconCoordinator {
     }
 
     func syncWithWindowState() {
-        let isVisible = settingsWindow?.isVisible ?? false
-        let isMiniaturized = settingsWindow?.isMiniaturized ?? false
-        let isOpen = Self.resolvedSettingsOpenState(
-            isVisible: isVisible,
-            isMiniaturized: isMiniaturized,
-            isAppHidden: isAppHiddenProvider(),
+        let appHidden = isAppHiddenProvider()
+        let isSettingsVisible = settingsWindow?.isVisible ?? false
+        let isSettingsMiniaturized = settingsWindow?.isMiniaturized ?? false
+        let settingsOpen = Self.resolvedSettingsOpenState(
+            isVisible: isSettingsVisible,
+            isMiniaturized: isSettingsMiniaturized,
+            isAppHidden: appHidden,
             wasOpen: isSettingsWindowOpen,
             isOpening: isOpeningSettings
         )
-        isSettingsWindowOpen = isOpen
-        applyActivationPolicy(isOpen ? .regular : .accessory)
+        isSettingsWindowOpen = settingsOpen
+
+        let isShowcaseVisible = showcaseWindow?.isVisible ?? false
+        let isShowcaseMiniaturized = showcaseWindow?.isMiniaturized ?? false
+        let showcaseOpen = Self.resolvedSettingsOpenState(
+            isVisible: isShowcaseVisible,
+            isMiniaturized: isShowcaseMiniaturized,
+            isAppHidden: appHidden,
+            wasOpen: isShowcaseWindowOpen,
+            isOpening: isOpeningShowcase
+        )
+        isShowcaseWindowOpen = showcaseOpen
+
+        applyActivationPolicy((settingsOpen || showcaseOpen) ? .regular : .accessory)
+    }
+
+    private func bringShowcaseWindowToFront() {
+        if let window = showcaseWindow, window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        activateAppHandler()
+        showcaseWindow?.makeKeyAndOrderFront(nil)
     }
 
     private func bringSettingsWindowToFront() {
@@ -472,6 +556,54 @@ final class DockIconCoordinator {
             NotificationCenter.default.removeObserver(token)
         }
         windowObserverTokens.removeAll()
+    }
+
+    private func attachShowcaseObservers(to window: NSWindow) {
+        let center = NotificationCenter.default
+        let presentedNames: [Notification.Name] = [
+            NSWindow.didBecomeKeyNotification,
+            NSWindow.didBecomeMainNotification,
+            NSWindow.didMiniaturizeNotification,
+            NSWindow.didDeminiaturizeNotification,
+        ]
+        for name in presentedNames {
+            let token = center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.isShowcaseWindowOpen = true
+                    self?.applyActivationPolicy(.regular)
+                }
+            }
+            showcaseObserverTokens.append(token)
+        }
+
+        let occlusionToken = center.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.syncWithWindowState()
+            }
+        }
+        showcaseObserverTokens.append(occlusionToken)
+
+        let closeToken = center.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.noteShowcaseWindowWillClose()
+            }
+        }
+        showcaseObserverTokens.append(closeToken)
+    }
+
+    private func removeShowcaseObservers() {
+        for token in showcaseObserverTokens {
+            NotificationCenter.default.removeObserver(token)
+        }
+        showcaseObserverTokens.removeAll()
     }
 }
 
@@ -538,13 +670,20 @@ private final class SettingsWindowTrackingView: NSView {
 
         if !isPreview && !isRunningTests {
             Self.terminateExistingInstances()
+            let launchShowcaseMode = ShowcaseManager.shared.resolveLaunchPresentation()
             LaunchAtLoginManager.shared.enableByDefaultIfNeeded()
             PermissionManager.shared.requestAccessibility()
-            if KeyTapManager.shared.isVietnameseEnabled {
+            if launchShowcaseMode == nil && KeyTapManager.shared.isVietnameseEnabled {
                 InputSourceManager.shared.checkAndWarnOnStartup()
             }
             UpdateManager.shared.startAutomaticChecksIfNeeded()
             MenuBarStatusView.refreshStatusBarTooltip()
+            if let launchShowcaseMode {
+                ShowcaseManager.shared.markShowcaseSeen()
+                DispatchQueue.main.async {
+                    ShowcaseManager.shared.showWindow(mode: launchShowcaseMode)
+                }
+            }
         }
     }
 
