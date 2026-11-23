@@ -865,4 +865,85 @@ struct OKeyTreTests {
         #expect(MenuBarStatusView.tooltipText(style: .off, language: .english) == "ÔKêyTre: Off")
         #expect(MenuBarStatusView.tooltipText(style: .off, language: .vietnamese) == "ÔKêyTre: Tắt")
     }
+
+    @Test("PermissionManager resets stale TCC only once per ad-hoc CDHash change and skips Team-signed builds")
+    func testAdHocTCCResetOnBinaryChange() {
+        let suiteName = "com.okeytre.tests.tcc.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var resetCalls: [String] = []
+
+        let v1AdHoc = CodeSigningIdentity(
+            bundleIdentifier: "com.okeytre.OKeyTre",
+            cdHashHex: "1111aaaa",
+            teamIdentifier: nil
+        )
+        let v2AdHoc = CodeSigningIdentity(
+            bundleIdentifier: "com.okeytre.OKeyTre",
+            cdHashHex: "2222bbbb",
+            teamIdentifier: nil
+        )
+        let teamSigned = CodeSigningIdentity(
+            bundleIdentifier: "com.okeytre.OKeyTre",
+            cdHashHex: "3333cccc",
+            teamIdentifier: "TEAM123456"
+        )
+
+        // 1. First launch / upgrade from pre-tracking v0.1 resets stale TCC once and records hash
+        let didResetV1 = PermissionManager.resetStaleAdHocAccessibilityIfNeeded(
+            identity: v1AdHoc,
+            userDefaults: defaults,
+            tccResetRunner: { resetCalls.append($0) }
+        )
+        #expect(didResetV1 == true)
+        #expect(resetCalls == ["com.okeytre.OKeyTre"])
+        #expect(defaults.string(forKey: PermissionManager.lastRegisteredCDHashDefaultsKey) == "1111aaaa")
+
+        // 2. Re-launching the exact same binary while still untrusted does NOT reset again
+        let didResetSameV1 = PermissionManager.resetStaleAdHocAccessibilityIfNeeded(
+            identity: v1AdHoc,
+            userDefaults: defaults,
+            tccResetRunner: { resetCalls.append($0) }
+        )
+        #expect(didResetSameV1 == false)
+        #expect(resetCalls.count == 1)
+
+        // 3. Upgrading to a new ad-hoc release (new CDHash) resets stale TCC once more
+        let didResetV2 = PermissionManager.resetStaleAdHocAccessibilityIfNeeded(
+            identity: v2AdHoc,
+            userDefaults: defaults,
+            tccResetRunner: { resetCalls.append($0) }
+        )
+        #expect(didResetV2 == true)
+        #expect(resetCalls == ["com.okeytre.OKeyTre", "com.okeytre.OKeyTre"])
+        #expect(defaults.string(forKey: PermissionManager.lastRegisteredCDHashDefaultsKey) == "2222bbbb")
+
+        // 4. Team-signed builds (Apple Development / Developer ID) never trigger tccutil reset
+        let didResetTeam = PermissionManager.resetStaleAdHocAccessibilityIfNeeded(
+            identity: teamSigned,
+            userDefaults: defaults,
+            tccResetRunner: { resetCalls.append($0) }
+        )
+        #expect(didResetTeam == false)
+        #expect(resetCalls.count == 2)
+
+        // 5. Already-trusted build updates stored CDHash without resetting
+        let shouldResetTrusted = PermissionManager.shouldResetStaleAdHocTCC(
+            identity: CodeSigningIdentity(
+                bundleIdentifier: "com.okeytre.OKeyTre",
+                cdHashHex: "4444dddd",
+                teamIdentifier: nil
+            ),
+            isTrusted: true,
+            userDefaults: defaults
+        )
+        #expect(shouldResetTrusted == false)
+        #expect(defaults.string(forKey: PermissionManager.lastRegisteredCDHashDefaultsKey) == "4444dddd")
+
+        // 6. Live test-host binary exposes a valid CodeSigningIdentity
+        let current = CodeSigningIdentity.current()
+        #expect(current != nil)
+        #expect(current?.cdHashHex.isEmpty == false)
+    }
 }

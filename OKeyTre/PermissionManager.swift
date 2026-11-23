@@ -8,10 +8,67 @@ import CoreFoundation
 import CoreGraphics
 import Darwin
 import Foundation
+import Security
 import os
+
+nonisolated struct CodeSigningIdentity: Equatable, Sendable {
+    let bundleIdentifier: String
+    let cdHashHex: String
+    let teamIdentifier: String?
+
+    var isAdHocSigned: Bool {
+        guard let teamIdentifier else { return true }
+        return teamIdentifier.isEmpty
+    }
+
+    static func current() -> CodeSigningIdentity? {
+        var selfCode: SecCode?
+        guard SecCodeCopySelf([], &selfCode) == errSecSuccess,
+              let selfCode else {
+            return nil
+        }
+
+        var staticCode: SecStaticCode?
+        guard SecCodeCopyStaticCode(selfCode, [], &staticCode) == errSecSuccess,
+              let staticCode else {
+            return nil
+        }
+
+        return fromStaticCode(staticCode, fallbackBundleIdentifier: Bundle.main.bundleIdentifier)
+    }
+
+    static func fromStaticCode(
+        _ staticCode: SecStaticCode,
+        fallbackBundleIdentifier: String? = nil
+    ) -> CodeSigningIdentity? {
+        var infoRef: CFDictionary?
+        let flags = SecCSFlags(rawValue: kSecCSSigningInformation)
+        guard SecCodeCopySigningInformation(staticCode, flags, &infoRef) == errSecSuccess,
+              let info = infoRef as? [String: Any] else {
+            return nil
+        }
+
+        let rawBundleId = (info[kSecCodeInfoIdentifier as String] as? String) ?? fallbackBundleIdentifier ?? ""
+        guard !rawBundleId.isEmpty,
+              let uniqueData = info[kSecCodeInfoUnique as String] as? Data,
+              !uniqueData.isEmpty else {
+            return nil
+        }
+
+        let cdHashHex = uniqueData.map { String(format: "%02x", $0) }.joined()
+        let teamId = info[kSecCodeInfoTeamIdentifier as String] as? String
+        return CodeSigningIdentity(
+            bundleIdentifier: rawBundleId,
+            cdHashHex: cdHashHex,
+            teamIdentifier: teamId
+        )
+    }
+}
 
 final class PermissionManager: ObservableObject {
     static let shared = PermissionManager()
+
+    nonisolated static let lastRegisteredCDHashDefaultsKey = "lastRegisteredAccessibilityCDHash"
 
     private nonisolated static let probeBundleIds = [
         "com.apple.dock",
@@ -82,14 +139,22 @@ final class PermissionManager: ObservableObject {
 
     func requestAccessibility() {
         if verifyPermissionNow() {
+            Self.recordRegisteredSignatureIfNeeded(userDefaults: .standard)
             print("Accessibility allowed. Activating input method")
             return
         }
-        promptAccessibilityRegistration()
+        if Self.resetStaleAdHocAccessibilityIfNeeded() {
+            // Re-prompt via a fresh LaunchServices helper process so `tccd` evaluates
+            // the cleared TCC table under a clean audit token rather than this PID's cache.
+            promptAccessibilityRegistrationInFreshInstance {}
+        } else {
+            promptAccessibilityRegistration()
+        }
     }
 
     func openAccessibilitySettings() {
         showSuccessAlertOnGrant = true
+        _ = Self.resetStaleAdHocAccessibilityIfNeeded()
         promptAccessibilityRegistrationInFreshInstance {
             guard let url = URL(
                 string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
@@ -104,9 +169,85 @@ final class PermissionManager: ObservableObject {
         }
     }
 
+    /// Determines whether an untrusted ad-hoc build has changed `CDHash` since Accessibility
+    /// was last registered/granted, requiring `/usr/bin/tccutil reset Accessibility <bundleId>`
+    /// to clear macOS TCC's stale old-version row (which otherwise stays visually stuck ON).
+    nonisolated static func shouldResetStaleAdHocTCC(
+        identity: CodeSigningIdentity?,
+        isTrusted: Bool,
+        userDefaults: UserDefaults
+    ) -> Bool {
+        guard let identity,
+              !identity.bundleIdentifier.isEmpty,
+              !identity.cdHashHex.isEmpty else {
+            return false
+        }
+
+        if isTrusted {
+            if userDefaults.string(forKey: lastRegisteredCDHashDefaultsKey) != identity.cdHashHex {
+                userDefaults.set(identity.cdHashHex, forKey: lastRegisteredCDHashDefaultsKey)
+            }
+            return false
+        }
+
+        guard identity.isAdHocSigned else {
+            return false
+        }
+
+        let previousCDHash = userDefaults.string(forKey: lastRegisteredCDHashDefaultsKey)
+        return previousCDHash != identity.cdHashHex
+    }
+
+    nonisolated static func recordRegisteredSignatureIfNeeded(
+        identity: CodeSigningIdentity? = CodeSigningIdentity.current(),
+        userDefaults: UserDefaults = .standard
+    ) {
+        guard let identity, !identity.cdHashHex.isEmpty else { return }
+        if userDefaults.string(forKey: lastRegisteredCDHashDefaultsKey) != identity.cdHashHex {
+            userDefaults.set(identity.cdHashHex, forKey: lastRegisteredCDHashDefaultsKey)
+        }
+    }
+
+    @discardableResult
+    nonisolated static func resetStaleAdHocAccessibilityIfNeeded(
+        identity: CodeSigningIdentity? = CodeSigningIdentity.current(),
+        userDefaults: UserDefaults = .standard,
+        tccResetRunner: (String) -> Void = runTCCReset(bundleIdentifier:)
+    ) -> Bool {
+        guard let identity,
+              shouldResetStaleAdHocTCC(
+                  identity: identity,
+                  isTrusted: false,
+                  userDefaults: userDefaults
+              ) else {
+            return false
+        }
+
+        tccResetRunner(identity.bundleIdentifier)
+        userDefaults.set(identity.cdHashHex, forKey: lastRegisteredCDHashDefaultsKey)
+        return true
+    }
+
+    private nonisolated static func runTCCReset(bundleIdentifier: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", "Accessibility", bundleIdentifier]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            // Best-effort cleanup; proceed with normal Accessibility prompt regardless.
+        }
+    }
+
     private func applyLivePermissionState(_ trusted: Bool) {
         if trusted {
             let tapStarted = KeyTapManager.shared.start()
+            if tapStarted {
+                Self.recordRegisteredSignatureIfNeeded(userDefaults: .standard)
+            }
             snapshotLock.withLock { $0.isGranted = tapStarted }
             let wasGranted = isAccessibilityGranted
             if isAccessibilityGranted != tapStarted {
