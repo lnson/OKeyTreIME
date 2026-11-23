@@ -105,7 +105,7 @@
           "Automatic raw-word restoration on word end for non-Vietnamese words",
           "Ad-hoc raw-word restore via Left Shift + Right Shift (even after ending a word)",
           "Quick Vietnamese on/off toggle via Left Command + Right Command (macOS) or Left Ctrl + Right Ctrl (Windows)",
-          "Smart word editing at cursor and across lines via Accessibility / UI Automation",
+          "Smart word editing at cursor and across lines",
           "Configurable modern tone placement (oà, uỳ) and spelling auto-correction"
         ]
       },
@@ -118,7 +118,7 @@
             "name": "ÔKêyTre hỗ trợ những hệ điều hành và thiết bị nào?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "ÔKêyTre hỗ trợ cả macOS Sonoma 14.0 trở lên (Universal binary cho Apple Silicon M1–M4 và Intel) lẫn Windows 10/11 (x64, ứng dụng Win32 C++23 thuần độc lập, không cần cài .NET hay VC++ Redistributable)."
+              "text": "ÔKêyTre hỗ trợ cả macOS Sonoma 14.0 trở lên (Apple Silicon M1–M4 và Intel) lẫn Windows 10 và Windows 11 (x64)."
             }
           },
           {
@@ -983,10 +983,10 @@
           <h3 lang="vi">Sửa từ thông minh tại con trỏ</h3>
           <h3 lang="en">Smart Cursor Word Editing</h3>
           <p lang="vi">
-            Quay lại sửa chữ trên cùng một dòng dễ dàng (kể cả trong Terminal / Windows Terminal). Với ứng dụng hỗ trợ Accessibility (macOS) hoặc UI Automation (Windows), chỉ cần đặt con trỏ vào từ bất kỳ để sửa dấu.
+            Quay lại sửa chữ trên cùng một dòng dễ dàng (kể cả trong Terminal), hoặc đặt con trỏ vào từ bất kỳ trong các ứng dụng hỗ trợ để sửa dấu trực tiếp.
           </p>
           <p lang="en">
-            Backspace into earlier words on the same line (even in Terminal / Windows Terminal), or click directly inside any word in Accessibility / UI Automation enabled apps to edit it.
+            Backspace into earlier words on the same line (even in Terminal), or click directly inside any word in supported apps to edit its diacritics.
           </p>
         </article>
 
@@ -1004,13 +1004,13 @@
 
         <article class="card">
           <div class="card-icon" aria-hidden="true">⌘</div>
-          <h3 lang="vi">Tích hợp với hệ điều hành</h3>
-          <h3 lang="en">Native Operating System Integration</h3>
+          <h3 lang="vi">Tích hợp hệ thống</h3>
+          <h3 lang="en">Native System Integration</h3>
           <p lang="vi">
-            Chạy gọn trên thanh menu macOS và khay hệ thống Windows (giao diện Fluent Sáng/Tối thuần C++23), tắt/bật nhanh bằng <code>⌘ Trái + ⌘ Phải</code> (macOS) hoặc <code>Ctrl Trái + Ctrl Phải</code> (Windows), tự khởi động cùng hệ thống và cảnh báo khi bàn phím không phải tiếng Anh (U.S.).
+            Chạy gọn trên thanh menu macOS và khay hệ thống Windows, tắt/bật nhanh bằng <code>⌘ Trái + ⌘ Phải</code> (macOS) hoặc <code>Ctrl Trái + Ctrl Phải</code> (Windows), tự khởi động cùng hệ thống và cảnh báo khi bàn phím không phải tiếng Anh (U.S.).
           </p>
           <p lang="en">
-            Lives cleanly in the macOS menu bar and Windows system tray (pure C++23 Fluent Light/Dark UI), toggles off/on via <code>Left ⌘ + Right ⌘</code> (macOS) or <code>Left Ctrl + Right Ctrl</code> (Windows), supports Launch at Login, and warns on non-English keyboard layouts.
+            Lives cleanly in the macOS menu bar and Windows system tray, toggles off/on via <code>Left ⌘ + Right ⌘</code> (macOS) or <code>Left Ctrl + Right Ctrl</code> (Windows), supports Launch at Login, and warns on non-English keyboard layouts.
           </p>
         </article>
 
@@ -1019,10 +1019,10 @@
           <h3 lang="vi">Nhẹ, nhanh &amp; riêng tư</h3>
           <h3 lang="en">Fast, Lightweight &amp; Private</h3>
           <p lang="vi">
-            Khởi động tức thì, không cần .NET hay VC++ runtime trên Windows, chiếm cực ít tài nguyên và phản hồi phím không độ trễ. Xử lý phím hoàn toàn ngoại tuyến, không thu thập bất kỳ dữ liệu nào.
+            Khởi động tức thì, chiếm cực ít tài nguyên hệ thống và phản hồi phím mượt mà không độ trễ. Hoạt động hoàn toàn ngoại tuyến, không thu thập bất kỳ dữ liệu nào.
           </p>
           <p lang="en">
-            Launches instantly with zero .NET or VC++ runtime dependencies on Windows, uses minimal resources, and responds without lag. Processes keystrokes completely offline with zero data collection.
+            Launches instantly, uses minimal system resources, and responds smoothly without lag. Processes keystrokes completely offline with zero data collection.
           </p>
         </article>
       </div>
@@ -1084,10 +1084,10 @@
               <h3 lang="vi">Tải về và giải nén tệp .zip</h3>
               <h3 lang="en">Download and extract the .zip archive</h3>
               <p lang="vi">
-                Tải tệp <code>OKeyTre-v*-windows-x64.zip</code> mới nhất từ <a href="https://github.com/lnson/OKeyTreIME/releases/latest">GitHub Releases</a> và giải nén <strong>OKeyTre.exe</strong> vào thư mục bất kỳ (không cần cài thêm .NET hay VC++ Redistributable).
+                Tải tệp <code>OKeyTre-v*-windows-x64.zip</code> mới nhất từ <a href="https://github.com/lnson/OKeyTreIME/releases/latest">GitHub Releases</a> và giải nén <strong>OKeyTre.exe</strong> vào thư mục bất kỳ.
               </p>
               <p lang="en">
-                Download the latest <code>OKeyTre-v*-windows-x64.zip</code> from <a href="https://github.com/lnson/OKeyTreIME/releases/latest">GitHub Releases</a> and extract <strong>OKeyTre.exe</strong> anywhere (no .NET or VC++ Redistributable required).
+                Download the latest <code>OKeyTre-v*-windows-x64.zip</code> from <a href="https://github.com/lnson/OKeyTreIME/releases/latest">GitHub Releases</a> and extract <strong>OKeyTre.exe</strong> anywhere.
               </p>
             </div>
           </li>
@@ -1128,10 +1128,10 @@
           </summary>
           <div class="faq-answer">
             <p lang="vi">
-              Trên <strong>macOS</strong>, ÔKêyTre là Universal binary chạy nguyên bản trên cả chip <strong>Apple Silicon (M1, M2, M3, M4)</strong> lẫn <strong>Intel</strong> (từ <strong>macOS Sonoma 14.0</strong> trở lên). Trên <strong>Windows</strong>, ÔKêyTre là ứng dụng Win32 C++23 thuần độc lập cho <strong>Windows 10 và Windows 11 (x64)</strong>, không cần cài .NET hay VC++ Redistributable.
+              Trên <strong>macOS</strong>, ÔKêyTre là Universal binary chạy nguyên bản trên cả chip <strong>Apple Silicon (M1, M2, M3, M4)</strong> lẫn <strong>Intel</strong> (từ <strong>macOS Sonoma 14.0</strong> trở lên). Trên <strong>Windows</strong>, ÔKêyTre là ứng dụng độc lập chạy ngay cho <strong>Windows 10 và Windows 11 (x64)</strong>.
             </p>
             <p lang="en">
-              On <strong>macOS</strong>, ÔKêyTre ships as a Universal binary running natively on both <strong>Apple Silicon (M1, M2, M3, M4)</strong> and <strong>Intel</strong> Macs (<strong>macOS Sonoma 14.0+</strong>). On <strong>Windows</strong>, ÔKêyTre ships as a standalone native C++23 Win32 app for <strong>Windows 10 &amp; 11 (x64)</strong> with zero .NET or VC++ Redistributable dependencies.
+              On <strong>macOS</strong>, ÔKêyTre ships as a Universal binary running natively on both <strong>Apple Silicon (M1, M2, M3, M4)</strong> and <strong>Intel</strong> Macs (<strong>macOS Sonoma 14.0+</strong>). On <strong>Windows</strong>, ÔKêyTre ships as a standalone native app for <strong>Windows 10 &amp; 11 (x64)</strong>.
             </p>
           </div>
         </details>
