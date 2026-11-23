@@ -144,6 +144,18 @@ void okeytre_buffer_set_ngh_to_ng(OKTInputMethodBuffer* buffer, bool enabled) {
   }
 }
 
+bool okeytre_buffer_get_restore_invalid_words(
+    const OKTInputMethodBuffer* buffer) {
+  return buffer != nullptr && buffer->impl.restore_invalid_words();
+}
+
+void okeytre_buffer_set_restore_invalid_words(OKTInputMethodBuffer* buffer,
+                                              bool enabled) {
+  if (buffer != nullptr) {
+    buffer->impl.SetRestoreInvalidWords(enabled);
+  }
+}
+
 int32_t okeytre_buffer_get_max_size(const OKTInputMethodBuffer* buffer) {
   return buffer != nullptr ? buffer->impl.max_buffer_size()
                            : okeytre::InputMethodBuffer::kDefaultMaxBufferSize;

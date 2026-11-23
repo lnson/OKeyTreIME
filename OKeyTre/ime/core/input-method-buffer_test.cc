@@ -197,5 +197,58 @@ TEST(InputMethodBufferTest, MaxLength512CharWordToneUndoEmits513CharsSafely) {
   EXPECT_EQ(action.text_to_insert.back(), u's');
 }
 
+TEST(InputMethodBufferTest,
+     RestoreInvalidWordsRestoresImpossibleCombinationsOnWordEnd) {
+  InputMethodBuffer ime(InputMethodStyle::kTelex, /*modern_tone=*/true,
+                        /*uo_horn=*/true, /*ng_to_ngh=*/true,
+                        /*ngh_to_ng=*/true,
+                        InputMethodBuffer::kDefaultMaxBufferSize,
+                        /*restore_invalid_words=*/true);
+
+  // 1. Common English words mangled by Telex restore cleanly on Space /
+  // punctuation while valid Vietnamese words in the same sentence stay intact.
+  EXPECT_EQ(
+      SimulateTyping(
+          ime, u"moojt window mowis cho user, text lexi. boot meet law ghost "),
+      u"một window mới cho user, text lexi. boot meet law ghost ");
+
+  ime.Reset();
+  EXPECT_EQ(
+      SimulateTyping(ime, u"your house source water world good tool book "),
+      u"your house source water world good tool book ");
+
+  // 2. Complex and rare valid Vietnamese syllables are never falsely restored.
+  ime.Reset();
+  EXPECT_EQ(SimulateTyping(
+                ime,
+                u"nghieengs thuyeenf khuyur ngoawnf hoachj xooong huowu quoocs "
+                u"quyeets khueesch gif gifn giuwax giuowngf ddc ddk "),
+            u"nghiếng thuyền khuỷu ngoằn hoạch xoong hươu quốc quyết khuếch gì "
+            u"gìn giữa giường đc đk ");
+
+  // 3. Intentional Telex escape sequences ("tesst", "towwn", "boook") keep
+  // their clean escaped ASCII form rather than doubling the escape key.
+  ime.Reset();
+  EXPECT_EQ(SimulateTyping(ime, u"tesst towwn boook "), u"test town book ");
+
+  // 4. Backspacing over the space into an auto-restored English word keeps it
+  // in restored raw mode so appending 's' stays literal ("lexis").
+  ime.Reset();
+  EXPECT_EQ(SimulateTyping(ime, u"lexi \x7Fs "), u"lexis ");
+
+  // 5. Works across VNI and VIQR modes as well.
+  ime.SetStyle(InputMethodStyle::kVNI);
+  EXPECT_EQ(SimulateTyping(ime, u"tieng61 utf8 e2e "), u"tiếng utf8 e2e ");
+
+  ime.SetStyle(InputMethodStyle::kVIQR);
+  EXPECT_EQ(SimulateTyping(ime, u"tie^'ng vie^.t le~i "), u"tiếng việt le~i ");
+
+  // 6. Disabling restore_invalid_words preserves transformed non-Vietnamese
+  // sequences as before.
+  ime.SetStyle(InputMethodStyle::kTelex);
+  ime.SetRestoreInvalidWords(false);
+  EXPECT_EQ(SimulateTyping(ime, u"lexi "), u"lẽi ");
+}
+
 }  // namespace
 }  // namespace okeytre

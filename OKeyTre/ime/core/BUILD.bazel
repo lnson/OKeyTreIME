@@ -56,6 +56,14 @@ genrule(
     tools = ["//imec:imec"],
 )
 
+genrule(
+    name = "generate_vietnamese_inv_automaton",
+    srcs = ["//OKeyTre/ime/specs:vietnamese.inv"],
+    outs = ["vietnamese-inv-automaton.generated.h"],
+    cmd = "$(location //invc:invc) --input=$(location //OKeyTre/ime/specs:vietnamese.inv) --output=$@ --struct_name=VietnameseInvAutomaton",
+    tools = ["//invc:invc"],
+)
+
 # 3. Stateful Runtime Buffer & Portable C++ Engine Library (`OKeyTreEngineLib`)
 cc_library(
     name = "input_method_buffer",
@@ -63,6 +71,7 @@ cc_library(
     hdrs = [
         "input-method-buffer.h",
         ":telex-automaton.generated.h",
+        ":vietnamese-inv-automaton.generated.h",
         ":viqr-automaton.generated.h",
         ":vni-automaton.generated.h",
     ],

@@ -61,6 +61,11 @@ void okeytre_buffer_set_ng_to_ngh(OKTInputMethodBuffer* buffer, bool enabled);
 bool okeytre_buffer_get_ngh_to_ng(const OKTInputMethodBuffer* buffer);
 void okeytre_buffer_set_ngh_to_ng(OKTInputMethodBuffer* buffer, bool enabled);
 
+bool okeytre_buffer_get_restore_invalid_words(
+    const OKTInputMethodBuffer* buffer);
+void okeytre_buffer_set_restore_invalid_words(OKTInputMethodBuffer* buffer,
+                                              bool enabled);
+
 int32_t okeytre_buffer_get_max_size(const OKTInputMethodBuffer* buffer);
 void okeytre_buffer_set_max_size(OKTInputMethodBuffer* buffer,
                                  int32_t max_buffer_size);

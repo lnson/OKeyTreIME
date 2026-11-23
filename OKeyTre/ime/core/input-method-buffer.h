@@ -14,6 +14,7 @@
 
 #include "telex-automaton.generated.h"
 #include "unicode-utils.h"
+#include "vietnamese-inv-automaton.generated.h"
 #include "viqr-automaton.generated.h"
 #include "vni-automaton.generated.h"
 
@@ -88,7 +89,8 @@ class InputMethodBuffer {
   explicit InputMethodBuffer(InputMethodStyle style = InputMethodStyle::kTelex,
                              bool modern_tone = false, bool uo_horn = false,
                              bool ng_to_ngh = false, bool ngh_to_ng = false,
-                             int32_t max_buffer_size = kDefaultMaxBufferSize);
+                             int32_t max_buffer_size = kDefaultMaxBufferSize,
+                             bool restore_invalid_words = false);
 
   void Reset() noexcept;
 
@@ -106,6 +108,11 @@ class InputMethodBuffer {
 
   bool ngh_to_ng() const noexcept;
   void SetNghToNg(bool enabled);
+
+  bool restore_invalid_words() const noexcept { return restore_invalid_words_; }
+  void SetRestoreInvalidWords(bool enabled) noexcept {
+    restore_invalid_words_ = enabled;
+  }
 
   int32_t max_buffer_size() const noexcept { return max_buffer_size_; }
   void SetMaxBufferSize(int32_t size);
@@ -164,6 +171,8 @@ class InputMethodBuffer {
                                             int32_t replacement_len,
                                             int32_t lcp);
   TextEditAction StepAutomaton(uint16_t key);
+  TextEditAction MaybeRestoreInvalidWordOnBoundary(int32_t word_start,
+                                                   uint16_t boundary_ch);
 
   std::vector<uint16_t> characters_;
   std::vector<WordRawHistory> word_history_;
@@ -171,6 +180,7 @@ class InputMethodBuffer {
   int32_t max_buffer_size_ = kDefaultMaxBufferSize;
   AutomatonVariant automaton_;
   bool should_read_at_caret_ = true;
+  bool restore_invalid_words_ = false;
 };
 
 }  // namespace okeytre

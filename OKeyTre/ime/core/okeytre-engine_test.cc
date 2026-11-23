@@ -67,6 +67,10 @@ TEST(OkeytreEngineTest, CAbiStatefulBufferFeedsKeysAndSynthesizesLcpActions) {
   ASSERT_EQ(text_len, 1);
   EXPECT_EQ(text[0], 0x00F3);
 
+  EXPECT_FALSE(okeytre_buffer_get_restore_invalid_words(buf));
+  okeytre_buffer_set_restore_invalid_words(buf, true);
+  EXPECT_TRUE(okeytre_buffer_get_restore_invalid_words(buf));
+
   okeytre_buffer_destroy(buf);
 }
 

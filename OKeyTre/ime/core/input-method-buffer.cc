@@ -44,6 +44,15 @@ int32_t LongestCommonPrefixLength(const uint16_t* a, int32_t a_len,
   return lcp;
 }
 
+bool HasVietnameseDiacritic(const uint16_t* word, int32_t word_len) noexcept {
+  for (int32_t i = 0; i < word_len; ++i) {
+    if (word[i] >= 0x0080) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 int32_t InputMethodBuffer::ClampBufferSize(int32_t size) noexcept {
@@ -84,10 +93,12 @@ InputMethodBuffer::AutomatonVariant InputMethodBuffer::MakeAutomaton(
 
 InputMethodBuffer::InputMethodBuffer(InputMethodStyle style, bool modern_tone,
                                      bool uo_horn, bool ng_to_ngh,
-                                     bool ngh_to_ng, int32_t max_buffer_size)
+                                     bool ngh_to_ng, int32_t max_buffer_size,
+                                     bool restore_invalid_words)
     : max_buffer_size_(ClampBufferSize(max_buffer_size)),
       automaton_(
-          MakeAutomaton(style, modern_tone, uo_horn, ng_to_ngh, ngh_to_ng)) {
+          MakeAutomaton(style, modern_tone, uo_horn, ng_to_ngh, ngh_to_ng)),
+      restore_invalid_words_(restore_invalid_words) {
   characters_.reserve(static_cast<size_t>(kMaxAllowedBufferSize + 16));
   word_history_.reserve(16);
 }
@@ -501,6 +512,44 @@ TextEditAction InputMethodBuffer::StepAutomaton(uint16_t key) {
                                     lcp);
 }
 
+TextEditAction InputMethodBuffer::MaybeRestoreInvalidWordOnBoundary(
+    int32_t word_start, uint16_t boundary_ch) {
+  const int32_t old_count = cursor_pos_ - word_start;
+  WordRawHistory* history = FindWordHistory(word_start);
+  if (old_count <= 0 || history == nullptr || history->raw_keystrokes.empty()) {
+    return {};
+  }
+
+  const uint16_t* current_word = characters_.data() + word_start;
+  const int32_t raw_count =
+      static_cast<int32_t>(history->raw_keystrokes.size());
+  const int32_t lcp = LongestCommonPrefixLength(
+      current_word, old_count, history->raw_keystrokes.data(), raw_count);
+  if (lcp == old_count && lcp == raw_count) {
+    return {};
+  }
+
+  // If the displayed word contains no Vietnamese diacritics and is no longer
+  // than the raw keystroke sequence, the user already escaped Telex/VNI
+  // modifiers manually (e.g. "tesst" -> "test", "towwn" -> "town", "boook" ->
+  // "book"). Keep their escaped ASCII word intact.
+  if (!HasVietnameseDiacritic(current_word, old_count) &&
+      raw_count >= old_count) {
+    return {};
+  }
+
+  if (!VietnameseInvAutomaton::Matches(current_word, old_count)) {
+    return {};
+  }
+
+  history->is_restored = true;
+  TextEditAction action = ApplyWordSuffixReplacement(
+      word_start, history->raw_keystrokes.data(), raw_count, lcp);
+  InsertChar(boundary_ch);
+  action.text_to_insert.push_back(static_cast<char16_t>(boundary_ch));
+  return action;
+}
+
 TextEditAction InputMethodBuffer::HandleInput(const uint16_t* input,
                                               int32_t input_len,
                                               uint32_t modifiers) {
@@ -589,9 +638,22 @@ TextEditAction InputMethodBuffer::HandleInput(const uint16_t* input,
         }
       }
 
-      if (!IsWordBoundary(ch)) {
-        EnsureWordHistory(word_start).raw_keystrokes.push_back(ch);
+      if (IsWordBoundary(ch)) {
+        if (restore_invalid_words_ && !is_restored &&
+            cursor_pos_ > word_start &&
+            (cursor_pos_ == static_cast<int32_t>(characters_.size()) ||
+             IsWordBoundary(characters_[static_cast<size_t>(cursor_pos_)]))) {
+          TextEditAction restore_action =
+              MaybeRestoreInvalidWordOnBoundary(word_start, ch);
+          if (!restore_action.IsNoOp()) {
+            return restore_action;
+          }
+        }
+        InsertChar(ch);
+        return {};
       }
+
+      EnsureWordHistory(word_start).raw_keystrokes.push_back(ch);
       InsertChar(ch);
       return {};
     }

@@ -254,13 +254,16 @@
 			inputPaths = (
 				"$(SRCROOT)/BUILD.bazel",
 				"$(SRCROOT)/OKeyTre/ime/specs/telex.ime",
+				"$(SRCROOT)/OKeyTre/ime/specs/vietnamese.inv",
 				"$(SRCROOT)/OKeyTre/ime/specs/vni.ime",
 				"$(SRCROOT)/OKeyTre/ime/specs/viqr.ime",
 				"$(SRCROOT)/imec/ime-compiler.cc",
+				"$(SRCROOT)/invc/invc-main.cc",
 			);
 			name = "Generate Automata (Bazel)";
 			outputPaths = (
 				"$(SRCROOT)/bazel-bin/OKeyTre/ime/core/telex-automaton.generated.h",
+				"$(SRCROOT)/bazel-bin/OKeyTre/ime/core/vietnamese-inv-automaton.generated.h",
 				"$(SRCROOT)/bazel-bin/OKeyTre/ime/core/viqr-automaton.generated.h",
 				"$(SRCROOT)/bazel-bin/OKeyTre/ime/core/vni-automaton.generated.h",
 			);
