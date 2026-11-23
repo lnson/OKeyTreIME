@@ -106,6 +106,27 @@ std::string MapFunctionName(int map_id, std::string_view map_name,
 // 1. Entry Point (`RewriteToBuffer`)
 
 void EmitRewriteEntryPoint(const CompiledAutomaton& compiled, Sink& sink) {
+  size_t max_capture_refs = 1;
+  size_t max_fixed_extra = 0;
+  for (const CompiledRule& rule : compiled.rules) {
+    size_t capture_refs = 0;
+    size_t fixed_extra = 0;
+    for (const CompiledRHSItem& item : rule.rhs_items) {
+      switch (item.kind) {
+        case CompiledRHSItem::Kind::kCapture:
+        case CompiledRHSItem::Kind::kMapProjection:
+          ++capture_refs;
+          break;
+        case CompiledRHSItem::Kind::kLiteral:
+        case CompiledRHSItem::Kind::kInputKey:
+          ++fixed_extra;
+          break;
+      }
+    }
+    max_capture_refs = std::max(max_capture_refs, capture_refs);
+    max_fixed_extra = std::max(max_fixed_extra, fixed_extra);
+  }
+
   sink.WriteLn("  inline int32_t RewriteToBuffer(const uint16_t* word,");
   sink.WriteLn("                                 int32_t word_len,");
   sink.WriteLn("                                 uint16_t input,");
@@ -172,11 +193,20 @@ void EmitRewriteEntryPoint(const CompiledAutomaton& compiled, Sink& sink) {
   sink.WriteLn();
   sink.WriteLn("    const uint16_t* matched_slice = word + match_start;");
   sink.WriteLn("    const int32_t slice_len = word_len - match_start;");
-  sink.WriteLn("    uint16_t repl_buf[512];");
-  sink.WriteLn("    const int32_t repl_len =");
+  sink.WriteLn("    const int32_t max_repl_cap = slice_len * $0 + $1;",
+               max_capture_refs, max_fixed_extra);
+  sink.WriteLn("    uint16_t stack_repl_buf[2600];");
+  sink.WriteLn("    std::vector<uint16_t> heap_repl_buf;");
+  sink.WriteLn("    uint16_t* repl_ptr = stack_repl_buf;");
+  sink.WriteLn("    if (max_repl_cap > 2600) {");
   sink.WriteLn(
-      "        ApplyRule(rule_id, matched_slice, slice_len, input, repl_buf, "
-      "512);");
+      "      heap_repl_buf.resize(static_cast<size_t>(max_repl_cap));");
+  sink.WriteLn("      repl_ptr = heap_repl_buf.data();");
+  sink.WriteLn("    }");
+  sink.WriteLn("    const int32_t repl_len = ApplyRule(");
+  sink.WriteLn(
+      "        rule_id, matched_slice, slice_len, input, repl_ptr, "
+      "max_repl_cap);");
   sink.WriteLn("    if (repl_len < 0) return -1;");
   sink.WriteLn();
   sink.WriteLn("    const int32_t total_len = match_start + repl_len;");
@@ -188,7 +218,7 @@ void EmitRewriteEntryPoint(const CompiledAutomaton& compiled, Sink& sink) {
       "sizeof(uint16_t));");
   sink.WriteLn("      }");
   sink.WriteLn("      if (repl_len > 0) {");
-  sink.WriteLn("        std::memcpy(out_buf + match_start, repl_buf,");
+  sink.WriteLn("        std::memcpy(out_buf + match_start, repl_ptr,");
   sink.WriteLn(
       "                    static_cast<size_t>(repl_len) * sizeof(uint16_t));");
   sink.WriteLn("      }");

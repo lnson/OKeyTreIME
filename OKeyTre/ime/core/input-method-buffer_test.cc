@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "unicode-utils.h"
@@ -162,6 +163,38 @@ TEST(InputMethodBufferTest, BackspaceAcrossWordsRespectsMaxBufferSize) {
       SimulateTyping(
           ime, u"co 1234567890\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7Fs"),
       u"cos");
+}
+
+TEST(InputMethodBufferTest, MaxLength512CharWordToneUndoEmits513CharsSafely) {
+  std::vector<uint16_t> word;
+  word.reserve(InputMethodBuffer::kMaxAllowedBufferSize);
+  word.push_back('n');
+  word.push_back('g');
+  word.push_back('h');
+  for (int32_t i = 0; i < 250; ++i) {
+    word.push_back('a');
+  }
+  word.push_back(0x1EBF);  // 'ế'
+  for (int32_t i = 0; i < 256; ++i) {
+    word.push_back('u');
+  }
+  word.push_back('n');
+  word.push_back('g');
+  ASSERT_EQ(static_cast<int32_t>(word.size()),
+            InputMethodBuffer::kMaxAllowedBufferSize);
+
+  InputMethodBuffer ime(InputMethodStyle::kTelex, /*modern_tone=*/true,
+                        /*uo_horn=*/true, /*ng_to_ngh=*/true,
+                        /*ngh_to_ng=*/true,
+                        InputMethodBuffer::kMaxAllowedBufferSize);
+  ime.SeedWithSurroundingText(word.data(), 512, 512);
+
+  const uint16_t key_s = 's';
+  const TextEditAction action = ime.HandleInput(&key_s, 1);
+  ASSERT_EQ(action.backspace_count, 259);
+  ASSERT_EQ(action.text_to_insert.size(), 260u);
+  EXPECT_EQ(action.text_to_insert.front(), u'\u00EA');
+  EXPECT_EQ(action.text_to_insert.back(), u's');
 }
 
 }  // namespace

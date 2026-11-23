@@ -105,3 +105,15 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "telex_benchmark_test",
+    size = "small",
+    srcs = ["telex-benchmark_test.cc"],
+    args = ["--benchmark_min_time=0.1s"],
+    deps = [
+        ":OKeyTreEngineLib",
+        ":input_method_buffer",
+        "@google_benchmark//:benchmark_main",
+    ],
+)
