@@ -450,10 +450,23 @@ TextEditAction InputMethodBuffer::ApplyWordSuffixReplacement(
 }
 
 TextEditAction InputMethodBuffer::RestoreCurrentWord() {
-  const int32_t word_start = CurrentWordStartIndex();
-  const int32_t old_count = cursor_pos_ - word_start;
+  int32_t word_end = cursor_pos_;
+  int32_t word_start = CurrentWordStartIndex();
+  if (word_end == word_start) {
+    while (word_end > 0 &&
+           IsWordBoundary(characters_[static_cast<size_t>(word_end - 1)])) {
+      --word_end;
+    }
+    word_start = word_end;
+    while (word_start > 0 &&
+           !IsWordBoundary(characters_[static_cast<size_t>(word_start - 1)])) {
+      --word_start;
+    }
+  }
+
+  const int32_t word_len = word_end - word_start;
   WordRawHistory* history = FindWordHistory(word_start);
-  if (old_count <= 0 || history == nullptr || history->raw_keystrokes.empty()) {
+  if (word_len <= 0 || history == nullptr || history->raw_keystrokes.empty()) {
     return {};
   }
 
@@ -462,14 +475,34 @@ TextEditAction InputMethodBuffer::RestoreCurrentWord() {
   const int32_t raw_count =
       static_cast<int32_t>(history->raw_keystrokes.size());
   const int32_t lcp =
-      LongestCommonPrefixLength(characters_.data() + word_start, old_count,
+      LongestCommonPrefixLength(characters_.data() + word_start, word_len,
                                 history->raw_keystrokes.data(), raw_count);
-  if (lcp == old_count && lcp == raw_count) {
+  if (lcp == word_len && lcp == raw_count) {
     return {};
   }
 
-  TextEditAction action = ApplyWordSuffixReplacement(
-      word_start, history->raw_keystrokes.data(), raw_count, lcp);
+  const int32_t trailing_len = cursor_pos_ - word_end;
+  if (trailing_len <= 0) {
+    TextEditAction action = ApplyWordSuffixReplacement(
+        word_start, history->raw_keystrokes.data(), raw_count, lcp);
+    TrimBufferToMaxSize();
+    return action;
+  }
+
+  const int32_t total_len = raw_count + trailing_len;
+  uint16_t stack_buf[576];
+  std::vector<uint16_t> heap_buf;
+  uint16_t* combined_ptr = stack_buf;
+  if (total_len > static_cast<int32_t>(std::size(stack_buf))) {
+    heap_buf.resize(static_cast<size_t>(total_len));
+    combined_ptr = heap_buf.data();
+  }
+  std::copy_n(history->raw_keystrokes.data(), raw_count, combined_ptr);
+  std::copy_n(characters_.data() + word_end, trailing_len,
+              combined_ptr + raw_count);
+
+  TextEditAction action =
+      ApplyWordSuffixReplacement(word_start, combined_ptr, total_len, lcp);
   TrimBufferToMaxSize();
   return action;
 }

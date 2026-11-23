@@ -151,6 +151,46 @@ TEST(InputMethodBufferTest,
   screen.erase(screen.size() - static_cast<size_t>(restore.backspace_count));
   screen.append(restore.text_to_insert);
   EXPECT_EQ(screen, u"tieens");
+
+  // 4. Restore AFTER ending a word with space or punctuation ("một rồ, " ->
+  // "một roof, "), preserving trailing boundaries and allowing the next word
+  // to transform normally.
+  ime.Reset();
+  screen = SimulateTyping(ime, u"moojt roof, ");
+  ASSERT_EQ(screen, u"một rồ, ");
+  restore = ime.RestoreCurrentWord();
+  ASSERT_FALSE(restore.IsNoOp());
+  EXPECT_EQ(restore.backspace_count, 3);
+  EXPECT_EQ(restore.text_to_insert, u"oof, ");
+  screen.erase(screen.size() - static_cast<size_t>(restore.backspace_count));
+  screen.append(restore.text_to_insert);
+  EXPECT_EQ(screen, u"một roof, ");
+
+  // Second consecutive restore is an idempotent no-op.
+  EXPECT_TRUE(ime.RestoreCurrentWord().IsNoOp());
+
+  // Next word still transforms normally ("mới").
+  screen.append(SimulateTyping(ime, u"mowis"));
+  EXPECT_EQ(screen, u"một roof, mới");
+
+  // 5. Restore after space when raw word is shorter than transformed word
+  // ("ngi " -> "nghi " with ngToNgh, then restore -> "ngi "), and backspacing
+  // over space keeps the restored word literal.
+  InputMethodBuffer ime_ngh(InputMethodStyle::kTelex, /*modern_tone=*/true,
+                            /*uo_horn=*/true, /*ng_to_ngh=*/true);
+  screen = SimulateTyping(ime_ngh, u"ngi ");
+  ASSERT_EQ(screen, u"nghi ");
+  restore = ime_ngh.RestoreCurrentWord();
+  ASSERT_FALSE(restore.IsNoOp());
+  screen.erase(screen.size() - static_cast<size_t>(restore.backspace_count));
+  screen.append(restore.text_to_insert);
+  EXPECT_EQ(screen, u"ngi ");
+
+  const uint16_t bs = kBackspace;
+  EXPECT_TRUE(ime_ngh.HandleInput(&bs, 1).IsNoOp());
+  screen.pop_back();
+  screen.append(SimulateTyping(ime_ngh, u"s"));
+  EXPECT_EQ(screen, u"ngis");
 }
 
 TEST(InputMethodBufferTest, BackspaceAcrossWordsRespectsMaxBufferSize) {

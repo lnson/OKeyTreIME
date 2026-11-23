@@ -777,6 +777,19 @@ struct OKeyTreTests {
         #expect(currentScreen() == "tiến")
         pressDualShift()
         #expect(currentScreen() == "tieens")
+
+        // 7. Pressing dual-Shift AFTER ending a word with space or punctuation restores the ended
+        // word while preserving trailing boundaries and allowing the next word to transform.
+        screen.removeAll()
+        ime.reset()
+        typeText("moojt roof, ")
+        #expect(currentScreen() == "một rồ, ")
+        pressDualShift()
+        #expect(currentScreen() == "một roof, ")
+        pressDualShift()
+        #expect(currentScreen() == "một roof, ")
+        typeText("mowis")
+        #expect(currentScreen() == "một roof, mới")
     }
 
     @MainActor

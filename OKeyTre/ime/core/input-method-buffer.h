@@ -125,8 +125,9 @@ class InputMethodBuffer {
   void SeedWithSurroundingText(const uint16_t* word, int32_t word_len,
                                int32_t caret_pos);
 
-  // Restores the current word before the caret back to its raw typed
-  // keystrokes and suppresses further transforms until the next word boundary.
+  // Restores the current word (or the most recently ended word when the caret
+  // sits immediately after word-boundary characters) back to its raw typed
+  // keystrokes, preserving any trailing boundaries.
   TextEditAction RestoreCurrentWord();
 
   // Feeds typed UTF-16 code units and modifier flags into the buffer,
