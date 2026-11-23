@@ -852,6 +852,8 @@ struct OKeyTreTests {
         #expect(AppLanguage.system.resolvedLanguageCode(preferredLanguages: ["ja-JP", "fr-FR"]) == "vi")
         #expect(AppLanguage.system.resolvedLanguageCode(preferredLanguages: []) == "vi")
 
+        #expect(AppLanguage.english.localized("settings.section.general") == "General")
+        #expect(AppLanguage.vietnamese.localized("settings.section.general") == "Thường gặp")
         #expect(AppLanguage.english.localized("settings.section.correction") == "Tones & Spelling")
         #expect(AppLanguage.vietnamese.localized("settings.section.correction") == "Bỏ dấu & Chính tả")
         #expect(AppLanguage.english.localized("menu.input_source_warning.title", "ABC") == "⚠️ Keyboard: ABC")

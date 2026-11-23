@@ -28,8 +28,22 @@
 "settings.sidebar.checking_updates" = "Checking...";
 "settings.sidebar.up_to_date" = "Up to date";
 "settings.sidebar.update_available" = "Update to %@";
+"settings.section.general" = "General";
 "settings.section.correction" = "Tones & Spelling";
 "settings.section.advanced" = "Advanced";
+
+/* General & Update Settings */
+"settings.general.system.header" = "System";
+"settings.general.launch_at_login.description" = "Automatically start ÔKêyTre in the menu bar when you log in to macOS.";
+"settings.general.language.description" = "Choose the display language for menus and settings.";
+"settings.updates.header" = "Updates";
+"settings.updates.auto_check.title" = "Automatically check for updates";
+"settings.updates.auto_check.description" = "Check GitHub Releases once a day in the background and show a notice when a new version is available.";
+"settings.updates.current_version" = "Current version: %@";
+"settings.updates.available_status" = "New version available: %@";
+"settings.updates.manual_download.title" = "Manual downloads";
+"settings.updates.manual_download.description" = "Open the releases page to view release notes or download the latest .dmg installer manually.";
+"settings.updates.manual_download.link" = "GitHub Releases";
 
 /* Tone Placement Settings */
 "settings.orthography.header" = "Tone Placement";

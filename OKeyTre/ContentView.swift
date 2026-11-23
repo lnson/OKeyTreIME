@@ -5,6 +5,7 @@ import AppKit
 import SwiftUI
 
 enum SettingsSection: String, CaseIterable, Identifiable {
+    case general
     case correction
     case advanced
 
@@ -12,6 +13,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     func title(in language: AppLanguage) -> String {
         switch self {
+        case .general:
+            return language.localized("settings.section.general")
         case .correction:
             return language.localized("settings.section.correction")
         case .advanced:
@@ -21,6 +24,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .general:
+            return "gearshape.fill"
         case .correction:
             return "wand.and.stars"
         case .advanced:
@@ -30,6 +35,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var tintColor: Color {
         switch self {
+        case .general:
+            return .teal
         case .correction:
             return .blue
         case .advanced:
@@ -40,7 +47,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
-    @State private var selectedSection: SettingsSection? = .correction
+    @State private var selectedSection: SettingsSection? = .general
 
     var body: some View {
         NavigationSplitView {
@@ -67,7 +74,9 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 195, ideal: 215, max: 240)
         } detail: {
-            switch selectedSection ?? .correction {
+            switch selectedSection ?? .general {
+            case .general:
+                GeneralSettingsPane()
             case .correction:
                 CorrectionSettingsPane()
             case .advanced:
@@ -80,42 +89,26 @@ struct ContentView: View {
 
 private struct SidebarFooter: View {
     @Binding var appLanguage: AppLanguage
-    @ObservedObject private var launchAtLoginManager = LaunchAtLoginManager.shared
 
     private static let logoImage: NSImage =
         NSImage(named: "AppIcon") ?? NSApplication.shared.applicationIconImage
 
-    private static let appVersion: String = {
-        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
-           !version.isEmpty, !version.hasPrefix("$(") {
-            return version
-        }
-        return "0.1"
-    }()
-
     var body: some View {
         VStack(spacing: 12) {
-            VStack(spacing: 8) {
-                Toggle(appLanguage.localized("menu.launch_at_login"), isOn: launchAtLoginManager.binding)
-                    .toggleStyle(.checkbox)
-                    .controlSize(.small)
+            HStack(spacing: 6) {
+                Image(systemName: "globe")
                     .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
-                HStack(spacing: 6) {
-                    Image(systemName: "globe")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-
-                    Picker(appLanguage.localized("menu.language"), selection: $appLanguage) {
-                        ForEach(AppLanguage.allCases) { option in
-                            Text(option.displayName(in: appLanguage)).tag(option)
-                        }
+                Picker(appLanguage.localized("menu.language"), selection: $appLanguage) {
+                    ForEach(AppLanguage.allCases) { option in
+                        Text(option.displayName(in: appLanguage)).tag(option)
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .controlSize(.small)
-                    .fixedSize()
                 }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .controlSize(.small)
+                .fixedSize()
             }
 
             VStack(spacing: 6) {
@@ -132,7 +125,7 @@ private struct SidebarFooter: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
 
-                    Text(appLanguage.localized("settings.sidebar.version", Self.appVersion))
+                    Text(appLanguage.localized("settings.sidebar.version", UpdateManager.currentAppVersionString))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -143,6 +136,100 @@ private struct SidebarFooter: View {
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 12)
         .padding(.vertical, 14)
+    }
+}
+
+private struct GeneralSettingsPane: View {
+    @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
+    @ObservedObject private var launchAtLoginManager = LaunchAtLoginManager.shared
+    @ObservedObject private var updateManager = UpdateManager.shared
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(isOn: launchAtLoginManager.binding) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(appLanguage.localized("menu.launch_at_login"))
+                            .font(.body)
+                        Text(appLanguage.localized("settings.general.launch_at_login.description"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text(appLanguage.localized("settings.general.system.header"))
+            }
+
+            Section {
+                Toggle(isOn: updateManager.autoCheckBinding) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(appLanguage.localized("settings.updates.auto_check.title"))
+                            .font(.body)
+                        Text(appLanguage.localized("settings.updates.auto_check.description"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                LabeledContent {
+                    HStack(spacing: 8) {
+                        if let release = updateManager.availableRelease {
+                            Button(appLanguage.localized("action.download_update")) {
+                                updateManager.openReleasePage(release)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+
+                        Button(appLanguage.localized("settings.sidebar.check_updates")) {
+                            updateManager.checkForUpdatesNow()
+                        }
+                        .disabled(updateManager.isChecking)
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        if let release = updateManager.availableRelease {
+                            Text(appLanguage.localized("settings.updates.available_status", release.displayVersion))
+                                .font(.body.weight(.medium))
+                        } else {
+                            Text(appLanguage.localized("settings.updates.current_version", UpdateManager.currentAppVersionString))
+                                .font(.body)
+                        }
+
+                        if updateManager.isChecking {
+                            Text(appLanguage.localized("settings.sidebar.checking_updates"))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        } else if updateManager.didConfirmUpToDate {
+                            Text(appLanguage.localized("settings.sidebar.up_to_date"))
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                LabeledContent {
+                    Link(destination: UpdateManager.releasesWebURL) {
+                        HStack(spacing: 4) {
+                            Text(appLanguage.localized("settings.updates.manual_download.link"))
+                            Image(systemName: "arrow.up.right.square")
+                                .font(.caption)
+                        }
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(appLanguage.localized("settings.updates.manual_download.title"))
+                            .font(.body)
+                        Text(appLanguage.localized("settings.updates.manual_download.description"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text(appLanguage.localized("settings.updates.header"))
+            }
+        }
+        .formStyle(.grouped)
+        .navigationTitle(appLanguage.localized("settings.section.general"))
         .onAppear {
             launchAtLoginManager.refreshStatus()
         }

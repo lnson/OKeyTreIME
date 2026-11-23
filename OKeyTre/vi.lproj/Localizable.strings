@@ -28,8 +28,22 @@
 "settings.sidebar.checking_updates" = "Đang kiểm tra...";
 "settings.sidebar.up_to_date" = "Đã là bản mới nhất";
 "settings.sidebar.update_available" = "Cập nhật bản %@";
+"settings.section.general" = "Thường gặp";
 "settings.section.correction" = "Bỏ dấu & Chính tả";
 "settings.section.advanced" = "Dành cho chuyên gia";
+
+/* General & Update Settings */
+"settings.general.system.header" = "Hệ thống";
+"settings.general.launch_at_login.description" = "Tự động mở ÔKêyTre trên thanh menu khi đăng nhập vào macOS.";
+"settings.general.language.description" = "Chọn ngôn ngữ hiển thị cho thanh menu và cửa sổ cài đặt.";
+"settings.updates.header" = "Cập nhật";
+"settings.updates.auto_check.title" = "Tự động kiểm tra cập nhật";
+"settings.updates.auto_check.description" = "Kiểm tra phiên bản mới trên GitHub Releases mỗi ngày một lần và hiển thị thông báo khi có bản mới.";
+"settings.updates.current_version" = "Phiên bản hiện tại: %@";
+"settings.updates.available_status" = "Đã có phiên bản mới: %@";
+"settings.updates.manual_download.title" = "Tải cập nhật thủ công";
+"settings.updates.manual_download.description" = "Mở trang phát hành để xem ghi chú thay đổi hoặc tải trực tiếp bộ cài .dmg mới nhất.";
+"settings.updates.manual_download.link" = "GitHub Releases";
 
 /* Tone Placement Settings */
 "settings.orthography.header" = "Quy tắc đặt dấu";
