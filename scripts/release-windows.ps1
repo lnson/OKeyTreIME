@@ -1,4 +1,4 @@
-﻿# Copyright (C) 2026 lnson
+# Copyright (C) 2026 lnson
 # SPDX-License-Identifier: GPL-3.0-only
 #
 # Builds, optionally Authenticode-signs, verifies, packages, and publishes
