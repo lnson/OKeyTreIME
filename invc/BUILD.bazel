@@ -11,6 +11,7 @@ genrule(
     srcs = ["inv-lexer.lpp"],
     outs = ["inv-lexer.yy.cc"],
     cmd = "/usr/bin/flex -o $@ $(location inv-lexer.lpp)",
+    cmd_bat = "where win_flex >nul 2>&1 && (win_flex --wincompat -o $@ $(location inv-lexer.lpp)) || (flex -o $@ $(location inv-lexer.lpp))",
 )
 
 genrule(
@@ -21,6 +22,7 @@ genrule(
         "inv-parser.yacc.h",
     ],
     cmd = "/usr/bin/bison -y --defines=$(location inv-parser.yacc.h) -o $(location inv-parser.yacc.cc) $(location inv-parser.ypp)",
+    cmd_bat = "where win_bison >nul 2>&1 && (win_bison -y --defines=$(location inv-parser.yacc.h) -o $(location inv-parser.yacc.cc) $(location inv-parser.ypp)) || (bison -y --defines=$(location inv-parser.yacc.h) -o $(location inv-parser.yacc.cc) $(location inv-parser.ypp))",
 )
 
 # 2. `.inv` AST, Minimized Inversion DFA Compiler & C++ Codegen Libraries

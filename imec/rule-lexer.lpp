@@ -4,6 +4,7 @@
 
 // Flex lexical analyzer for `.ime` grammar specifications.
 
+#if defined(__clang__)
 #pragma clang diagnostic ignored "-Wunused-function"
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -12,6 +13,7 @@
 #pragma clang diagnostic ignored "-Wdeprecated-register"
 #pragma clang diagnostic ignored "-Wconversion"
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#endif
 
 #include <cstring>
 #include <string>
@@ -61,6 +63,8 @@ static uint16_t OkeytreReadUtf8Char(const char* text, int len) {
 %option noyywrap
 %option nounput
 %option nodefault
+%option nounistd
+%option never-interactive
 %option 8bit
 %option prefix="okeytre_yy"
 

@@ -1,12 +1,34 @@
-# Enable Bzlmod and Apple platform toolchains
+# Enable Bzlmod and platform-specific toolchains
 common --enable_bzlmod
-build --apple_platform_type=macos
-build --macos_minimum_os=14.0
-build --cxxopt=-std=c++23
-build --host_cxxopt=-std=c++23
+common --enable_platform_specific_config
+
+# macOS platform flags
+build:macos --apple_platform_type=macos
+build:macos --macos_minimum_os=14.0
+build:macos --cxxopt=-std=c++23
+build:macos --host_cxxopt=-std=c++23
+
+# Linux platform flags
+build:linux --cxxopt=-std=c++23
+build:linux --host_cxxopt=-std=c++23
+
+# Windows (MSVC) platform flags
+build:windows --action_env=PATH
+build:windows --host_action_env=PATH
+build:windows --cxxopt=/std:c++latest
+build:windows --host_cxxopt=/std:c++latest
+build:windows --cxxopt=/utf-8
+build:windows --host_cxxopt=/utf-8
+build:windows --cxxopt=/Zc:__cplusplus
+build:windows --host_cxxopt=/Zc:__cplusplus
+build:windows --cxxopt=/DNOMINMAX
+build:windows --host_cxxopt=/DNOMINMAX
+build:windows --cxxopt=/DWIN32_LEAN_AND_MEAN
+build:windows --host_cxxopt=/DWIN32_LEAN_AND_MEAN
+
 test --test_output=errors
 
-# Release build profile (`bazel build --config=release //:OKeyTreApp`)
+# Release build profile (`bazel build --config=release //:OKeyTreApp` or `//:OKeyTreWindows`)
 build:release --compilation_mode=opt
 build:release --strip=always
 build:release --objc_enable_binary_stripping

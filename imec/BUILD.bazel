@@ -11,6 +11,7 @@ genrule(
     srcs = ["rule-lexer.lpp"],
     outs = ["rule-lexer.yy.cc"],
     cmd = "/usr/bin/flex -o $@ $(location rule-lexer.lpp)",
+    cmd_bat = "where win_flex >nul 2>&1 && (win_flex --wincompat -o $@ $(location rule-lexer.lpp)) || (flex -o $@ $(location rule-lexer.lpp))",
 )
 
 genrule(
@@ -21,6 +22,7 @@ genrule(
         "rule-parser.yacc.h",
     ],
     cmd = "/usr/bin/bison -y --defines=$(location rule-parser.yacc.h) -o $(location rule-parser.yacc.cc) $(location rule-parser.ypp)",
+    cmd_bat = "where win_bison >nul 2>&1 && (win_bison -y --defines=$(location rule-parser.yacc.h) -o $(location rule-parser.yacc.cc) $(location rule-parser.ypp)) || (bison -y --defines=$(location rule-parser.yacc.h) -o $(location rule-parser.yacc.cc) $(location rule-parser.ypp))",
 )
 
 # 2. `.ime` AST, Automaton IR, Compiler & Codegen Libraries

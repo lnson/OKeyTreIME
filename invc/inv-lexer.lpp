@@ -4,6 +4,7 @@
 
 // Flex lexical analyzer for `.inv` inversion-matcher specifications.
 
+#if defined(__clang__)
 #pragma clang diagnostic ignored "-Wunused-function"
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-parameter"
@@ -12,6 +13,7 @@
 #pragma clang diagnostic ignored "-Wdeprecated-register"
 #pragma clang diagnostic ignored "-Wconversion"
 #pragma clang diagnostic ignored "-Wshorten-64-to-32"
+#endif
 
 #include <cstdint>
 #include <cstring>
@@ -61,6 +63,8 @@ static uint16_t InvcReadUtf8Char(const char* text, int len) {
 %option noyywrap
 %option nounput
 %option nodefault
+%option nounistd
+%option never-interactive
 %option 8bit
 %option prefix="invc_yy"
 
