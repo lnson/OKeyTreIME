@@ -16,7 +16,7 @@ final class ShowcaseManager: ObservableObject {
     /// Bump this version string whenever a release introduces new user-facing functionality that
     /// should re-open the Showcase window once for upgrading users. Leave unchanged on pure
     /// bug-fix releases so users are only notified when new capabilities ship.
-    nonisolated static let currentFeatureMilestoneVersionString = "0.2.1"
+    nonisolated static let currentFeatureMilestoneVersionString = "0.3"
     static let currentFeatureMilestoneVersion = AppVersion(currentFeatureMilestoneVersionString)!
 
     nonisolated static let lastSeenShowcaseVersionDefaultsKey = "lastSeenShowcaseVersion"
