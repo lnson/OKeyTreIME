@@ -860,5 +860,9 @@ struct OKeyTreTests {
         #expect(AppLanguage.vietnamese.localized("menu.input_source_warning.title", "ABC") == "⚠️ Bàn phím: ABC")
         #expect(AppLanguage.system.displayName(in: .english) == "System Default")
         #expect(AppLanguage.system.displayName(in: .vietnamese) == "Theo hệ thống")
+
+        #expect(MenuBarStatusView.tooltipText(style: .telex, language: .english) == "ÔKêyTre: Telex")
+        #expect(MenuBarStatusView.tooltipText(style: .off, language: .english) == "ÔKêyTre: Off")
+        #expect(MenuBarStatusView.tooltipText(style: .off, language: .vietnamese) == "ÔKêyTre: Tắt")
     }
 }

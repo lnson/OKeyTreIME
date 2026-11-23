@@ -192,6 +192,9 @@ final class KeyTapManager: ObservableObject {
             defaults.set(style.rawValue, forKey: InputMethodBuffer.lastActiveStyleDefaultsKey)
         }
         dualShiftDetector.reset()
+        if defaults === UserDefaults.standard {
+            MenuBarStatusView.refreshStatusBarTooltip()
+        }
     }
 
     func toggleVietnameseEnabled(defaults: UserDefaults = .standard) {

@@ -5,6 +5,7 @@
 "menu.input_source_warning.subtitle" = "Recommended: English (U.S.) keyboard";
 "menu.input_style" = "Input Method";
 "menu.input_style.off" = "Off";
+"menu.tooltip.mode" = "ÔKêyTre: %@";
 "menu.launch_at_login" = "Launch at Login";
 "menu.auto_check_updates" = "Auto-Check for Updates";
 "menu.update_available.title" = "✨ New Version Available: %@";

@@ -10,6 +10,69 @@ struct MenuBarStatusView: View {
     @ObservedObject var inputSourceManager = InputSourceManager.shared
     @ObservedObject var permissionManager = PermissionManager.shared
     @ObservedObject var keyTapManager = KeyTapManager.shared
+    @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
+
+    static func tooltipText(
+        style: InputMethodStyle,
+        language: AppLanguage,
+        isAccessibilityGranted: Bool = true,
+        isEnglishKeyboard: Bool = true,
+        keyboardName: String = "U.S."
+    ) -> String {
+        let base = language.localized("menu.tooltip.mode", style.displayName(in: language))
+        if !isAccessibilityGranted {
+            return "\(base) · \(language.localized("menu.accessibility_missing.title"))"
+        }
+        if style.isVietnameseEnabled && !isEnglishKeyboard {
+            return "\(base) · \(language.localized("menu.input_source_warning.title", keyboardName))"
+        }
+        return base
+    }
+
+    private static func findStatusBarButton(in view: NSView) -> NSStatusBarButton? {
+        if let button = view as? NSStatusBarButton {
+            return button
+        }
+        for subview in view.subviews {
+            if let found = findStatusBarButton(in: subview) {
+                return found
+            }
+        }
+        return nil
+    }
+
+    static func refreshStatusBarTooltip() {
+        let current = tooltipText(
+            style: KeyTapManager.shared.inputMethodStyle,
+            language: AppLanguage.current,
+            isAccessibilityGranted: PermissionManager.shared.isAccessibilityGranted,
+            isEnglishKeyboard: InputSourceManager.shared.isEnglish,
+            keyboardName: InputSourceManager.shared.currentSourceName
+        )
+        applyStatusBarTooltip(current)
+    }
+
+    private static func applyStatusBarTooltip(_ text: String) {
+        let update = { () -> Bool in
+            for window in NSApplication.shared.windows {
+                if let contentView = window.contentView,
+                   let button = findStatusBarButton(in: contentView) {
+                    if button.toolTip != text {
+                        button.toolTip = text
+                    }
+                    return true
+                }
+            }
+            return false
+        }
+        if !update() {
+            for delay in [0.1, 0.4] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                    _ = update()
+                }
+            }
+        }
+    }
 
     var body: some View {
         let iconName: String = if !permissionManager.isAccessibilityGranted {
@@ -21,8 +84,19 @@ struct MenuBarStatusView: View {
         } else {
             "keyboard"
         }
+        let tooltip = Self.tooltipText(
+            style: keyTapManager.inputMethodStyle,
+            language: appLanguage,
+            isAccessibilityGranted: permissionManager.isAccessibilityGranted,
+            isEnglishKeyboard: inputSourceManager.isEnglish,
+            keyboardName: inputSourceManager.currentSourceName
+        )
+        let _ = DispatchQueue.main.async {
+            Self.applyStatusBarTooltip(tooltip)
+        }
         Image(systemName: iconName)
             .id(iconName)
+            .help(tooltip)
     }
 }
 
@@ -147,6 +221,7 @@ private struct MenuBarMenuContent: View {
                 InputSourceManager.shared.checkAndWarnOnStartup()
             }
             UpdateManager.shared.startAutomaticChecksIfNeeded()
+            MenuBarStatusView.refreshStatusBarTooltip()
         }
     }
 

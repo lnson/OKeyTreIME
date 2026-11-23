@@ -5,6 +5,7 @@
 "menu.input_source_warning.subtitle" = "Nên dùng bàn phím tiếng Anh (U.S.)";
 "menu.input_style" = "Kiểu gõ";
 "menu.input_style.off" = "Tắt";
+"menu.tooltip.mode" = "ÔKêyTre: %@";
 "menu.launch_at_login" = "Khởi động cùng hệ thống";
 "menu.auto_check_updates" = "Tự động kiểm tra cập nhật";
 "menu.update_available.title" = "✨ Đã có phiên bản mới: %@";
