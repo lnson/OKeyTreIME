@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import AppKit
+import CoreText
 import Darwin
 import SwiftUI
 import os
@@ -74,15 +75,75 @@ struct MenuBarStatusView: View {
         }
     }
 
+    /// Custom vector template icon ("Vi" + rounded I-beam cursor) matching the
+    /// exact stroke weight, cap height, and baseline of SF Symbols' `character.cursor.ibeam`.
+    private static let vietnameseCursorIcon: NSImage = {
+        let height: CGFloat = 16.0
+        let fontSize: CGFloat = 11.5
+        let baseFont = NSFont.systemFont(ofSize: fontSize, weight: .medium)
+        let font = baseFont.fontDescriptor.withDesign(.rounded)
+            .flatMap { NSFont(descriptor: $0, size: fontSize) } ?? baseFont
+
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: NSColor.black,
+            .kern: -0.35,
+        ]
+        let text = NSAttributedString(string: "Vi", attributes: attrs)
+        let textSize = text.size()
+
+        let strokeWidth: CGFloat = 1.1
+        let barWidth: CGFloat = 3.8
+        let padLeft: CGFloat = 0.5
+        let gap: CGFloat = 1.4
+        let padRight: CGFloat = 0.8
+
+        let ibeamLeftX = padLeft + textSize.width + gap
+        let ibeamCenterX = ibeamLeftX + barWidth / 2.0
+        let width = ceil(ibeamLeftX + barWidth + padRight)
+
+        let image = NSImage(size: NSSize(width: width, height: height), flipped: false) { _ in
+            NSColor.black.setStroke()
+
+            let bottomY: CGFloat = 1.75
+            let topY: CGFloat = height - 1.75
+
+            let path = NSBezierPath()
+            path.lineWidth = strokeWidth
+            path.lineCapStyle = .round
+
+            path.move(to: NSPoint(x: ibeamCenterX, y: bottomY))
+            path.line(to: NSPoint(x: ibeamCenterX, y: topY))
+
+            path.move(to: NSPoint(x: ibeamCenterX - barWidth / 2.0, y: topY))
+            path.line(to: NSPoint(x: ibeamCenterX + barWidth / 2.0, y: topY))
+
+            path.move(to: NSPoint(x: ibeamCenterX - barWidth / 2.0, y: bottomY))
+            path.line(to: NSPoint(x: ibeamCenterX + barWidth / 2.0, y: bottomY))
+
+            path.stroke()
+
+            let line = CTLineCreateWithAttributedString(text)
+            if let ctx = NSGraphicsContext.current?.cgContext {
+                let baselineY = (bottomY + topY - font.capHeight) / 2.0 - 0.5
+                ctx.textPosition = CGPoint(x: padLeft, y: baselineY)
+                CTLineDraw(line, ctx)
+            }
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }()
+
     var body: some View {
-        let iconName: String = if !permissionManager.isAccessibilityGranted {
+        let systemIconName: String? = if !permissionManager.isAccessibilityGranted {
             "exclamationmark.triangle.fill"
         } else if !keyTapManager.isVietnameseEnabled {
             "nosign"
         } else if !inputSourceManager.isEnglish {
             "exclamationmark.triangle.fill"
         } else {
-            "keyboard"
+            nil
         }
         let tooltip = Self.tooltipText(
             style: keyTapManager.inputMethodStyle,
@@ -94,9 +155,15 @@ struct MenuBarStatusView: View {
         let _ = DispatchQueue.main.async {
             Self.applyStatusBarTooltip(tooltip)
         }
-        Image(systemName: iconName)
-            .id(iconName)
-            .help(tooltip)
+        Group {
+            if let systemIconName {
+                Image(systemName: systemIconName)
+            } else {
+                Image(nsImage: Self.vietnameseCursorIcon)
+            }
+        }
+        .id(systemIconName ?? "vi-cursor")
+        .help(tooltip)
     }
 }
 
