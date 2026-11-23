@@ -7,7 +7,7 @@
   <meta
     name="description"
     id="meta-description"
-    content="ÔKêyTre (OKeyTre) là bộ gõ tiếng Việt mã nguồn mở nhanh, gọn nhẹ trên thanh menu macOS (Apple Silicon &amp; Intel). Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ tại con trỏ và khôi phục tiếng Anh tức thì."
+    content="ÔKêyTre (OKeyTre) là bộ gõ tiếng Việt mã nguồn mở nhanh, gọn nhẹ trên thanh menu macOS (Apple Silicon &amp; Intel). Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, tự động khôi phục từ không phải tiếng Việt, khôi phục nhanh bằng hai phím Shift và sửa từ thông minh tại con trỏ."
   />
   <meta
     name="keywords"
@@ -38,7 +38,7 @@
   <meta
     property="og:description"
     id="og-description"
-    content="Bộ gõ tiếng Việt mã nguồn mở trên thanh menu macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ thông minh tại con trỏ và khôi phục tiếng Anh tức thì."
+    content="Bộ gõ tiếng Việt mã nguồn mở trên thanh menu macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, tự động khôi phục từ không phải tiếng Việt và sửa từ thông minh tại con trỏ."
   />
   <meta property="og:url" id="og-url" content="https://lnson.github.io/OKeyTreIME/" />
   <meta property="og:locale" id="og-locale" content="vi_VN" />
@@ -59,7 +59,7 @@
   <meta
     name="twitter:description"
     id="twitter-description"
-    content="Bộ gõ tiếng Việt mã nguồn mở trên thanh menu macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ thông minh tại con trỏ và khôi phục tiếng Anh tức thì."
+    content="Bộ gõ tiếng Việt mã nguồn mở trên thanh menu macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, tự động khôi phục từ không phải tiếng Việt và sửa từ thông minh tại con trỏ."
   />
   <meta name="twitter:image" content="https://lnson.github.io/OKeyTreIME/icon.png" />
 
@@ -79,7 +79,7 @@
         "alternateName": "OKeyTre",
         "url": "https://lnson.github.io/OKeyTreIME/",
         "image": "https://lnson.github.io/OKeyTreIME/icon.png",
-        "description": "ÔKêyTre (OKeyTre) is a fast, lightweight, open-source Vietnamese input method (IME) for the macOS menu bar supporting Telex, VNI, and VIQR with free-order diacritics, smart cursor word editing, and instant English restore.",
+        "description": "ÔKêyTre (OKeyTre) is a fast, lightweight, open-source Vietnamese input method (IME) for the macOS menu bar supporting Telex, VNI, and VIQR with free-order diacritics, automatic restoration of non-Vietnamese words, smart cursor word editing, and instant dual-Shift raw restore.",
         "applicationCategory": "UtilitiesApplication",
         "operatingSystem": "macOS 14.0 or later (Apple Silicon & Intel)",
         "softwareVersion": "0.2.1",
@@ -102,7 +102,8 @@
         "featureList": [
           "Telex, VNI, and VIQR Vietnamese input methods",
           "Free-order diacritics and tone mark placement",
-          "Instant raw English restore via Left Shift + Right Shift",
+          "Automatic raw-word restoration on word end for non-Vietnamese words",
+          "Ad-hoc raw-word restore via Left Shift + Right Shift (even after ending a word)",
           "Quick Vietnamese on/off toggle via Left Command + Right Command",
           "Smart word editing at cursor and across lines",
           "Configurable modern tone placement (oà, uỳ) and spelling auto-correction"
@@ -122,10 +123,10 @@
           },
           {
             "@type": "Question",
-            "name": "Làm sao để tắt nhanh bộ gõ hoặc gõ từ tiếng Anh khi đang bật ÔKêyTre?",
+            "name": "Làm sao để gõ xen kẽ từ tiếng Anh hoặc tắt nhanh bộ gõ khi đang dùng ÔKêyTre?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Nhấn đồng thời ⌘ Trái + ⌘ Phải (Left ⌘ + Right ⌘) hoặc chọn Tắt (Off) trên thanh menu để tắt/bật bộ gõ tiếng Việt. Để khôi phục riêng từ đang gõ về tiếng Anh gốc, nhấn đồng thời ⇧ Trái + ⇧ Phải (Left ⇧ + Right ⇧)."
+              "text": "Mặc định ÔKêyTre tự động khôi phục các từ có tổ hợp âm không phải tiếng Việt (như user) về ký tự gốc ngay khi nhấn dấu cách hoặc dấu câu. Bạn cũng có thể nhấn đồng thời ⇧ Trái + ⇧ Phải (kể cả ngay sau dấu cách) để khôi phục thủ công, hoặc nhấn ⌘ Trái + ⌘ Phải để tắt/bật nhanh bộ gõ."
             }
           },
           {
@@ -133,7 +134,7 @@
             "name": "ÔKêyTre khác gì so với bộ gõ tiếng Việt mặc định trên macOS?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "ÔKêyTre khắc phục tình trạng gạch chân (underline) gây nuốt chữ hoặc nhảy ký tự trên trình duyệt và IDE, đồng thời bổ sung bỏ dấu tự do, sửa từ tại con trỏ, khôi phục tiếng Anh tức thì bằng hai phím Shift và tuỳ chỉnh quy tắc đặt dấu."
+              "text": "ÔKêyTre khắc phục tình trạng gạch chân (underline) gây nuốt chữ hoặc nhảy ký tự trên trình duyệt và IDE, đồng thời bổ sung tự động khôi phục từ không phải tiếng Việt, bỏ dấu tự do, sửa từ tại con trỏ, khôi phục nhanh bằng hai phím Shift và tuỳ chỉnh quy tắc đặt dấu."
             }
           },
           {
@@ -414,11 +415,12 @@
       box-shadow: var(--shadow-sm);
       margin-bottom: 64px;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 14px;
     }
 
     .demo-item {
+      grid-column: span 2;
       padding: 14px 16px;
       background: var(--bg);
       border-radius: var(--radius-md);
@@ -427,6 +429,10 @@
       flex-direction: column;
       justify-content: space-between;
       gap: 10px;
+    }
+
+    .demo-item.demo-wide {
+      grid-column: span 3;
     }
 
     .demo-label {
@@ -689,7 +695,9 @@
       .showcase {
         grid-template-columns: 1fr;
       }
-      .demo-item {
+      .demo-item,
+      .demo-item.demo-wide {
+        grid-column: 1 / -1;
         flex-direction: row;
         align-items: center;
       }
@@ -786,10 +794,10 @@
       <h1 lang="en">Effortless, natural<br />Vietnamese typing for Mac</h1>
 
       <p class="hero-sub" lang="vi">
-        <strong>ÔKêyTre</strong> nằm gọn trên thanh menu macOS, hỗ trợ bỏ dấu tự do, sửa từ thông minh ngay tại con trỏ và khôi phục tiếng Anh tức thì.
+        <strong>ÔKêyTre</strong> nằm gọn trên thanh menu macOS, hỗ trợ bỏ dấu tự do, tự động khôi phục từ không phải tiếng Việt, khôi phục tức thì bằng hai phím Shift và sửa từ thông minh tại con trỏ.
       </p>
       <p class="hero-sub" lang="en">
-        <strong>ÔKêyTre</strong> lives quietly in your macOS menu bar with free-order diacritics, smart word editing right at the cursor, and instant English restore.
+        <strong>ÔKêyTre</strong> lives quietly in your macOS menu bar with free-order diacritics, automatic non-Vietnamese word restoration, instant dual-Shift restore, and smart word editing right at the cursor.
       </p>
 
       <div class="cta-row">
@@ -820,6 +828,30 @@
 
     <!-- Keystroke Showcase -->
     <div class="showcase" aria-label="Typing examples">
+      <div class="demo-item demo-wide">
+        <div class="demo-label" lang="vi">Tự động khôi phục từ không phải tiếng Việt</div>
+        <div class="demo-label" lang="en">Auto-restore non-Vietnamese words</div>
+        <div class="demo-keys">
+          <span class="demo-typed">úer</span>
+          <span class="demo-op">+</span>
+          <kbd>Space</kbd>
+          <span class="demo-arrow">→</span>
+          <span class="demo-result">user␣</span>
+        </div>
+      </div>
+
+      <div class="demo-item demo-wide">
+        <div class="demo-label" lang="vi">Khôi phục từ gốc tức thì</div>
+        <div class="demo-label" lang="en">Instant raw-word restore</div>
+        <div class="demo-keys">
+          <span class="demo-typed">rồ␣</span>
+          <span class="demo-op">+</span>
+          <span class="kbd-group"><kbd>⇧ Left</kbd><kbd>⇧ Right</kbd></span>
+          <span class="demo-arrow">→</span>
+          <span class="demo-result">roof␣</span>
+        </div>
+      </div>
+
       <div class="demo-item">
         <div class="demo-label" lang="vi">Bỏ dấu tự do</div>
         <div class="demo-label" lang="en">Free-order diacritics</div>
@@ -833,14 +865,13 @@
       </div>
 
       <div class="demo-item">
-        <div class="demo-label" lang="vi">Khôi phục tiếng Anh tức thì</div>
-        <div class="demo-label" lang="en">Instant English restore</div>
+        <div class="demo-label" lang="vi">Bật / tắt nhanh bộ gõ</div>
+        <div class="demo-label" lang="en">Quick on/off toggle</div>
         <div class="demo-keys">
-          <span class="demo-typed">lẽi</span>
-          <span class="demo-op">+</span>
-          <span class="kbd-group"><kbd>⇧ Left</kbd><kbd>⇧ Right</kbd></span>
+          <span class="kbd-group"><kbd>⌘ Left</kbd><kbd>⌘ Right</kbd></span>
           <span class="demo-arrow">→</span>
-          <span class="demo-result">lexi</span>
+          <span class="demo-result" lang="vi">Tắt / Bật</span>
+          <span class="demo-result" lang="en">Off / On</span>
         </div>
       </div>
 
@@ -885,13 +916,13 @@
 
         <article class="card">
           <div class="card-icon" aria-hidden="true">⇧</div>
-          <h3 lang="vi">Gõ tiếng Anh &amp; tắt/bật tức thì</h3>
-          <h3 lang="en">Instant English &amp; On/Off Toggle</h3>
+          <h3 lang="vi">Tự động khôi phục &amp; ⇧ + ⇧ tức thì</h3>
+          <h3 lang="en">Auto-Restore &amp; Dual-Shift Restore</h3>
           <p lang="vi">
-            Nhấn đồng thời <code>⇧ Trái + ⇧ Phải</code> để khôi phục từ hiện tại về ký tự gốc, hoặc nhấn <code>⌘ Trái + ⌘ Phải</code> (hay chọn <code>Tắt</code> trên menu bar) để tắt/bật nhanh bộ gõ tiếng Việt.
+            Tự động trả các từ không phải tiếng Việt (như <code>user</code>) về ký tự gốc ngay khi nhấn dấu cách hoặc dấu câu. Nhấn đồng thời <code>⇧ Trái + ⇧ Phải</code> (trong lúc gõ hoặc ngay sau dấu cách) để khôi phục từ gốc thủ công.
           </p>
           <p lang="en">
-            Press <code>Left ⇧ + Right ⇧</code> together to restore the current word to raw characters, or press <code>Left ⌘ + Right ⌘</code> (or select <code>Off</code> in the menu bar) to toggle Vietnamese input off and on.
+            Automatically restores non-Vietnamese words (like <code>user</code>) to raw characters on Space or punctuation. Press <code>Left ⇧ + Right ⇧</code> together (mid-word or even after Space) for instant manual raw-word restore.
           </p>
         </article>
 
@@ -924,10 +955,10 @@
           <h3 lang="vi">Tích hợp chuẩn macOS</h3>
           <h3 lang="en">Native macOS Integration</h3>
           <p lang="vi">
-            Chạy hoàn toàn trên thanh menu, hỗ trợ khởi động cùng hệ thống và tự động tạm tắt khi bạn chuyển sang bàn phím khác tiếng Anh để tránh xung đột.
+            Chạy hoàn toàn trên thanh menu, nhấn <code>⌘ Trái + ⌘ Phải</code> để tắt/bật nhanh bộ gõ, hỗ trợ khởi động cùng hệ thống và cảnh báo khi chuyển sang bàn phím khác U.S./ABC để tránh xung đột.
           </p>
           <p lang="en">
-            Lives entirely in the menu bar, supports Launch at Login, and automatically pauses when switching away from U.S./ABC layouts to prevent conflicts.
+            Lives entirely in the menu bar, toggles off/on via <code>Left ⌘ + Right ⌘</code>, supports Launch at Login, and warns when switching away from U.S./ABC layouts to prevent conflicts.
           </p>
         </article>
 
@@ -1018,15 +1049,15 @@
 
         <details class="faq-item">
           <summary>
-            <span lang="vi">Làm sao để tắt nhanh bộ gõ hoặc gõ từ tiếng Anh khi đang bật ÔKêyTre?</span>
-            <span lang="en">How do I quickly toggle Vietnamese input off or type raw English words?</span>
+            <span lang="vi">Làm sao để gõ xen kẽ từ tiếng Anh hoặc tắt nhanh bộ gõ khi đang dùng ÔKêyTre?</span>
+            <span lang="en">How do I type English words inline or quickly toggle ÔKêyTre off?</span>
           </summary>
           <div class="faq-answer">
             <p lang="vi">
-              Nhấn đồng thời <code>⌘ Trái + ⌘ Phải</code> (hoặc chọn <code>Tắt</code> trên thanh menu) để tắt/bật nhanh bộ gõ tiếng Việt. Khi chỉ muốn trả riêng từ đang gõ về ký tự tiếng Anh gốc mà không tắt bộ gõ, hãy nhấn đồng thời <code>⇧ Trái + ⇧ Phải</code>.
+              Mặc định ÔKêyTre <strong>tự động khôi phục từ không phải tiếng Việt</strong> (như <code>user</code>) về ký tự gốc ngay khi bạn nhấn dấu cách hoặc dấu câu (có thể bật/tắt ngay trên thanh menu). Với những từ tiếng Anh trùng âm tiết tiếng Việt (như <code>roof </code> → <code>rồ </code>), hãy nhấn đồng thời <code>⇧ Trái + ⇧ Phải</code> (trong lúc gõ hoặc ngay sau dấu cách) để khôi phục thủ công, hoặc nhấn <code>⌘ Trái + ⌘ Phải</code> để tắt/bật nhanh bộ gõ.
             </p>
             <p lang="en">
-              Press <code>Left ⌘ + Right ⌘</code> together (or choose <code>Off</code> in the menu bar) to toggle Vietnamese input off and on. To restore only the current word to raw English characters without turning off Vietnamese mode, press <code>Left ⇧ + Right ⇧</code>.
+              By default, ÔKêyTre <strong>automatically restores non-Vietnamese words</strong> (such as <code>user</code>) back to raw characters as soon as you press Space or punctuation (toggleable directly from the menu bar). For English words whose Telex output happens to be a valid Vietnamese syllable (like <code>roof </code> → <code>rồ </code>), press <code>Left ⇧ + Right ⇧</code> (mid-word or right after Space) to restore manually, or press <code>Left ⌘ + Right ⌘</code> to toggle Vietnamese input off and on.
             </p>
           </div>
         </details>
@@ -1038,10 +1069,10 @@
           </summary>
           <div class="faq-answer">
             <p lang="vi">
-              ÔKêyTre không dùng vùng gạch chân tạm (pre-edit underline) của bộ gõ mặc định vốn hay gây lỗi nuốt chữ hoặc nhân đôi ký tự trên thanh địa chỉ trình duyệt, Spotlight và IDE. Ngoài ra ÔKêyTre hỗ trợ bỏ dấu tự do, sửa từ ngay tại con trỏ, khôi phục tiếng Anh bằng <code>⇧ + ⇧</code> và tuỳ chỉnh quy tắc chính tả.
+              ÔKêyTre không dùng vùng gạch chân tạm (pre-edit underline) của bộ gõ mặc định vốn hay gây lỗi nuốt chữ hoặc nhân đôi ký tự trên thanh địa chỉ trình duyệt, Spotlight và IDE. Ngoài ra ÔKêyTre hỗ trợ tự động khôi phục từ không phải tiếng Việt khi gõ xen kẽ, bỏ dấu tự do, sửa từ ngay tại con trỏ, khôi phục nhanh bằng <code>⇧ + ⇧</code> và tuỳ chỉnh quy tắc chính tả.
             </p>
             <p lang="en">
-              ÔKêyTre avoids the pre-edit underline buffer used by the stock macOS IME that often causes swallowed or duplicated characters in browser address bars, Spotlight, and IDEs, while adding free-order diacritics, smart cursor word editing, instant <code>⇧ + ⇧</code> English restore, and configurable orthography rules.
+              ÔKêyTre avoids the pre-edit underline buffer used by the stock macOS IME that often causes swallowed or duplicated characters in browser address bars, Spotlight, and IDEs, while adding automatic restoration of non-Vietnamese words, free-order diacritics, smart cursor word editing, instant <code>⇧ + ⇧</code> restore, and configurable orthography rules.
             </p>
           </div>
         </details>
@@ -1088,18 +1119,18 @@
         vi: {
           title: "ÔKêyTre (OKeyTre) — Bộ gõ tiếng Việt nhanh, nhẹ cho macOS",
           description:
-            "ÔKêyTre (OKeyTre) là bộ gõ tiếng Việt mã nguồn mở nhanh, gọn nhẹ trên thanh menu macOS (Apple Silicon & Intel). Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ tại con trỏ và khôi phục tiếng Anh tức thì.",
+            "ÔKêyTre (OKeyTre) là bộ gõ tiếng Việt mã nguồn mở nhanh, gọn nhẹ trên thanh menu macOS (Apple Silicon & Intel). Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, tự động khôi phục từ không phải tiếng Việt, khôi phục tức thì bằng hai phím Shift và sửa từ thông minh tại con trỏ.",
           ogDescription:
-            "Bộ gõ tiếng Việt mã nguồn mở trên thanh menu macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa từ thông minh tại con trỏ và khôi phục tiếng Anh tức thì.",
+            "Bộ gõ tiếng Việt mã nguồn mở trên thanh menu macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, tự động khôi phục từ không phải tiếng Việt, khôi phục bằng hai phím Shift và sửa từ thông minh tại con trỏ.",
           locale: "vi_VN",
           canonical: BASE_URL,
         },
         en: {
           title: "ÔKêyTre (OKeyTre) — Fast, Native Vietnamese Input Method for macOS",
           description:
-            "ÔKêyTre (OKeyTre) is a fast, lightweight, open-source Vietnamese input method (IME) for the macOS menu bar (Apple Silicon & Intel) supporting Telex, VNI, VIQR, free-order diacritics, and smart cursor editing.",
+            "ÔKêyTre (OKeyTre) is a fast, lightweight, open-source Vietnamese input method (IME) for the macOS menu bar (Apple Silicon & Intel) supporting Telex, VNI, VIQR, free-order diacritics, automatic restoration of non-Vietnamese words, instant dual-Shift restore, and smart cursor editing.",
           ogDescription:
-            "Open-source Vietnamese IME for the macOS menu bar with Telex, VNI, VIQR, free-order diacritics, smart cursor word editing, and instant English restore.",
+            "Open-source Vietnamese IME for the macOS menu bar with Telex, VNI, VIQR, free-order diacritics, automatic restoration of non-Vietnamese words, instant dual-Shift restore, and smart cursor word editing.",
           locale: "en_US",
           canonical: BASE_URL + "?lang=en",
         },
