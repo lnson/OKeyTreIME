@@ -4,6 +4,7 @@
 "menu.input_source_warning.title" = "⚠️ Bàn phím: %@";
 "menu.input_source_warning.subtitle" = "Nên dùng bàn phím tiếng Anh (U.S.)";
 "menu.input_style" = "Kiểu gõ";
+"menu.input_style.off" = "Tắt";
 "menu.launch_at_login" = "Khởi động cùng hệ thống";
 "menu.auto_check_updates" = "Tự động kiểm tra cập nhật";
 "menu.update_available.title" = "✨ Đã có phiên bản mới: %@";
@@ -34,6 +35,7 @@
 
 /* General & Update Settings */
 "settings.general.system.header" = "Hệ thống";
+"settings.general.input_style.description" = "Nhấn đồng thời Command Trái + Command Phải để chuyển nhanh giữa Tắt và kiểu gõ đang dùng.";
 "settings.general.launch_at_login.description" = "Tự động mở ÔKêyTre trên thanh menu khi đăng nhập vào macOS.";
 "settings.general.language.description" = "Chọn ngôn ngữ hiển thị cho thanh menu và cửa sổ cài đặt.";
 "settings.updates.header" = "Cập nhật";

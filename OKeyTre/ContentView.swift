@@ -141,12 +141,27 @@ private struct SidebarFooter: View {
 
 private struct GeneralSettingsPane: View {
     @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
+    @ObservedObject private var keyTapManager = KeyTapManager.shared
     @ObservedObject private var launchAtLoginManager = LaunchAtLoginManager.shared
     @ObservedObject private var updateManager = UpdateManager.shared
 
     var body: some View {
         Form {
             Section {
+                Picker(selection: keyTapManager.styleBinding) {
+                    ForEach(InputMethodStyle.allCases) { style in
+                        Text(style.displayName(in: appLanguage)).tag(style)
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(appLanguage.localized("menu.input_style"))
+                            .font(.body)
+                        Text(appLanguage.localized("settings.general.input_style.description"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 Toggle(isOn: launchAtLoginManager.binding) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(appLanguage.localized("menu.launch_at_login"))

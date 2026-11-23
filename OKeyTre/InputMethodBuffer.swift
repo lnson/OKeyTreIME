@@ -8,15 +8,20 @@
 import Foundation
 import CoreGraphics
 
-/// Supported Vietnamese input method styles.
+/// Supported Vietnamese input method styles (plus `.off` to pass keystrokes through untouched).
 enum InputMethodStyle: String, CaseIterable, Identifiable {
+    case off = "off"
     case telex = "telex"
     case vni = "vni"
     case viqr = "viqr"
 
     var id: String { rawValue }
 
-    var title: String {
+    var isVietnameseEnabled: Bool {
+        self != .off
+    }
+
+    func displayName(in language: AppLanguage) -> String {
         switch self {
         case .telex:
             return "Telex"
@@ -24,12 +29,14 @@ enum InputMethodStyle: String, CaseIterable, Identifiable {
             return "VNI"
         case .viqr:
             return "VIQR"
+        case .off:
+            return language.localized("menu.input_style.off")
         }
     }
 
     fileprivate var cStyle: OKTInputMethodStyle {
         switch self {
-        case .telex:
+        case .telex, .off:
             return OKT_STYLE_TELEX
         case .vni:
             return OKT_STYLE_VNI
@@ -58,6 +65,8 @@ final class InputMethodBuffer {
 
     /// UserDefaults key controlling the selected input method style (`InputMethodStyle.rawValue`).
     static let inputMethodDefaultsKey = "inputMethodStyle"
+    /// UserDefaults key remembering the last active non-`.off` style for `Left ⌘ + Right ⌘` toggling.
+    static let lastActiveStyleDefaultsKey = "lastActiveInputMethodStyle"
     /// UserDefaults key controlling modern Vietnamese tone placement (`oà, oé, uý` vs `òa, óe, úy`).
     static let modernToneDefaultsKey = "modernTone"
     /// Default setting for modern Vietnamese tone placement (`oà, oé, uý`).
@@ -78,6 +87,7 @@ final class InputMethodBuffer {
     static let maxAllowedBufferSize = Int(OKT_BUFFER_MAX_SIZE)
 
     private let rawBuffer: OpaquePointer
+    private var isOff: Bool
 
     deinit {
         okeytre_buffer_destroy(rawBuffer)
@@ -89,11 +99,17 @@ final class InputMethodBuffer {
     }
 
     var style: InputMethodStyle {
-        InputMethodStyle(cStyle: okeytre_buffer_get_style(rawBuffer))
+        isOff ? .off : InputMethodStyle(cStyle: okeytre_buffer_get_style(rawBuffer))
     }
 
     func setStyle(_ newStyle: InputMethodStyle) {
-        okeytre_buffer_set_style(rawBuffer, newStyle.cStyle)
+        if newStyle == .off {
+            isOff = true
+            reset()
+        } else {
+            isOff = false
+            okeytre_buffer_set_style(rawBuffer, newStyle.cStyle)
+        }
     }
 
     var modernTone: Bool {
@@ -139,6 +155,7 @@ final class InputMethodBuffer {
             nghToNg,
             Int32(maxBufferSize)
         )!
+        self.isOff = (style == .off)
     }
 
     func reset() {
@@ -195,6 +212,7 @@ final class InputMethodBuffer {
 
     @discardableResult
     func restoreCurrentWord() -> Action? {
+        guard !isOff else { return nil }
         let buffer = rawBuffer
         return Self.decodeAction { outBuf, backspaceCount, outLen in
             okeytre_buffer_restore_current_word(
@@ -209,6 +227,7 @@ final class InputMethodBuffer {
 
     @discardableResult
     func handleInput(_ input: UnsafeBufferPointer<UniChar>, flags: CGEventFlags = []) -> Action? {
+        guard !isOff else { return nil }
         let disruptingModifiers: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate]
         if flags.intersection(disruptingModifiers).isEmpty {
             seedCaretIfNeeded()

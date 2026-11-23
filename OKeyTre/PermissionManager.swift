@@ -196,7 +196,7 @@ final class PermissionManager: ObservableObject {
         if snapshot.isGranted && !trusted {
             // Tear down the Mach port directly on the background queue so `WindowServer`
             // releases the event tap immediately even if the main run loop is busy.
-            KeyTapManager.shared.tearDownTapPortImmediately()
+            KeyTapManager.tearDownSharedTapPortImmediately()
             snapshotLock.withLock { $0.isGranted = false }
             Task { @MainActor [weak owner] in
                 owner?.applyLivePermissionState(false)

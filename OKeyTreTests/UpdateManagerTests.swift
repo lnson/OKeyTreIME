@@ -1,6 +1,7 @@
 // Copyright (C) 2026 lnson
 // SPDX-License-Identifier: GPL-3.0-only
 
+import CoreGraphics
 import Foundation
 import Testing
 @testable import OKeyTre
@@ -301,6 +302,94 @@ struct AppDefaultsTests {
         secondLaunchManager.enableByDefaultIfNeeded()
         #expect(!secondLaunchManager.isEnabled)
         #expect(registerCalls == 1)
+    }
+
+    @Test("InputMethodStyle.off disables transforms, remembers last active style on toggle, and DualCommandDetector handles chords")
+    func offInputMethodStyleAndDualCommandDetector() throws {
+        let suiteName = "com.okeytre.tests.vietnamese.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let manager = KeyTapManager(defaults: defaults, observeWorkspace: false)
+        #expect(manager.inputMethodStyle == .telex)
+        #expect(manager.isVietnameseEnabled)
+
+        // Select VNI, then toggle off via Left+Right Command action -> switches to .off,
+        // and toggling again restores .vni!
+        manager.setInputMethodStyle(.vni, defaults: defaults)
+        #expect(manager.inputMethodStyle == .vni)
+
+        manager.toggleVietnameseEnabled(defaults: defaults)
+        #expect(manager.inputMethodStyle == .off)
+        #expect(!manager.isVietnameseEnabled)
+
+        // Reloading from UserDefaults while .off preserves .off AND remembers .vni as last active style.
+        let reloadedManager = KeyTapManager(defaults: defaults, observeWorkspace: false)
+        #expect(reloadedManager.inputMethodStyle == .off)
+        reloadedManager.toggleVietnameseEnabled(defaults: defaults)
+        #expect(reloadedManager.inputMethodStyle == .vni)
+        #expect(reloadedManager.isVietnameseEnabled)
+
+        // Verify InputMethodBuffer(.off) passes input through untouched.
+        let offBuffer = InputMethodBuffer(style: .off)
+        #expect(offBuffer.style == .off)
+        let action: InputMethodBuffer.Action? = [UniChar(0x0061), UniChar(0x0073)].withUnsafeBufferPointer { ptr in
+            _ = offBuffer.handleInput(UnsafeBufferPointer(start: ptr.baseAddress, count: 1))
+            return offBuffer.handleInput(UnsafeBufferPointer(start: ptr.baseAddress! + 1, count: 1))
+        }
+        #expect(action == nil)
+
+        var detector = DualCommandDetector()
+
+        // 1. Clean Left Command down -> Right Command down triggers toggle.
+        let leftDown1 = detector.shouldTriggerToggle(keyCode: KeyCodes.leftCommandKeyCode, flags: .maskCommand)
+        #expect(!leftDown1)
+        let rightDown1 = detector.shouldTriggerToggle(keyCode: KeyCodes.rightCommandKeyCode, flags: .maskCommand)
+        #expect(rightDown1)
+
+        // Releasing both Command keys resets cleanly.
+        let rightUp1 = detector.shouldTriggerToggle(keyCode: KeyCodes.rightCommandKeyCode, flags: .maskCommand)
+        #expect(!rightUp1)
+        let leftUp1 = detector.shouldTriggerToggle(keyCode: KeyCodes.leftCommandKeyCode, flags: [])
+        #expect(!leftUp1)
+
+        // 2. Clean Right Command down -> Left Command down also triggers toggle.
+        let rightDown2 = detector.shouldTriggerToggle(keyCode: KeyCodes.rightCommandKeyCode, flags: .maskCommand)
+        #expect(!rightDown2)
+        let leftDown2 = detector.shouldTriggerToggle(keyCode: KeyCodes.leftCommandKeyCode, flags: .maskCommand)
+        #expect(leftDown2)
+        let leftUp2 = detector.shouldTriggerToggle(keyCode: KeyCodes.leftCommandKeyCode, flags: .maskCommand)
+        #expect(!leftUp2)
+        let rightUp2 = detector.shouldTriggerToggle(keyCode: KeyCodes.rightCommandKeyCode, flags: [])
+        #expect(!rightUp2)
+
+        // 3. Pressing a regular key while holding Command (e.g. Cmd+C) disrupts the chord until released.
+        let leftDown3 = detector.shouldTriggerToggle(keyCode: KeyCodes.leftCommandKeyCode, flags: .maskCommand)
+        #expect(!leftDown3)
+        detector.noteNonModifierKeyDown()
+        let rightDownDisrupted = detector.shouldTriggerToggle(keyCode: KeyCodes.rightCommandKeyCode, flags: .maskCommand)
+        #expect(!rightDownDisrupted)
+        let rightUpDisrupted = detector.shouldTriggerToggle(keyCode: KeyCodes.rightCommandKeyCode, flags: .maskCommand)
+        #expect(!rightUpDisrupted)
+        let leftUpDisrupted = detector.shouldTriggerToggle(keyCode: KeyCodes.leftCommandKeyCode, flags: [])
+        #expect(!leftUpDisrupted)
+
+        // 4. Holding Shift/Option/Control alongside Command does not trigger toggle.
+        let shiftLeftCmd = detector.shouldTriggerToggle(
+            keyCode: KeyCodes.leftCommandKeyCode,
+            flags: [.maskCommand, .maskShift]
+        )
+        #expect(!shiftLeftCmd)
+        let shiftRightCmd = detector.shouldTriggerToggle(
+            keyCode: KeyCodes.rightCommandKeyCode,
+            flags: [.maskCommand, .maskShift]
+        )
+        #expect(!shiftRightCmd)
+        detector.reset()
+        let leftAfterReset = detector.shouldTriggerToggle(keyCode: KeyCodes.leftCommandKeyCode, flags: .maskCommand)
+        #expect(!leftAfterReset)
+        let rightAfterReset = detector.shouldTriggerToggle(keyCode: KeyCodes.rightCommandKeyCode, flags: .maskCommand)
+        #expect(rightAfterReset)
     }
 }
 

@@ -9,10 +9,18 @@ import os
 struct MenuBarStatusView: View {
     @ObservedObject var inputSourceManager = InputSourceManager.shared
     @ObservedObject var permissionManager = PermissionManager.shared
+    @ObservedObject var keyTapManager = KeyTapManager.shared
 
     var body: some View {
-        let hasWarning = !permissionManager.isAccessibilityGranted || !inputSourceManager.isEnglish
-        let iconName = hasWarning ? "exclamationmark.triangle.fill" : "keyboard"
+        let iconName: String = if !permissionManager.isAccessibilityGranted {
+            "exclamationmark.triangle.fill"
+        } else if !keyTapManager.isVietnameseEnabled {
+            "nosign"
+        } else if !inputSourceManager.isEnglish {
+            "exclamationmark.triangle.fill"
+        } else {
+            "keyboard"
+        }
         Image(systemName: iconName)
             .id(iconName)
     }
@@ -23,7 +31,7 @@ private struct MenuBarMenuContent: View {
     @ObservedObject var permissionManager = PermissionManager.shared
     @ObservedObject var launchAtLoginManager = LaunchAtLoginManager.shared
     @ObservedObject var updateManager = UpdateManager.shared
-    @AppStorage(InputMethodBuffer.inputMethodDefaultsKey) private var selectedStyle: InputMethodStyle = .telex
+    @ObservedObject var keyTapManager = KeyTapManager.shared
     @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
     @Environment(\.openWindow) private var openWindow
 
@@ -53,7 +61,7 @@ private struct MenuBarMenuContent: View {
             Divider()
         }
 
-        if !inputSourceManager.isEnglish {
+        if keyTapManager.isVietnameseEnabled && !inputSourceManager.isEnglish {
             Section {
                 Text(appLanguage.localized("menu.input_source_warning.title", inputSourceManager.currentSourceName))
                 Text(appLanguage.localized("menu.input_source_warning.subtitle"))
@@ -65,16 +73,13 @@ private struct MenuBarMenuContent: View {
             Divider()
         }
 
-        // Inline menu items to switch between Telex, VNI, and VIQR
-        Picker(appLanguage.localized("menu.input_style"), selection: $selectedStyle) {
+        // Inline menu items to switch between Telex, VNI, VIQR, and Off
+        Picker(appLanguage.localized("menu.input_style"), selection: keyTapManager.styleBinding) {
             ForEach(InputMethodStyle.allCases) { style in
-                Text(style.title).tag(style)
+                Text(style.displayName(in: appLanguage)).tag(style)
             }
         }
         .pickerStyle(.inline)
-        .onChange(of: selectedStyle) { _, newValue in
-            KeyTapManager.shared.inputMethodStyle = newValue
-        }
 
         Divider()
 
@@ -138,7 +143,9 @@ private struct MenuBarMenuContent: View {
             Self.terminateExistingInstances()
             LaunchAtLoginManager.shared.enableByDefaultIfNeeded()
             PermissionManager.shared.requestAccessibility()
-            InputSourceManager.shared.checkAndWarnOnStartup()
+            if KeyTapManager.shared.isVietnameseEnabled {
+                InputSourceManager.shared.checkAndWarnOnStartup()
+            }
             UpdateManager.shared.startAutomaticChecksIfNeeded()
         }
     }

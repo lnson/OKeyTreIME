@@ -5,6 +5,8 @@ import CoreGraphics
 
 enum KeyCodes {
     static let backspaceKeyCode: CGKeyCode = 51
+    static let rightCommandKeyCode: CGKeyCode = 54
+    static let leftCommandKeyCode: CGKeyCode = 55
     static let leftShiftKeyCode: CGKeyCode = 56
     static let rightShiftKeyCode: CGKeyCode = 60
 }

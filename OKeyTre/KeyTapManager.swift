@@ -3,9 +3,11 @@
 
 import AppKit
 import ApplicationServices
+import Combine
 import CoreFoundation
 import CoreGraphics
 import Foundation
+import SwiftUI
 import os
 
 private nonisolated final class TapPortBox: @unchecked Sendable {
@@ -94,32 +96,127 @@ struct DualShiftDetector {
     }
 }
 
-class KeyTapManager {
-    nonisolated static let shared = KeyTapManager()
+struct DualCommandDetector {
+    private(set) var isLeftCommandPressed = false
+    private(set) var isRightCommandPressed = false
+    private(set) var isDisrupted = false
+    private var hasTriggeredForActiveChord = false
 
+    mutating func reset() {
+        isLeftCommandPressed = false
+        isRightCommandPressed = false
+        isDisrupted = false
+        hasTriggeredForActiveChord = false
+    }
+
+    mutating func noteNonModifierKeyDown() {
+        if isLeftCommandPressed || isRightCommandPressed {
+            isDisrupted = true
+        }
+    }
+
+    mutating func shouldTriggerToggle(keyCode: CGKeyCode, flags: CGEventFlags) -> Bool {
+        guard flags.contains(.maskCommand) else {
+            reset()
+            return false
+        }
+
+        let otherModifiers: CGEventFlags = [.maskShift, .maskControl, .maskAlternate]
+        if !flags.intersection(otherModifiers).isEmpty {
+            isDisrupted = true
+            return false
+        }
+
+        switch keyCode {
+        case KeyCodes.leftCommandKeyCode:
+            isLeftCommandPressed.toggle()
+        case KeyCodes.rightCommandKeyCode:
+            isRightCommandPressed.toggle()
+        default:
+            return false
+        }
+
+        if !isLeftCommandPressed && !isRightCommandPressed {
+            reset()
+            return false
+        }
+
+        if !isLeftCommandPressed || !isRightCommandPressed {
+            hasTriggeredForActiveChord = false
+            return false
+        }
+
+        guard !isDisrupted, !hasTriggeredForActiveChord else {
+            return false
+        }
+
+        hasTriggeredForActiveChord = true
+        return true
+    }
+}
+
+final class KeyTapManager: ObservableObject {
+    static let shared = KeyTapManager()
+
+    private nonisolated static let sharedPortBox = TapPortBox()
+
+    @Published private(set) var inputMethodStyle: InputMethodStyle
+
+    var isVietnameseEnabled: Bool {
+        inputMethodStyle.isVietnameseEnabled
+    }
+
+    private var lastActiveStyle: InputMethodStyle
     private let magicTag: Int64 = 0xCAFE_BABE
-    private nonisolated let portBox = TapPortBox()
+    private nonisolated var portBox: TapPortBox { Self.sharedPortBox }
     private var mouseMonitor: Any?
     private var dualShiftDetector = DualShiftDetector()
-    private var inputMethodBuffer: InputMethodBuffer = {
-        let defaults = UserDefaults.standard
-        let style = defaults.string(forKey: InputMethodBuffer.inputMethodDefaultsKey)
-            .flatMap(InputMethodStyle.init(rawValue:)) ?? .telex
-        let storedMaxSize = defaults.integer(forKey: InputMethodBuffer.maxBufferSizeDefaultsKey)
-        return InputMethodBuffer(
-            style: style,
-            modernTone: InputMethodBuffer.resolvedModernTone(from: defaults),
-            uoHorn: defaults.bool(forKey: InputMethodBuffer.uoHornDefaultsKey),
-            ngToNgh: defaults.bool(forKey: InputMethodBuffer.ngToNghDefaultsKey),
-            nghToNg: defaults.bool(forKey: InputMethodBuffer.nghToNgDefaultsKey),
-            maxBufferSize: storedMaxSize > 0 ? storedMaxSize : InputMethodBuffer.defaultMaxBufferSize
-        )
-    }()
+    private var dualCommandDetector = DualCommandDetector()
+    private var inputMethodBuffer: InputMethodBuffer
 
-    /// Currently active input method style (`.telex`, `.vni`, or `.viqr`).
-    var inputMethodStyle: InputMethodStyle {
-        get { inputMethodBuffer.style }
-        set { inputMethodBuffer.setStyle(newValue) }
+    var styleBinding: Binding<InputMethodStyle> {
+        Binding(
+            get: { self.inputMethodStyle },
+            set: { self.setInputMethodStyle($0) }
+        )
+    }
+
+    func setInputMethodStyle(_ style: InputMethodStyle, defaults: UserDefaults = .standard) {
+        if inputMethodStyle != style {
+            inputMethodStyle = style
+        }
+        inputMethodBuffer.setStyle(style)
+        defaults.set(style.rawValue, forKey: InputMethodBuffer.inputMethodDefaultsKey)
+        if style != .off {
+            lastActiveStyle = style
+            defaults.set(style.rawValue, forKey: InputMethodBuffer.lastActiveStyleDefaultsKey)
+        }
+        dualShiftDetector.reset()
+    }
+
+    func toggleVietnameseEnabled(defaults: UserDefaults = .standard) {
+        if inputMethodStyle == .off {
+            setInputMethodStyle(lastActiveStyle, defaults: defaults)
+        } else {
+            setInputMethodStyle(.off, defaults: defaults)
+        }
+    }
+
+    static func resolvedStyles(
+        from defaults: UserDefaults = .standard
+    ) -> (selected: InputMethodStyle, lastActive: InputMethodStyle) {
+        let selected = defaults.string(forKey: InputMethodBuffer.inputMethodDefaultsKey)
+            .flatMap(InputMethodStyle.init(rawValue:)) ?? .telex
+        let storedLastActive = defaults.string(forKey: InputMethodBuffer.lastActiveStyleDefaultsKey)
+            .flatMap(InputMethodStyle.init(rawValue:))
+        let lastActive: InputMethodStyle = if selected != .off {
+            selected
+        } else if let storedLastActive, storedLastActive != .off {
+            storedLastActive
+        } else {
+            .telex
+        }
+        return (selected, lastActive)
     }
 
     var modernTone: Bool {
@@ -147,7 +244,24 @@ class KeyTapManager {
         set { inputMethodBuffer.maxBufferSize = newValue }
     }
 
-    private init() {
+    init(
+        defaults: UserDefaults = .standard,
+        observeWorkspace: Bool = true
+    ) {
+        let (selected, lastActive) = Self.resolvedStyles(from: defaults)
+        let storedMaxSize = defaults.integer(forKey: InputMethodBuffer.maxBufferSizeDefaultsKey)
+        self.inputMethodStyle = selected
+        self.lastActiveStyle = lastActive
+        self.inputMethodBuffer = InputMethodBuffer(
+            style: selected,
+            modernTone: InputMethodBuffer.resolvedModernTone(from: defaults),
+            uoHorn: defaults.bool(forKey: InputMethodBuffer.uoHornDefaultsKey),
+            ngToNgh: defaults.bool(forKey: InputMethodBuffer.ngToNghDefaultsKey),
+            nghToNg: defaults.bool(forKey: InputMethodBuffer.nghToNgDefaultsKey),
+            maxBufferSize: storedMaxSize > 0 ? storedMaxSize : InputMethodBuffer.defaultMaxBufferSize
+        )
+
+        guard observeWorkspace else { return }
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         workspaceCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
@@ -155,6 +269,7 @@ class KeyTapManager {
             queue: .main
         ) { [weak self] notification in
             self?.dualShiftDetector.reset()
+            self?.dualCommandDetector.reset()
             self?.inputMethodBuffer.reset()
             guard PermissionManager.shared.verifyPermissionNow() else { return }
             if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
@@ -170,6 +285,11 @@ class KeyTapManager {
                 CaretTextReader.handleAppTerminated(pid: app.processIdentifier)
             }
         }
+    }
+
+    @discardableResult
+    nonisolated static func tearDownSharedTapPortImmediately() -> Bool {
+        sharedPortBox.tearDown()
     }
 
     @discardableResult
@@ -229,6 +349,7 @@ class KeyTapManager {
             mouseMonitor = nil
         }
         dualShiftDetector.reset()
+        dualCommandDetector.reset()
         inputMethodBuffer.reset()
         if hadTap {
             print("Event Tap turned off")
@@ -238,6 +359,7 @@ class KeyTapManager {
     private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByUserInput || type == .tapDisabledByTimeout {
             dualShiftDetector.reset()
+            dualCommandDetector.reset()
             inputMethodBuffer.reset()
             // Verify live authorization via `WindowServer` + cross-process AX IPC rather than
             // `AXIsProcessTrusted()`'s stale cache before ever re-enabling a disabled tap.
@@ -259,10 +381,21 @@ class KeyTapManager {
 
         if type == .flagsChanged {
             let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-            if dualShiftDetector.shouldTriggerRestore(keyCode: keyCode, flags: flags),
+            if dualCommandDetector.shouldTriggerToggle(keyCode: keyCode, flags: flags) {
+                toggleVietnameseEnabled()
+                return Unmanaged.passUnretained(event)
+            }
+            if isVietnameseEnabled,
+               dualShiftDetector.shouldTriggerRestore(keyCode: keyCode, flags: flags),
                let action = inputMethodBuffer.restoreCurrentWord() {
                 postAction(action, proxy: proxy)
             }
+            return Unmanaged.passUnretained(event)
+        }
+
+        dualCommandDetector.noteNonModifierKeyDown()
+
+        guard isVietnameseEnabled else {
             return Unmanaged.passUnretained(event)
         }
 
