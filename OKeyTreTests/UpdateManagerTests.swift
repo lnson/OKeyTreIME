@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
 import AppKit
+import ApplicationServices
 import CoreGraphics
 import Foundation
 import Testing
@@ -503,6 +504,88 @@ struct AppDefaultsTests {
         #expect(!coordinator.isSettingsWindowOpen)
         #expect(policyTransitions == [.regular, .accessory])
         #expect(tooltipRefreshCount == 1)
+    }
+
+    @Test("CaretTextReader guards invalid caret ranges, empty contenteditable blocks, and placeholders so Backspace on empty keeps Telex active")
+    func caretTextReaderEmptyAndPlaceholderGuards() throws {
+        // 1. Rejects missing, negative (kCFNotFound), and NSNotFound / CFIndex.max locations.
+        #expect(!CaretTextReader.isValidCaretLocation(nil))
+        #expect(!CaretTextReader.isValidCaretLocation(-1))
+        #expect(!CaretTextReader.isValidCaretLocation(NSNotFound))
+        #expect(!CaretTextReader.isValidCaretLocation(Int.max))
+        #expect(CaretTextReader.isValidCaretLocation(0))
+        #expect(CaretTextReader.isValidCaretLocation(10))
+
+        // 2. Detects placeholder text even with trailing contenteditable <br> newlines.
+        #expect(CaretTextReader.isPlaceholderMatch(value: "Ask Gemini", placeholder: "Ask Gemini"))
+        #expect(CaretTextReader.isPlaceholderMatch(value: "Ask Gemini\n", placeholder: "Ask Gemini"))
+        #expect(!CaretTextReader.isPlaceholderMatch(value: "bootj", placeholder: "Ask Gemini"))
+        #expect(!CaretTextReader.isPlaceholderMatch(value: "Ask Gemini", placeholder: nil))
+        #expect(!CaretTextReader.isPlaceholderMatch(value: "Ask Gemini", placeholder: ""))
+
+        // 3. Treats empty rich-text paragraph nodes (<br>, U+200B, U+FFFC) as empty while keeping real words.
+        #expect(CaretTextReader.isEmptyCaretContainerText(""))
+        #expect(CaretTextReader.isEmptyCaretContainerText("\n"))
+        #expect(CaretTextReader.isEmptyCaretContainerText("\u{200B}\n"))
+        #expect(CaretTextReader.isEmptyCaretContainerText("\u{FFFC}"))
+        #expect(!CaretTextReader.isEmptyCaretContainerText("b"))
+        #expect(!CaretTextReader.isEmptyCaretContainerText("Gemini"))
+
+        // 4. Detects empty rich-text editor DOM class lists (e.g. Gemini's Quill `ql-blank`,
+        //    TipTap `is-editor-empty` / leaf `is-empty`, CKEditor `ck-placeholder`) whose
+        //    `AXValue` contains CSS `::before` placeholder text before the first character is typed.
+        #expect(CaretTextReader.isEmptyEditorClassList(["ql-editor", "ql-blank", "textarea"]))
+        #expect(!CaretTextReader.isEmptyEditorClassList(["ql-editor", "textarea"]))
+        #expect(CaretTextReader.isEmptyEditorClassList(["ProseMirror", "is-editor-empty"]))
+        #expect(CaretTextReader.isEmptyEditorClassList(["ck", "ck-placeholder"]))
+        #expect(!CaretTextReader.isEmptyEditorClassList(["is-empty"], includeLeafClasses: false))
+        #expect(CaretTextReader.isEmptyEditorClassList(["is-empty"], includeLeafClasses: true))
+
+        // 5. Extracts start AXTextMarker in-process via HIServices (`AXTextMarkerRangeCopyStartMarker`)
+        //    so Chromium/Firefox `AXSelectedTextMarkerRange` works without WebKit-only attributes.
+        let startBytes: [UInt8] = [0x01, 0x02, 0x03, 0x04]
+        let endBytes: [UInt8] = [0x05, 0x06, 0x07, 0x08]
+        let startMarker = try startBytes.withUnsafeBufferPointer { ptr in
+            let base = try #require(ptr.baseAddress)
+            return AXTextMarkerCreate(kCFAllocatorDefault, base, ptr.count)
+        }
+        let endMarker = try endBytes.withUnsafeBufferPointer { ptr in
+            let base = try #require(ptr.baseAddress)
+            return AXTextMarkerCreate(kCFAllocatorDefault, base, ptr.count)
+        }
+        let markerRange = AXTextMarkerRangeCreate(kCFAllocatorDefault, startMarker, endMarker)
+        let extractedStart = try #require(CaretTextReader.startTextMarker(for: markerRange))
+        #expect(CFEqual(extractedStart, startMarker))
+        #expect(!CFEqual(extractedStart, endMarker))
+        #expect(CaretTextReader.startTextMarker(for: "not-a-marker-range" as CFString) == nil)
+
+        // 6. Pressing Backspace when InputMethodBuffer is already empty and then typing "bootj"
+        //    without poisoned placeholder seeding transforms "bootj" -> "bột".
+        let buffer = InputMethodBuffer(style: .telex)
+        let backspace: [UniChar] = [0x007F]
+        let extraBackspaceAction = backspace.withUnsafeBufferPointer { ptr in
+            buffer.handleInput(ptr)
+        }
+        #expect(extraBackspaceAction == nil)
+
+        var rendered = ""
+        for scalar in "bootj".unicodeScalars {
+            let unit: [UniChar] = [UniChar(scalar.value)]
+            let action = unit.withUnsafeBufferPointer { ptr in
+                buffer.handleInput(ptr)
+            }
+            if let action {
+                if action.backspaceCount > 0 {
+                    let keepCount = max(0, rendered.utf16.count - action.backspaceCount)
+                    let prefixUnits = Array(rendered.utf16.prefix(keepCount))
+                    rendered = String(utf16CodeUnits: prefixUnits, count: prefixUnits.count)
+                }
+                rendered += action.text
+            } else {
+                rendered.unicodeScalars.append(scalar)
+            }
+        }
+        #expect(rendered == "bột")
     }
 }
 
