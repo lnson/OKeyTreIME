@@ -126,3 +126,14 @@ cc_test(
         "@google_benchmark//:benchmark_main",
     ],
 )
+
+cc_test(
+    name = "inv_benchmark_test",
+    size = "small",
+    srcs = ["inv-benchmark_test.cc"],
+    args = ["--benchmark_min_time=0.1s"],
+    deps = [
+        ":input_method_buffer",
+        "@google_benchmark//:benchmark_main",
+    ],
+)

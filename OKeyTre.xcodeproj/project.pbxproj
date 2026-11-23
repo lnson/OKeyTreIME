@@ -53,6 +53,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				"ime/core/input-method-buffer_test.cc",
+				"ime/core/inv-benchmark_test.cc",
 				"ime/core/okeytre-engine_test.cc",
 				"ime/core/telex-benchmark_test.cc",
 				"ime/core/unicode-utils_test.cc",
