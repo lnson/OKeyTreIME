@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="vi" data-lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ÔKêyTre — Bộ gõ tiếng Việt hiện đại cho macOS</title>
+  <meta
+    name="description"
+    content="ÔKêyTre — Bộ gõ tiếng Việt nhanh, gọn nhẹ trên menu bar macOS. Hỗ trợ Telex, VNI, VIQR, bỏ dấu tự do, sửa chữ thông minh và khôi phục tiếng Anh tức thì."
+  />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <style>
+    :root {
+      --bg: #fbf6eb;
+      --bg-elevated: #fffcf5;
+      --bg-subtle: #f3ead7;
+      --ink: #1d2421;
+      --ink-muted: #52605a;
+      --bamboo: #134b3f;
+      --bamboo-hover: #0d382f;
+      --bamboo-soft: rgba(19, 75, 63, 0.09);
+      --border: rgba(19, 75, 63, 0.14);
+      --code-bg: #172420;
+      --code-ink: #f4efe4;
+      --shadow-sm: 0 2px 8px rgba(20, 35, 30, 0.05);
+      --shadow-md: 0 14px 34px rgba(19, 55, 44, 0.09);
+      --radius-lg: 20px;
+      --radius-md: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+        Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      background-image: radial-gradient(
+        ellipse 80% 50% at 50% -10%,
+        rgba(19, 75, 63, 0.08),
+        transparent
+      );
+      color: var(--ink);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Bilingual visibility */
+    html[data-lang="vi"] [lang="en"] {
+      display: none !important;
+    }
+    html[data-lang="en"] [lang="vi"] {
+      display: none !important;
+    }
+
+    a {
+      color: var(--bamboo);
+      text-decoration: none;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Top Navigation */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: rgba(251, 246, 235, 0.84);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+
+    .brand img {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .lang-switch {
+      display: inline-flex;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px;
+    }
+
+    .lang-btn {
+      border: none;
+      background: transparent;
+      color: var(--ink-muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .lang-btn.active {
+      background: var(--bamboo);
+      color: #fff;
+    }
+
+    .gh-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--ink);
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .gh-link:hover {
+      border-color: var(--bamboo);
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 68px 0 52px;
+    }
+
+    .hero-icon {
+      width: 116px;
+      height: 116px;
+      border-radius: 26px;
+      box-shadow: var(--shadow-md);
+      margin-bottom: 22px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: var(--bamboo-soft);
+      color: var(--bamboo);
+      border: 1px solid var(--border);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 999px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.25rem);
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      margin-bottom: 16px;
+      color: var(--ink);
+    }
+
+    .hero-sub {
+      max-width: 640px;
+      margin: 0 auto 30px;
+      font-size: 1.12rem;
+      color: var(--ink-muted);
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: var(--bamboo);
+      color: #fff;
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 13px 24px;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(19, 75, 63, 0.22);
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+
+    .btn-primary:hover {
+      background: var(--bamboo-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-elevated);
+      color: var(--ink);
+      border: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 13px 22px;
+      border-radius: 12px;
+      transition: border-color 0.15s ease, transform 0.15s ease;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--bamboo);
+      transform: translateY(-1px);
+    }
+
+    .hero-meta {
+      font-size: 0.85rem;
+      color: var(--ink-muted);
+    }
+
+    /* Keystroke Showcase Strip */
+    .showcase {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 64px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .demo-item {
+      padding: 14px 16px;
+      background: var(--bg);
+      border-radius: var(--radius-md);
+      border: 1px solid rgba(19, 75, 63, 0.09);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .demo-label {
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--bamboo);
+    }
+
+    .demo-keys {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        monospace;
+      font-size: 0.88rem;
+      display: flex;
+      align-items: center;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      gap: 6px;
+      color: var(--ink);
+    }
+
+    .demo-typed {
+      background: rgba(19, 75, 63, 0.05);
+      border: 1px dashed rgba(19, 75, 63, 0.24);
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 0.84rem;
+      color: var(--ink);
+    }
+
+    .demo-op {
+      color: var(--ink-muted);
+      font-size: 0.82rem;
+    }
+
+    .kbd-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    kbd {
+      background: #fff;
+      border: 1px solid rgba(19, 75, 63, 0.22);
+      border-bottom-width: 2px;
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-size: 0.78rem;
+      font-family: inherit;
+      color: var(--ink);
+    }
+
+    .demo-arrow {
+      color: var(--ink-muted);
+      font-weight: 600;
+    }
+
+    .demo-result {
+      font-weight: 700;
+      color: var(--bamboo);
+      background: var(--bamboo-soft);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .demo-sep {
+      color: var(--ink-muted);
+      opacity: 0.45;
+      margin: 0 1px;
+    }
+
+    /* Section Headings */
+    section {
+      margin-bottom: 68px;
+    }
+
+    .section-title {
+      font-size: 1.75rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .section-sub {
+      text-align: center;
+      color: var(--ink-muted);
+      max-width: 600px;
+      margin: 0 auto 34px;
+    }
+
+    /* Features Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(285px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 26px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--bamboo-soft);
+      color: var(--bamboo);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.15rem;
+      margin-bottom: 14px;
+    }
+
+    .card h3 {
+      font-size: 1.12rem;
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .card p {
+      font-size: 0.95rem;
+      color: var(--ink-muted);
+    }
+
+    .card code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.86em;
+      background: var(--bg-subtle);
+      padding: 1px 6px;
+      border-radius: 5px;
+      color: var(--bamboo);
+    }
+
+    /* Installation Steps */
+    .install-box {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .steps {
+      display: grid;
+      gap: 22px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .step-num {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--bamboo);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.92rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .step h4 {
+      font-size: 1.04rem;
+      margin-bottom: 4px;
+    }
+
+    .step p {
+      font-size: 0.94rem;
+      color: var(--ink-muted);
+    }
+
+    .code-block {
+      margin-top: 10px;
+      background: var(--code-bg);
+      color: var(--code-ink);
+      border-radius: 10px;
+      padding: 11px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.88rem;
+      overflow-x: auto;
+    }
+
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .copy-btn:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 30px 0 44px;
+      text-align: center;
+      font-size: 0.88rem;
+      color: var(--ink-muted);
+    }
+
+    footer a {
+      font-weight: 600;
+    }
+
+    @media (max-width: 880px) {
+      .showcase {
+        grid-template-columns: 1fr;
+      }
+      .demo-item {
+        flex-direction: row;
+        align-items: center;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .hero {
+        padding: 46px 0 36px;
+      }
+      .demo-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .install-box {
+        padding: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav-inner">
+      <a href="#" class="brand">
+        <img src="icon.png" alt="ÔKêyTre icon" />
+        <span>ÔKêyTre</span>
+      </a>
+      <div class="nav-actions">
+        <div class="lang-switch" role="group" aria-label="Language switch">
+          <button type="button" class="lang-btn active" data-set-lang="vi">VI</button>
+          <button type="button" class="lang-btn" data-set-lang="en">EN</button>
+        </div>
+        <a
+          class="gh-link"
+          href="https://github.com/lnson/OKeyTreIME/issues"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span lang="vi">Báo lỗi</span>
+          <span lang="en">Report a Bug</span>
+        </a>
+        <a
+          class="gh-link"
+          href="https://github.com/lnson/OKeyTreIME"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+          </svg>
+          <span>GitHub</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Hero -->
+    <section class="hero">
+      <img class="hero-icon" src="icon.png" alt="ÔKêyTre app icon" />
+      <div>
+        <span class="badge" lang="vi">Mã nguồn mở · macOS 14.0+ (Apple Silicon &amp; Intel)</span>
+        <span class="badge" lang="en">Open Source · macOS 14.0+ (Apple Silicon &amp; Intel)</span>
+      </div>
+
+      <h1 lang="vi">Gõ tiếng Việt mượt mà,<br />tự nhiên trên máy Mac</h1>
+      <h1 lang="en">Effortless, natural<br />Vietnamese typing for Mac</h1>
+
+      <p class="hero-sub" lang="vi">
+        <strong>ÔKêyTre</strong> nằm gọn trên thanh menu macOS, hỗ trợ bỏ dấu tự do, sửa từ thông minh ngay tại con trỏ và khôi phục tiếng Anh tức thì.
+      </p>
+      <p class="hero-sub" lang="en">
+        <strong>ÔKêyTre</strong> lives quietly in your macOS menu bar with free-order diacritics, smart word editing right at the cursor, and instant English restore.
+      </p>
+
+      <div class="cta-row">
+        <a
+          class="btn-primary"
+          href="https://github.com/lnson/OKeyTreIME/releases/latest"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span lang="vi">Tải về cho macOS (.dmg)</span>
+          <span lang="en">Download for macOS (.dmg)</span>
+        </a>
+        <a
+          class="btn-secondary"
+          href="#install"
+        >
+          <span lang="vi">Hướng dẫn cài đặt</span>
+          <span lang="en">Installation Guide</span>
+        </a>
+      </div>
+
+      <p class="hero-meta" lang="vi">Miễn phí &amp; Mã nguồn mở (GPL-3.0) · Không thu thập dữ liệu</p>
+      <p class="hero-meta" lang="en">Free &amp; Open Source (GPL-3.0) · Zero telemetry or network access</p>
+    </section>
+
+    <!-- Keystroke Showcase -->
+    <div class="showcase" aria-label="Typing examples">
+      <div class="demo-item">
+        <div class="demo-label" lang="vi">Bỏ dấu tự do</div>
+        <div class="demo-label" lang="en">Free-order diacritics</div>
+        <div class="demo-keys">
+          <span class="demo-typed">tieng</span>
+          <span class="demo-op">+</span>
+          <span class="kbd-group"><kbd>e</kbd><kbd>s</kbd></span>
+          <span class="demo-arrow">→</span>
+          <span class="demo-result">tiếng</span>
+        </div>
+      </div>
+
+      <div class="demo-item">
+        <div class="demo-label" lang="vi">Khôi phục tiếng Anh tức thì</div>
+        <div class="demo-label" lang="en">Instant English restore</div>
+        <div class="demo-keys">
+          <span class="demo-typed">lẽi</span>
+          <span class="demo-op">+</span>
+          <span class="kbd-group"><kbd>⇧ Left</kbd><kbd>⇧ Right</kbd></span>
+          <span class="demo-arrow">→</span>
+          <span class="demo-result">lexi</span>
+        </div>
+      </div>
+
+      <div class="demo-item">
+        <div class="demo-label" lang="vi">Sửa lỗi chính tả tuỳ chọn</div>
+        <div class="demo-label" lang="en">Toggleable auto-correction</div>
+        <div class="demo-keys">
+          <span class="demo-typed">ngi</span>
+          <span class="demo-arrow">→</span>
+          <span class="demo-result">nghi</span>
+          <span class="demo-sep">·</span>
+          <span class="demo-typed">tưo</span>
+          <span class="demo-arrow">→</span>
+          <span class="demo-result">tươ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <section id="features">
+      <h2 class="section-title" lang="vi">Tính năng nổi bật</h2>
+      <h2 class="section-title" lang="en">Key Features</h2>
+      <p class="section-sub" lang="vi">
+        Thiết kế tối giản, tập trung vào độ chính xác và cảm giác gõ liền mạch trên mọi ứng dụng Mac.
+      </p>
+      <p class="section-sub" lang="en">
+        Minimal by design, focused on accuracy and a seamless native typing feel across every Mac app.
+      </p>
+
+      <div class="features-grid">
+        <div class="card">
+          <div class="card-icon">⌨️</div>
+          <h3 lang="vi">Telex, VNI &amp; VIQR</h3>
+          <h3 lang="en">Telex, VNI &amp; VIQR</h3>
+          <p lang="vi">
+            Hỗ trợ đầy đủ ba kiểu gõ phổ biến nhất. Cho phép gõ dấu thanh và dấu mũ/móc ở bất kỳ vị trí nào trong âm tiết, hoặc huỷ dấu nhanh bằng phím <code>z</code>.
+          </p>
+          <p lang="en">
+            Full support for all three standard Vietnamese input styles. Type tone marks and vowel modifiers anywhere in a syllable, or strip marks cleanly.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">⇧</div>
+          <h3 lang="vi">Gõ tiếng Anh không vấp</h3>
+          <h3 lang="en">Seamless English Typing</h3>
+          <p lang="vi">
+            Nhấn đồng thời <code>Shift Trái + Shift Phải</code> để khôi phục ngay từ hiện tại về chuỗi ký tự gốc và tạm ngưng biến đổi tiếng Việt cho đến khi sang từ mới.
+          </p>
+          <p lang="en">
+            Press <code>Left Shift + Right Shift</code> together to restore the current word to its raw typed characters and pause transformations until the next word.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">I</div>
+          <h3 lang="vi">Sửa từ thông minh tại con trỏ</h3>
+          <h3 lang="en">Smart Cursor Word Editing</h3>
+          <p lang="vi">
+            Quay lại sửa chữ trên cùng một dòng dễ dàng (kể cả trong Terminal). Với ứng dụng hỗ trợ Trợ năng, chỉ cần đặt con trỏ vào từ bất kỳ để sửa dấu.
+          </p>
+          <p lang="en">
+            Backspace into earlier words on the same line (even in Terminal), or click directly inside any word in Accessibility-enabled apps to edit it.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">✓</div>
+          <h3 lang="vi">Tuỳ chỉnh chính tả &amp; quy tắc dấu</h3>
+          <h3 lang="en">Configurable Orthography</h3>
+          <p lang="vi">
+            Bật/tắt riêng từng quy tắc: đặt dấu kiểu mới (<code>hoà, uỳ</code> thay vì <code>hòa, ùy</code>), tự sửa <code>ng + i/e → nghi/nghe</code>, <code>ngh + a/o/u → nga/ngo/ngu</code>, và <code>ưo → ươ</code>.
+          </p>
+          <p lang="en">
+            Toggle each rule individually: modern tone placement (<code>oà, uỳ</code> vs <code>òa, ùy</code>), <code>ng + i/e → nghi/nghe</code>, <code>ngh + a/o/u → nga/ngo/ngu</code>, and <code>ưo → ươ</code>.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">⌘</div>
+          <h3 lang="vi">Tích hợp chuẩn macOS</h3>
+          <h3 lang="en">Native macOS Integration</h3>
+          <p lang="vi">
+            Chạy hoàn toàn trên thanh menu, hỗ trợ khởi động cùng hệ thống và tự động tạm tắt khi bạn chuyển sang bàn phím khác tiếng Anh để tránh xung đột.
+          </p>
+          <p lang="en">
+            Lives entirely in the menu bar, supports Launch at Login, and automatically pauses when switching away from U.S./ABC layouts to prevent conflicts.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">⚡</div>
+          <h3 lang="vi">Nhẹ, nhanh &amp; riêng tư</h3>
+          <h3 lang="en">Fast, Lightweight &amp; Private</h3>
+          <p lang="vi">
+            Khởi động tức thì, chiếm cực ít tài nguyên hệ thống và phản hồi phím mượt mà không độ trễ. Hoạt động hoàn toàn ngoại tuyến, không thu thập bất kỳ dữ liệu nào.
+          </p>
+          <p lang="en">
+            Launches instantly, uses minimal system resources, and responds smoothly without lag. Runs completely offline on your Mac with zero data collection.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Installation -->
+    <section id="install">
+      <h2 class="section-title" lang="vi">Cài đặt trong 1 phút</h2>
+      <h2 class="section-title" lang="en">1-Minute Setup</h2>
+      <p class="section-sub" lang="vi">
+        Hoạt động trên macOS Sonoma 14.0 trở lên (cả chip Apple Silicon M-series và Intel).
+      </p>
+      <p class="section-sub" lang="en">
+        Works on macOS Sonoma 14.0 or later (Universal binary for both Apple Silicon and Intel).
+      </p>
+
+      <div class="install-box">
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div>
+              <h4 lang="vi">Tải về và kéo vào Applications</h4>
+              <h4 lang="en">Download and drag to Applications</h4>
+              <p lang="vi">
+                Tải file <code>.dmg</code> mới nhất từ trang <a href="https://github.com/lnson/OKeyTreIME/releases/latest">GitHub Releases</a>, mở lên và kéo <strong>OKeyTre</strong> vào thư mục <strong>Applications</strong>.
+              </p>
+              <p lang="en">
+                Download the latest <code>.dmg</code> from <a href="https://github.com/lnson/OKeyTreIME/releases/latest">GitHub Releases</a>, open it, and drag <strong>OKeyTre</strong> into <strong>Applications</strong>.
+              </p>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-num">2</div>
+            <div>
+              <h4 lang="vi">Cho phép mở lần đầu (ứng dụng mã nguồn mở)</h4>
+              <h4 lang="en">Allow first launch (open-source build)</h4>
+              <p lang="vi">
+                Vì ứng dụng được ký ad-hoc (không qua tài khoản trả phí của Apple), hãy vào <strong>System Settings → Privacy &amp; Security → Open Anyway</strong>, hoặc chạy lệnh sau trong Terminal:
+              </p>
+              <p lang="en">
+                Because the app is ad-hoc signed rather than Apple-notarized, allow it via <strong>System Settings → Privacy &amp; Security → Open Anyway</strong>, or run this once in Terminal:
+              </p>
+              <div class="code-block">
+                <span id="xattr-cmd">xattr -cr /Applications/OKeyTre.app</span>
+                <button type="button" class="copy-btn" id="copy-btn">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="step">
+            <div class="step-num">3</div>
+            <div>
+              <h4 lang="vi">Cấp quyền Trợ năng &amp; dùng bàn phím U.S./ABC</h4>
+              <h4 lang="en">Grant Accessibility &amp; use the U.S./ABC layout</h4>
+              <p lang="vi">
+                Mở <strong>ÔKêyTre</strong>, cấp quyền <strong>Accessibility (Trợ năng)</strong> khi được hỏi và chọn bàn phím hệ thống là <strong>U.S.</strong> hoặc <strong>ABC</strong> để bắt đầu gõ!
+              </p>
+              <p lang="en">
+                Launch <strong>ÔKêyTre</strong>, grant <strong>Accessibility</strong> permission when prompted, and select the macOS <strong>U.S.</strong> or <strong>ABC</strong> keyboard layout to start typing!
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p lang="vi">
+        Bản quyền &copy; 2026 <code>lnson</code> · Phân phối theo giấy phép
+        <a href="https://github.com/lnson/OKeyTreIME/blob/main/LICENSE">GNU GPL v3.0</a> ·
+        <a href="https://github.com/lnson/OKeyTreIME">Mã nguồn trên GitHub</a> ·
+        <a href="https://github.com/lnson/OKeyTreIME/issues" target="_blank" rel="noopener noreferrer">Báo lỗi &amp; Góp ý</a>
+      </p>
+      <p lang="en">
+        Copyright &copy; 2026 <code>lnson</code> · Licensed under
+        <a href="https://github.com/lnson/OKeyTreIME/blob/main/LICENSE">GNU GPL v3.0</a> ·
+        <a href="https://github.com/lnson/OKeyTreIME">Source on GitHub</a> ·
+        <a href="https://github.com/lnson/OKeyTreIME/issues" target="_blank" rel="noopener noreferrer">Report a Bug</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      const root = document.documentElement;
+      const buttons = document.querySelectorAll("[data-set-lang]");
+
+      function setLang(lang) {
+        root.setAttribute("data-lang", lang);
+        root.setAttribute("lang", lang);
+        document.title =
+          lang === "vi"
+            ? "ÔKêyTre — Bộ gõ tiếng Việt hiện đại cho macOS"
+            : "ÔKêyTre — Modern Vietnamese Input Method for macOS";
+        buttons.forEach((btn) => {
+          btn.classList.toggle("active", btn.getAttribute("data-set-lang") === lang);
+        });
+        try {
+          localStorage.setItem("okeytre-lang", lang);
+        } catch (_) {}
+      }
+
+      let saved = null;
+      try {
+        saved = localStorage.getItem("okeytre-lang");
+      } catch (_) {}
+      if (saved === "en" || saved === "vi") {
+        setLang(saved);
+      } else if (navigator.language && !navigator.language.toLowerCase().startsWith("vi")) {
+        setLang("en");
+      }
+
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => setLang(btn.getAttribute("data-set-lang")));
+      });
+
+      const copyBtn = document.getElementById("copy-btn");
+      const cmdText = document.getElementById("xattr-cmd").textContent;
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(cmdText).then(() => {
+          const prev = copyBtn.textContent;
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => {
+            copyBtn.textContent = prev;
+          }, 1500);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
