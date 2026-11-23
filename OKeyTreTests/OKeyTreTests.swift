@@ -18,6 +18,7 @@ private extension InputMethodBuffer {
         uoHorn: Bool = false,
         ngToNgh: Bool = false,
         nghToNg: Bool = false,
+        restoreInvalidWords: Bool = false,
         maxBufferSize: Int = InputMethodBuffer.defaultMaxBufferSize
     ) {
         self.init(
@@ -26,6 +27,7 @@ private extension InputMethodBuffer {
             uoHorn: uoHorn,
             ngToNgh: ngToNgh,
             nghToNg: nghToNg,
+            restoreInvalidWords: restoreInvalidWords,
             maxBufferSize: maxBufferSize
         )
         seedWithSurroundingText(characters, caretOffset: pos ?? characters.count)

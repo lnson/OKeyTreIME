@@ -524,6 +524,7 @@ private final class SettingsWindowTrackingView: NSView {
 
         UserDefaults.standard.register(defaults: [
             InputMethodBuffer.modernToneDefaultsKey: InputMethodBuffer.defaultModernTone,
+            InputMethodBuffer.restoreInvalidWordsDefaultsKey: InputMethodBuffer.defaultRestoreInvalidWords,
             UpdateManager.autoCheckDefaultsKey: UpdateManager.defaultAutoCheck,
         ])
 

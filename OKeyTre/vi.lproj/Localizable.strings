@@ -53,6 +53,11 @@
 "settings.orthography.modern_tone.title" = "Đặt dấu theo chính tả kiểu mới (\"oà, oé, uý\")";
 "settings.orthography.modern_tone.description" = "Đặt dấu thanh lên nguyên âm thứ hai trong các vần mở \"oa\", \"oe\", \"uy\" (ví dụ: hoà, khoẻ, thuý thay vì hòa, khỏe, thúy).";
 
+/* English & Non-Vietnamese Word Restoration */
+"settings.english.header" = "Từ tiếng Anh & Ngoại lai";
+"settings.english.restore_invalid.title" = "Tự động khôi phục từ không phải tiếng Việt";
+"settings.english.restore_invalid.description" = "Tự động trả về chuỗi phím gốc ngay khi kết thúc từ (bằng dấu cách hoặc dấu câu) nếu từ đó chứa tổ hợp âm không thể có trong tiếng Việt (ví dụ: window, user, text, lexi).";
+
 /* Auto-Correction Settings */
 "settings.correction.header" = "Chính tả & Nguyên âm đôi";
 "settings.correction.uo_horn.title" = "Tự động sửa \"ưo\" thành \"ươ\"";

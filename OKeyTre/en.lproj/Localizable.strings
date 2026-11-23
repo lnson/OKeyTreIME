@@ -53,6 +53,11 @@
 "settings.orthography.modern_tone.title" = "Use modern Vietnamese orthography (\"oà, oé, uý\")";
 "settings.orthography.modern_tone.description" = "Place tone marks on the second vowel in open \"oa\", \"oe\", and \"uy\" syllables (e.g., hoà, khoẻ, thuý instead of hòa, khỏe, thúy).";
 
+/* English & Non-Vietnamese Word Restoration */
+"settings.english.header" = "English & Non-Vietnamese Words";
+"settings.english.restore_invalid.title" = "Auto-restore invalid Vietnamese words";
+"settings.english.restore_invalid.description" = "Automatically restore the raw typed characters when ending a word (with Space or punctuation) that contains combinations impossible in Vietnamese (e.g., window, user, text, lexi).";
+
 /* Auto-Correction Settings */
 "settings.correction.header" = "Spelling & Diphthongs";
 "settings.correction.uo_horn.title" = "Auto-correct \"ưo\" to \"ươ\"";

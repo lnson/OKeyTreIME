@@ -77,6 +77,10 @@ final class InputMethodBuffer {
     static let ngToNghDefaultsKey = "ngToNgh"
     /// UserDefaults key controlling the `ngh + [aou] -> ng[aou]` (`?nghToNg`) rule.
     static let nghToNgDefaultsKey = "nghToNg"
+    /// UserDefaults key controlling automatic raw-word restoration on word end for invalid Vietnamese syllables.
+    static let restoreInvalidWordsDefaultsKey = "restoreInvalidWords"
+    /// Default setting for automatic raw-word restoration on word end.
+    static let defaultRestoreInvalidWords = true
     /// UserDefaults key controlling the maximum number of characters retained in the buffer before the caret.
     static let maxBufferSizeDefaultsKey = "maxBufferSize"
     /// Default maximum number of characters retained in the buffer across word boundaries.
@@ -132,11 +136,23 @@ final class InputMethodBuffer {
         set { okeytre_buffer_set_ngh_to_ng(rawBuffer, newValue) }
     }
 
+    var restoreInvalidWords: Bool {
+        get { okeytre_buffer_get_restore_invalid_words(rawBuffer) }
+        set { okeytre_buffer_set_restore_invalid_words(rawBuffer, newValue) }
+    }
+
     static func resolvedModernTone(from defaults: UserDefaults = .standard) -> Bool {
         if let value = defaults.object(forKey: modernToneDefaultsKey) as? Bool {
             return value
         }
         return defaultModernTone
+    }
+
+    static func resolvedRestoreInvalidWords(from defaults: UserDefaults = .standard) -> Bool {
+        if let value = defaults.object(forKey: restoreInvalidWordsDefaultsKey) as? Bool {
+            return value
+        }
+        return defaultRestoreInvalidWords
     }
 
     init(
@@ -145,6 +161,7 @@ final class InputMethodBuffer {
         uoHorn: Bool = false,
         ngToNgh: Bool = false,
         nghToNg: Bool = false,
+        restoreInvalidWords: Bool = InputMethodBuffer.defaultRestoreInvalidWords,
         maxBufferSize: Int = InputMethodBuffer.defaultMaxBufferSize
     ) {
         self.rawBuffer = okeytre_buffer_create(
@@ -155,6 +172,7 @@ final class InputMethodBuffer {
             nghToNg,
             Int32(maxBufferSize)
         )!
+        okeytre_buffer_set_restore_invalid_words(self.rawBuffer, restoreInvalidWords)
         self.isOff = (style == .off)
     }
 

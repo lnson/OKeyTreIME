@@ -242,6 +242,11 @@ final class KeyTapManager: ObservableObject {
         set { inputMethodBuffer.nghToNg = newValue }
     }
 
+    var restoreInvalidWords: Bool {
+        get { inputMethodBuffer.restoreInvalidWords }
+        set { inputMethodBuffer.restoreInvalidWords = newValue }
+    }
+
     var maxBufferSize: Int {
         get { inputMethodBuffer.maxBufferSize }
         set { inputMethodBuffer.maxBufferSize = newValue }
@@ -261,6 +266,7 @@ final class KeyTapManager: ObservableObject {
             uoHorn: defaults.bool(forKey: InputMethodBuffer.uoHornDefaultsKey),
             ngToNgh: defaults.bool(forKey: InputMethodBuffer.ngToNghDefaultsKey),
             nghToNg: defaults.bool(forKey: InputMethodBuffer.nghToNgDefaultsKey),
+            restoreInvalidWords: InputMethodBuffer.resolvedRestoreInvalidWords(from: defaults),
             maxBufferSize: storedMaxSize > 0 ? storedMaxSize : InputMethodBuffer.defaultMaxBufferSize
         )
 

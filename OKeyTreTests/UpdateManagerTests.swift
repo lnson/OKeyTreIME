@@ -587,5 +587,53 @@ struct AppDefaultsTests {
         }
         #expect(rendered == "bột")
     }
+
+    @Test("restoreInvalidWords defaults to true, respects UserDefaults overrides, and restores impossible Vietnamese words on word end")
+    func restoreInvalidWordsLifecycleAndTyping() throws {
+        let suiteName = "com.okeytre.tests.restoreinvalid.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(InputMethodBuffer.defaultRestoreInvalidWords)
+        #expect(InputMethodBuffer.resolvedRestoreInvalidWords(from: defaults))
+
+        let buffer = InputMethodBuffer(style: .telex)
+        #expect(buffer.restoreInvalidWords)
+
+        func simulateTyping(_ input: String, into target: InputMethodBuffer) -> String {
+            var screen: [UniChar] = []
+            for ch in input.utf16 {
+                let action = [ch].withUnsafeBufferPointer { ptr in
+                    target.handleInput(ptr)
+                }
+                if let action {
+                    if action.backspaceCount > 0 {
+                        screen.removeLast(action.backspaceCount)
+                    }
+                    screen.append(contentsOf: action.text.utf16)
+                } else {
+                    screen.append(ch)
+                }
+            }
+            return String(utf16CodeUnits: screen, count: screen.count)
+        }
+
+        // Enabled: English words with impossible Vietnamese phonotactics restore on Space/punctuation,
+        // while valid Vietnamese words stay accented.
+        let typedEnabled = simulateTyping("moojt window mowis cho user, lexi! ", into: buffer)
+        #expect(typedEnabled == "một window mới cho user, lexi! ")
+
+        // Disabled via UserDefaults / property: keeps transformed characters as-is.
+        defaults.set(false, forKey: InputMethodBuffer.restoreInvalidWordsDefaultsKey)
+        #expect(!InputMethodBuffer.resolvedRestoreInvalidWords(from: defaults))
+
+        let manager = KeyTapManager(defaults: defaults, observeWorkspace: false)
+        #expect(!manager.restoreInvalidWords)
+
+        buffer.reset()
+        buffer.restoreInvalidWords = false
+        let typedDisabled = simulateTyping("lexi ", into: buffer)
+        #expect(typedDisabled == "lẽi ")
+    }
 }
 
