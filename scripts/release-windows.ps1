@@ -41,19 +41,28 @@ $ResourceHeaderPath = Join-Path $RepoRoot "windows\resources\resource.h"
 $ManifestPath = Join-Path $RepoRoot "windows\resources\okeytre.manifest"
 $AppVersionPath = Join-Path $RepoRoot "windows\app-version.h"
 
-# Refresh PATH from Registry so tools installed after opening this shell are found.
-$regPath = @()
+# Refresh and deduplicate PATH from Registry so tools installed after opening
+# this shell are found without growing PATH across repeated runs.
+$rawEntries = @()
 $machinePath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
 $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
-if ($FlexBisonDir) { $regPath += $FlexBisonDir }
-if ($env:PATH) { $regPath += $env:PATH }
-if ($machinePath) { $regPath += $machinePath }
-if ($userPath) { $regPath += $userPath }
+if ($FlexBisonDir) { $rawEntries += $FlexBisonDir }
+if ($env:PATH) { $rawEntries += ($env:PATH -split ";") }
+if ($machinePath) { $rawEntries += ($machinePath -split ";") }
+if ($userPath) { $rawEntries += ($userPath -split ";") }
 $wingetLinks = Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Links"
-if (Test-Path $wingetLinks) { $regPath += $wingetLinks }
+if (Test-Path $wingetLinks) { $rawEntries += $wingetLinks }
 $bazeliskPkg = Get-ChildItem (Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Packages\Bazel.Bazelisk*") -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($bazeliskPkg) { $regPath += $bazeliskPkg.FullName }
-$env:PATH = ($regPath -join ";")
+if ($bazeliskPkg) { $rawEntries += $bazeliskPkg.FullName }
+$seenPaths = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+$dedupedPath = New-Object System.Collections.Generic.List[string]
+foreach ($entry in $rawEntries) {
+    $trimmed = if ($null -ne $entry) { $entry.Trim() } else { "" }
+    if ($trimmed -and $seenPaths.Add($trimmed)) {
+        $dedupedPath.Add($trimmed)
+    }
+}
+$env:PATH = ($dedupedPath -join ";")
 
 if (-not $env:BAZEL_SH) {
     $userBazelSh = [Environment]::GetEnvironmentVariable("BAZEL_SH", "User")

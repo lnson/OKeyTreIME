@@ -11,7 +11,15 @@ genrule(
     srcs = ["inv-lexer.lpp"],
     outs = ["inv-lexer.yy.cc"],
     cmd = "/usr/bin/flex -o $@ $(location inv-lexer.lpp)",
-    cmd_bat = "where win_flex >nul 2>&1 && (win_flex --wincompat -o $@ $(location inv-lexer.lpp)) || (flex -o $@ $(location inv-lexer.lpp))",
+    cmd_bat = (
+        "set \"OKT_ROOT=%CD%\" && " +
+        "set \"OKT_TMP=%CD%\\$(@D)\\_flex_tmp_invc\" && " +
+        "if not exist \"!OKT_TMP!\" mkdir \"!OKT_TMP!\" && " +
+        "set \"TEMP=!OKT_TMP!\" && set \"TMP=!OKT_TMP!\" && " +
+        "pushd \"!OKT_TMP!\" && " +
+        "(where win_flex >nul 2>&1 && (win_flex --wincompat -o \"!OKT_ROOT!\\$@\" \"!OKT_ROOT!\\$(location inv-lexer.lpp)\") || (flex -o \"!OKT_ROOT!\\$@\" \"!OKT_ROOT!\\$(location inv-lexer.lpp)\")) && " +
+        "popd && rmdir /s /q \"!OKT_TMP!\""
+    ),
 )
 
 genrule(
@@ -22,7 +30,13 @@ genrule(
         "inv-parser.yacc.h",
     ],
     cmd = "/usr/bin/bison -y --defines=$(location inv-parser.yacc.h) -o $(location inv-parser.yacc.cc) $(location inv-parser.ypp)",
-    cmd_bat = "where win_bison >nul 2>&1 && (win_bison -y --defines=$(location inv-parser.yacc.h) -o $(location inv-parser.yacc.cc) $(location inv-parser.ypp)) || (bison -y --defines=$(location inv-parser.yacc.h) -o $(location inv-parser.yacc.cc) $(location inv-parser.ypp))",
+    cmd_bat = (
+        "set \"OKT_TMP=%CD%\\$(@D)\\_bison_tmp_invc\" && " +
+        "if not exist \"!OKT_TMP!\" mkdir \"!OKT_TMP!\" && " +
+        "set \"TEMP=!OKT_TMP!\" && set \"TMP=!OKT_TMP!\" && " +
+        "(where win_bison >nul 2>&1 && (win_bison -y --defines=$(location inv-parser.yacc.h) -o $(location inv-parser.yacc.cc) $(location inv-parser.ypp)) || (bison -y --defines=$(location inv-parser.yacc.h) -o $(location inv-parser.yacc.cc) $(location inv-parser.ypp))) && " +
+        "rmdir /s /q \"!OKT_TMP!\""
+    ),
 )
 
 # 2. `.inv` AST, Minimized Inversion DFA Compiler & C++ Codegen Libraries
