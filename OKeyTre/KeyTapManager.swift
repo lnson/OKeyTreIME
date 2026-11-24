@@ -167,10 +167,19 @@ final class KeyTapManager: ObservableObject {
         inputMethodStyle.isVietnameseEnabled
     }
 
+    /// True only when ÔKêyTre's Vietnamese mode is enabled AND the system keyboard input source
+    /// is a compatible English layout (suspending ÔKêyTre automatically whenever a system IME or
+    /// non-English keyboard layout is active).
+    var isEffectivelyActive: Bool {
+        isVietnameseEnabled && isEnglishInputSource()
+    }
+
     private var lastActiveStyle: InputMethodStyle
     private let magicTag: Int64 = 0xCAFE_BABE
     private nonisolated var portBox: TapPortBox { Self.sharedPortBox }
     private var mouseMonitor: Any?
+    private var inputSourceCancellable: AnyCancellable?
+    private let isEnglishInputSource: () -> Bool
     private var dualShiftDetector = DualShiftDetector()
     private var dualCommandDetector = DualCommandDetector()
     private var inputMethodBuffer: InputMethodBuffer
@@ -265,7 +274,10 @@ final class KeyTapManager: ObservableObject {
 
     init(
         defaults: UserDefaults = .standard,
-        observeWorkspace: Bool = true
+        observeWorkspace: Bool = true,
+        isEnglishInputSource: @escaping () -> Bool = {
+            InputSourceManager.shared.refreshIfCurrentSourceChanged()
+        }
     ) {
         let (selected, lastActive) = Self.resolvedStyles(from: defaults)
         let resolvedRestoreInvalid = InputMethodBuffer.resolvedRestoreInvalidWords(from: defaults)
@@ -273,6 +285,7 @@ final class KeyTapManager: ObservableObject {
         self.inputMethodStyle = selected
         self.restoreInvalidWords = resolvedRestoreInvalid
         self.lastActiveStyle = lastActive
+        self.isEnglishInputSource = isEnglishInputSource
         self.inputMethodBuffer = InputMethodBuffer(
             style: selected,
             modernTone: InputMethodBuffer.resolvedModernTone(from: defaults),
@@ -284,6 +297,17 @@ final class KeyTapManager: ObservableObject {
         )
 
         guard observeWorkspace else { return }
+        inputSourceCancellable = InputSourceManager.shared.$isEnglish
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.dualShiftDetector.reset()
+                self?.inputMethodBuffer.reset()
+                DispatchQueue.main.async {
+                    MenuBarStatusView.refreshStatusBarTooltip()
+                }
+            }
+
         let workspaceCenter = NSWorkspace.shared.notificationCenter
         workspaceCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
@@ -293,6 +317,7 @@ final class KeyTapManager: ObservableObject {
             self?.dualShiftDetector.reset()
             self?.dualCommandDetector.reset()
             self?.inputMethodBuffer.reset()
+            InputSourceManager.shared.updateCurrentSource()
             guard PermissionManager.shared.verifyPermissionNow() else { return }
             if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
                 CaretTextReader.enableEnhancedUserInterface(for: app.processIdentifier)
@@ -403,22 +428,59 @@ final class KeyTapManager: ObservableObject {
 
         if type == .flagsChanged {
             let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-            if dualCommandDetector.shouldTriggerToggle(keyCode: keyCode, flags: flags) {
-                toggleVietnameseEnabled()
-                return Unmanaged.passUnretained(event)
-            }
-            if isVietnameseEnabled,
-               dualShiftDetector.shouldTriggerRestore(keyCode: keyCode, flags: flags),
-               let action = inputMethodBuffer.restoreCurrentWord() {
+            if let action = processFlagsChanged(keyCode: keyCode, flags: flags) {
                 postAction(action, proxy: proxy)
             }
             return Unmanaged.passUnretained(event)
         }
 
+        let action = withUnsafeTemporaryAllocation(of: UniChar.self, capacity: 4) { buf in
+            var actualLength = 0
+            event.keyboardGetUnicodeString(
+                maxStringLength: buf.count,
+                actualStringLength: &actualLength,
+                unicodeString: buf.baseAddress
+            )
+            let count = min(max(0, actualLength), buf.count)
+            return processKeyDown(
+                UnsafeBufferPointer(start: buf.baseAddress, count: count),
+                flags: flags
+            )
+        }
+        if let action {
+            postAction(action, proxy: proxy)
+            return nil
+        }
+
+        return Unmanaged.passUnretained(event)
+    }
+
+    func processFlagsChanged(keyCode: CGKeyCode, flags: CGEventFlags) -> InputMethodBuffer.Action? {
+        if dualCommandDetector.shouldTriggerToggle(keyCode: keyCode, flags: flags) {
+            toggleVietnameseEnabled()
+            return nil
+        }
+        guard isEffectivelyActive else {
+            dualShiftDetector.reset()
+            inputMethodBuffer.reset()
+            return nil
+        }
+        if dualShiftDetector.shouldTriggerRestore(keyCode: keyCode, flags: flags) {
+            return inputMethodBuffer.restoreCurrentWord()
+        }
+        return nil
+    }
+
+    func processKeyDown(
+        _ characters: UnsafeBufferPointer<UniChar>,
+        flags: CGEventFlags = []
+    ) -> InputMethodBuffer.Action? {
         dualCommandDetector.noteNonModifierKeyDown()
 
-        guard isVietnameseEnabled else {
-            return Unmanaged.passUnretained(event)
+        guard isEffectivelyActive else {
+            dualShiftDetector.reset()
+            inputMethodBuffer.reset()
+            return nil
         }
 
         if !flags.contains(.maskShift) {
@@ -432,28 +494,10 @@ final class KeyTapManager: ObservableObject {
         if !flags.intersection(disruptingModifiers).isEmpty {
             dualShiftDetector.reset()
             inputMethodBuffer.reset()
-            return Unmanaged.passUnretained(event)
-        }
-
-        let action = withUnsafeTemporaryAllocation(of: UniChar.self, capacity: 4) { buf in
-            var actualLength = 0
-            event.keyboardGetUnicodeString(
-                maxStringLength: buf.count,
-                actualStringLength: &actualLength,
-                unicodeString: buf.baseAddress
-            )
-            let count = min(max(0, actualLength), buf.count)
-            return inputMethodBuffer.handleInput(
-                UnsafeBufferPointer(start: buf.baseAddress, count: count),
-                flags: flags
-            )
-        }
-        if let action {
-            postAction(action, proxy: proxy)
             return nil
         }
 
-        return Unmanaged.passUnretained(event)
+        return inputMethodBuffer.handleInput(characters, flags: flags)
     }
 
     private func postAction(_ action: InputMethodBuffer.Action, proxy: CGEventTapProxy) {

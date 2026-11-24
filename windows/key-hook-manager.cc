@@ -6,6 +6,8 @@
 #include <array>
 #include <vector>
 
+#include "windows/input-source-manager.h"
+
 namespace okeytre::win {
 
 namespace {
@@ -296,12 +298,23 @@ LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
     if (is_key_down) {
       dual_control_.OnKeyEvent(vk, true, mods);
     }
-    if (controller_.is_vietnamese_enabled() &&
+    const bool english_layout =
+        InputSourceManager::IsForegroundKeyboardEnglish();
+    if (english_layout != controller_.is_system_keyboard_compatible()) {
+      controller_.SetSystemKeyboardCompatible(english_layout);
+      if (on_foreground_changed_) {
+        on_foreground_changed_();
+      }
+    }
+    if (controller_.is_effectively_active() &&
         dual_shift_.OnKeyEvent(vk, is_key_down, mods)) {
-      if (const auto action = controller_.RestoreCurrentWord();
+      if (const std::optional<ImeEditAction> action =
+              controller_.RestoreCurrentWord();
           action.has_value()) {
         SendEditAction(*action);
       }
+    } else if (!controller_.is_effectively_active()) {
+      dual_shift_.Reset();
     }
     return 0;
   }
@@ -320,7 +333,17 @@ LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
   // Any non-modifier key down disrupts an active Ctrl chord.
   dual_control_.NoteNonModifierKeyDown();
 
-  if (!controller_.is_vietnamese_enabled()) {
+  const bool english_layout = InputSourceManager::IsForegroundKeyboardEnglish();
+  if (english_layout != controller_.is_system_keyboard_compatible()) {
+    controller_.SetSystemKeyboardCompatible(english_layout);
+    if (on_foreground_changed_) {
+      on_foreground_changed_();
+    }
+  }
+
+  if (!controller_.is_effectively_active()) {
+    dual_shift_.Reset();
+    controller_.ResetBuffer();
     return 0;
   }
 

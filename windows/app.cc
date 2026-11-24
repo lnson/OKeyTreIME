@@ -116,7 +116,19 @@ void App::WireSubsystems() {
   ime_controller_->SetOnStateChanged([this]() { RefreshAllUI(); });
 
   input_source_manager_ = std::make_unique<InputSourceManager>();
-  input_source_manager_->SetOnChanged([this]() { RefreshAllUI(); });
+  ime_controller_->SetSystemKeyboardCompatible(
+      input_source_manager_->is_english());
+  input_source_manager_->SetOnChanged([this]() {
+    if (ime_controller_ != nullptr && input_source_manager_ != nullptr) {
+      ime_controller_->SetSystemKeyboardCompatible(
+          input_source_manager_->is_english());
+    }
+    if (key_hook_ != nullptr && input_source_manager_ != nullptr &&
+        !input_source_manager_->is_english()) {
+      key_hook_->ResetTransientState();
+    }
+    RefreshAllUI();
+  });
 
   launch_at_login_ = std::make_unique<LaunchAtLoginManager>(*settings_);
 

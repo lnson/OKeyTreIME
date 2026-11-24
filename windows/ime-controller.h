@@ -55,10 +55,17 @@ class ImeController {
   bool is_vietnamese_enabled() const noexcept {
     return input_style_ != InputStyle::kOff;
   }
+  bool is_system_keyboard_compatible() const noexcept {
+    return system_keyboard_compatible_;
+  }
+  bool is_effectively_active() const noexcept {
+    return is_vietnamese_enabled() && system_keyboard_compatible_;
+  }
   InputStyle last_active_style() const noexcept { return last_active_style_; }
 
   void SetInputStyle(InputStyle style);
   void ToggleVietnameseEnabled();
+  void SetSystemKeyboardCompatible(bool compatible) noexcept;
 
   bool modern_tone() const noexcept;
   void SetModernTone(bool enabled);
@@ -96,6 +103,7 @@ class ImeController {
   OKTInputMethodBuffer* raw_buffer_ = nullptr;
   InputStyle input_style_ = InputStyle::kTelex;
   InputStyle last_active_style_ = InputStyle::kTelex;
+  bool system_keyboard_compatible_ = true;
 };
 
 }  // namespace okeytre::win

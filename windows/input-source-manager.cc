@@ -3,19 +3,101 @@
 
 #include "windows/input-source-manager.h"
 
+// clang-format off
 #include <windows.h>
+// clang-format on
 #include <commctrl.h>
 #include <shellapi.h>
 
+#include <cwchar>
 #include <iterator>
+#include <unordered_map>
 
 namespace okeytre::win {
 
 namespace {
 
-HKL GetActiveKeyboardLayout() {
+struct SpecialLayoutInfo {
+  std::wstring layout_text;
+  LANGID lang_id = 0;
+};
+
+// Maps the 12-bit Windows `"Layout Id"` (stored in `HIWORD(hkl) & 0x0FFF` when
+// `(HIWORD(hkl) & 0xF000) == 0xF000`) to its underlying KLID language and name.
+// This detects IME/keyboard variants such as Windows built-in Vietnamese Telex
+// (`0001042a`) or VNI (`0002042a`) even when installed under `en-US` (`0409`).
+const std::unordered_map<uint16_t, SpecialLayoutInfo>& GetSpecialLayoutMap() {
+  static const std::unordered_map<uint16_t, SpecialLayoutInfo>* const kMap =
+      []() {
+        auto* table = new std::unordered_map<uint16_t, SpecialLayoutInfo>();
+        HKEY layouts_key = nullptr;
+        if (RegOpenKeyExW(
+                HKEY_LOCAL_MACHINE,
+                L"SYSTEM\\CurrentControlSet\\Control\\Keyboard Layouts", 0,
+                KEY_READ, &layouts_key) != ERROR_SUCCESS ||
+            layouts_key == nullptr) {
+          return table;
+        }
+
+        wchar_t subkey_name[32] = {};
+        for (DWORD index = 0;; ++index) {
+          DWORD name_len = static_cast<DWORD>(std::size(subkey_name));
+          if (RegEnumKeyExW(layouts_key, index, subkey_name, &name_len, nullptr,
+                            nullptr, nullptr, nullptr) != ERROR_SUCCESS) {
+            break;
+          }
+          wchar_t* end_ptr = nullptr;
+          const unsigned long klid_val = wcstoul(subkey_name, &end_ptr, 16);
+          if (end_ptr == subkey_name) {
+            continue;
+          }
+
+          HKEY subkey = nullptr;
+          if (RegOpenKeyExW(layouts_key, subkey_name, 0, KEY_READ, &subkey) !=
+                  ERROR_SUCCESS ||
+              subkey == nullptr) {
+            continue;
+          }
+
+          wchar_t layout_id_buf[16] = {};
+          DWORD id_bytes = sizeof(layout_id_buf);
+          DWORD type = 0;
+          if (RegQueryValueExW(subkey, L"Layout Id", nullptr, &type,
+                               reinterpret_cast<LPBYTE>(layout_id_buf),
+                               &id_bytes) == ERROR_SUCCESS &&
+              (type == REG_SZ || type == REG_EXPAND_SZ)) {
+            wchar_t* id_end = nullptr;
+            const unsigned long special_id =
+                wcstoul(layout_id_buf, &id_end, 16);
+            if (id_end != layout_id_buf) {
+              SpecialLayoutInfo info;
+              info.lang_id = static_cast<LANGID>(klid_val & 0xFFFFu);
+
+              wchar_t text_buf[128] = {};
+              DWORD text_bytes = sizeof(text_buf);
+              DWORD text_type = 0;
+              if (RegQueryValueExW(subkey, L"Layout Text", nullptr, &text_type,
+                                   reinterpret_cast<LPBYTE>(text_buf),
+                                   &text_bytes) == ERROR_SUCCESS &&
+                  (text_type == REG_SZ || text_type == REG_EXPAND_SZ)) {
+                info.layout_text.assign(text_buf);
+              }
+              table->try_emplace(static_cast<uint16_t>(special_id & 0x0FFFu),
+                                 std::move(info));
+            }
+          }
+          RegCloseKey(subkey);
+        }
+        RegCloseKey(layouts_key);
+        return table;
+      }();
+  return *kMap;
+}
+
+HKL GetActiveKeyboardLayout() noexcept {
   HWND fg = GetForegroundWindow();
-  DWORD thread_id = fg != nullptr ? GetWindowThreadProcessId(fg, nullptr) : 0;
+  const DWORD thread_id =
+      fg != nullptr ? GetWindowThreadProcessId(fg, nullptr) : 0;
   HKL hkl = GetKeyboardLayout(thread_id);
   if (hkl == nullptr) {
     hkl = GetKeyboardLayout(0);
@@ -23,20 +105,57 @@ HKL GetActiveKeyboardLayout() {
   return hkl;
 }
 
-bool IsEnglishKeyboardLayout(HKL hkl) {
+LANGID ResolveLayoutLangId(HKL hkl, const std::wstring** out_special_text) {
+  if (out_special_text != nullptr) {
+    *out_special_text = nullptr;
+  }
+  const uintptr_t raw = reinterpret_cast<uintptr_t>(hkl);
+  const LANGID input_lang = LOWORD(raw);
+  const uint16_t device_id = HIWORD(raw);
+  if (device_id == 0) {
+    return input_lang;
+  }
+  if ((device_id & 0xF000u) != 0xF000u) {
+    return static_cast<LANGID>(device_id);
+  }
+  const std::unordered_map<uint16_t, SpecialLayoutInfo>& special_map =
+      GetSpecialLayoutMap();
+  const auto it = special_map.find(static_cast<uint16_t>(device_id & 0x0FFFu));
+  if (it != special_map.end()) {
+    if (out_special_text != nullptr && !it->second.layout_text.empty()) {
+      *out_special_text = &it->second.layout_text;
+    }
+    return it->second.lang_id;
+  }
+  return input_lang;
+}
+
+bool IsEnglishKeyboardLayout(HKL hkl) noexcept {
   if (hkl == nullptr) {
     return true;
   }
-  const LANGID lang_id = LOWORD(reinterpret_cast<uintptr_t>(hkl));
-  return PRIMARYLANGID(lang_id) == LANG_ENGLISH;
+  const LANGID input_lang = LOWORD(reinterpret_cast<uintptr_t>(hkl));
+  if (PRIMARYLANGID(input_lang) != LANG_ENGLISH) {
+    return false;
+  }
+  const LANGID layout_lang = ResolveLayoutLangId(hkl, nullptr);
+  return PRIMARYLANGID(layout_lang) == LANG_ENGLISH;
 }
 
 std::wstring GetKeyboardLayoutDisplayName(HKL hkl, AppLanguage language) {
   if (hkl == nullptr) {
     return Localized(language, "input_source.unknown");
   }
-  const LANGID lang_id = LOWORD(reinterpret_cast<uintptr_t>(hkl));
-  const LCID lcid = MAKELCID(lang_id, SORT_DEFAULT);
+  const std::wstring* special_text = nullptr;
+  const LANGID input_lang = LOWORD(reinterpret_cast<uintptr_t>(hkl));
+  const LANGID layout_lang = ResolveLayoutLangId(hkl, &special_text);
+  if (special_text != nullptr && PRIMARYLANGID(layout_lang) != LANG_ENGLISH) {
+    return *special_text;
+  }
+
+  const LANGID display_lang =
+      PRIMARYLANGID(input_lang) != LANG_ENGLISH ? input_lang : layout_lang;
+  const LCID lcid = MAKELCID(display_lang, SORT_DEFAULT);
   wchar_t locale_name[LOCALE_NAME_MAX_LENGTH] = {};
   if (LCIDToLocaleName(lcid, locale_name, LOCALE_NAME_MAX_LENGTH, 0) > 0) {
     wchar_t display_name[128] = {};
@@ -51,6 +170,10 @@ std::wstring GetKeyboardLayoutDisplayName(HKL hkl, AppLanguage language) {
 }  // namespace
 
 InputSourceManager::InputSourceManager() { Refresh(AppLanguage::kSystem); }
+
+bool InputSourceManager::IsForegroundKeyboardEnglish() noexcept {
+  return IsEnglishKeyboardLayout(GetActiveKeyboardLayout());
+}
 
 bool InputSourceManager::Refresh(AppLanguage language) {
   const HKL hkl = GetActiveKeyboardLayout();

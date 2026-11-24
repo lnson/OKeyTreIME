@@ -726,5 +726,103 @@ struct AppDefaultsTests {
         #expect(currentPolicy == .accessory)
         #expect(!coordinator.isShowcaseWindowOpen)
     }
+
+    @Test("KeyTapManager suspends typing transforms and word reversion when system IME or non-English keyboard is active")
+    func suspendsWhenSystemInputSourceIsNonEnglish() throws {
+        // 1. Verify InputSourceManager classifies English keyboard layouts vs system IMEs.
+        #expect(InputSourceManager.isCompatibleEnglishKeyboard(
+            sourceID: "com.apple.keylayout.US",
+            sourceType: "TISTypeKeyboardLayout"
+        ))
+        #expect(InputSourceManager.isCompatibleEnglishKeyboard(
+            sourceID: "com.apple.keylayout.ABC",
+            sourceType: "TISTypeKeyboardLayout"
+        ))
+        #expect(InputSourceManager.isCompatibleEnglishKeyboard(
+            sourceID: "com.apple.keylayout.British",
+            sourceType: "TISTypeKeyboardLayout"
+        ))
+        // macOS built-in Vietnamese IME modes & layout must NOT be treated as compatible English layouts.
+        #expect(!InputSourceManager.isCompatibleEnglishKeyboard(
+            sourceID: "com.apple.inputmethod.VietnameseIM.VietnameseTelex",
+            sourceType: "TISTypeKeyboardInputMode"
+        ))
+        #expect(!InputSourceManager.isCompatibleEnglishKeyboard(
+            sourceID: "com.apple.inputmethod.VietnameseIM.VietnameseVNI",
+            sourceType: "TISTypeKeyboardInputMode"
+        ))
+        #expect(!InputSourceManager.isCompatibleEnglishKeyboard(
+            sourceID: "com.apple.keylayout.Vietnamese",
+            sourceType: "TISTypeKeyboardLayout"
+        ))
+        // Even an input mode whose ID contains "English" is still an input method, not a raw layout.
+        #expect(!InputSourceManager.isCompatibleEnglishKeyboard(
+            sourceID: "com.example.inputmethod.CustomEnglishMode",
+            sourceType: "TISTypeKeyboardInputMode"
+        ))
+
+        // 2. Verify KeyTapManager passes keystrokes through untouched (no transforms, no auto-restore
+        //    reversion, no Dual-Shift restore) while system IME is active, and resumes cleanly on U.S.
+        let suiteName = "com.okeytre.tests.systemime.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var systemIsEnglish = true
+        let manager = KeyTapManager(
+            defaults: defaults,
+            observeWorkspace: false,
+            isEnglishInputSource: { systemIsEnglish }
+        )
+        #expect(manager.isVietnameseEnabled)
+        #expect(manager.isEffectivelyActive)
+
+        func typeThroughManager(_ input: String) -> String {
+            var screen: [UniChar] = []
+            for ch in input.utf16 {
+                let action = [ch].withUnsafeBufferPointer { ptr in
+                    manager.processKeyDown(ptr)
+                }
+                if let action {
+                    if action.backspaceCount > 0 {
+                        screen.removeLast(min(action.backspaceCount, screen.count))
+                    }
+                    screen.append(contentsOf: action.text.utf16)
+                } else {
+                    screen.append(ch)
+                }
+            }
+            return String(utf16CodeUnits: screen, count: screen.count)
+        }
+
+        // Active on English layout: Telex transforms Vietnamese and auto-restores non-Vietnamese.
+        #expect(typeThroughManager("tieengs user ") == "tiếng user ")
+
+        // Start a word ("rồ "), then switch to system Vietnamese IME before Dual-Shift or next word:
+        #expect(typeThroughManager("roof ") == "rồ ")
+        systemIsEnglish = false
+        #expect(manager.isVietnameseEnabled)
+        #expect(!manager.isEffectivelyActive)
+
+        // Dual-Shift must NOT revert the previously typed word when system IME is active.
+        _ = manager.processFlagsChanged(keyCode: KeyCodes.leftShiftKeyCode, flags: .maskShift)
+        let blockedRestore = manager.processFlagsChanged(
+            keyCode: KeyCodes.rightShiftKeyCode,
+            flags: .maskShift
+        )
+        #expect(blockedRestore == nil)
+
+        // Typing while system IME is active produces zero actions (never transforms or reverts text).
+        for ch in "tieengs user, window ".utf16 {
+            let action = [ch].withUnsafeBufferPointer { ptr in
+                manager.processKeyDown(ptr)
+            }
+            #expect(action == nil)
+        }
+
+        // Switching back to English keyboard automatically resumes Telex without toggling settings.
+        systemIsEnglish = true
+        #expect(manager.isEffectivelyActive)
+        #expect(typeThroughManager("vieetj ") == "việt ")
+    }
 }
 

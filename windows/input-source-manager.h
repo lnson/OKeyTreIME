@@ -27,6 +27,12 @@ class InputSourceManager {
     return current_source_name_;
   }
 
+  // Fast, allocation-free check of the active foreground thread's keyboard
+  // layout (`HKL`), catching both non-English input languages (e.g. `vi-VN`)
+  // and non-English keyboard layouts/IMEs added under an English language pack
+  // (e.g. Windows built-in Vietnamese Telex `0001042a` under `en-US`).
+  static bool IsForegroundKeyboardEnglish() noexcept;
+
   // Re-queries the foreground window's keyboard layout. Returns true if the
   // English state or layout name changed.
   bool Refresh(AppLanguage language);

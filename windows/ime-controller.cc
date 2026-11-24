@@ -88,6 +88,16 @@ void ImeController::ToggleVietnameseEnabled() {
   }
 }
 
+void ImeController::SetSystemKeyboardCompatible(bool compatible) noexcept {
+  if (system_keyboard_compatible_ == compatible) {
+    return;
+  }
+  system_keyboard_compatible_ = compatible;
+  if (raw_buffer_ != nullptr) {
+    okeytre_buffer_reset(raw_buffer_);
+  }
+}
+
 bool ImeController::modern_tone() const noexcept {
   return okeytre_buffer_get_modern_tone(raw_buffer_);
 }
@@ -172,7 +182,10 @@ void ImeController::SeedCaretIfNeeded() {
 std::optional<ImeEditAction> ImeController::HandleInput(const uint16_t* input,
                                                         int32_t input_len,
                                                         uint32_t modifiers) {
-  if (input_style_ == InputStyle::kOff) {
+  if (!is_effectively_active()) {
+    if (raw_buffer_ != nullptr) {
+      okeytre_buffer_reset(raw_buffer_);
+    }
     return std::nullopt;
   }
 
@@ -203,7 +216,10 @@ std::optional<ImeEditAction> ImeController::HandleInput(const uint16_t* input,
 }
 
 std::optional<ImeEditAction> ImeController::RestoreCurrentWord() {
-  if (input_style_ == InputStyle::kOff) {
+  if (!is_effectively_active()) {
+    if (raw_buffer_ != nullptr) {
+      okeytre_buffer_reset(raw_buffer_);
+    }
     return std::nullopt;
   }
 

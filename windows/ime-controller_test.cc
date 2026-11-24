@@ -64,11 +64,38 @@ TEST(ImeControllerTest, AutoRestoreAndManualRestore) {
 
 TEST(ImeControllerTest, ExtractsSurroundingWordAtCaret) {
   const std::u16string text = u"hello tieng world";
-  const auto word = ExtractSurroundingWord(
-      reinterpret_cast<const uint16_t*>(text.data()),
-      static_cast<int32_t>(text.size()), 0, 11);
+  const SurroundingWord word =
+      ExtractSurroundingWord(reinterpret_cast<const uint16_t*>(text.data()),
+                             static_cast<int32_t>(text.size()), 0, 11);
   ASSERT_EQ(word.word_utf16.size(), 5u);
   EXPECT_EQ(word.caret_offset, 5);
+}
+
+TEST(ImeControllerTest,
+     SuspendsTransformsAndReversionWhenSystemKeyboardIncompatible) {
+  SettingsStore store(std::make_unique<InMemorySettingsBackend>());
+  ImeController controller(store);
+
+  EXPECT_TRUE(controller.is_vietnamese_enabled());
+  EXPECT_TRUE(controller.is_effectively_active());
+  EXPECT_EQ(TypeString(controller, u"roof "), u"r\u1ed3 ");
+
+  // Switching to a system IME / non-English layout resets the buffer and blocks
+  // both keystroke transforms/reversions and manual Dual-Shift restoration.
+  controller.SetSystemKeyboardCompatible(false);
+  EXPECT_TRUE(controller.is_vietnamese_enabled());
+  EXPECT_FALSE(controller.is_effectively_active());
+  EXPECT_FALSE(controller.RestoreCurrentWord().has_value());
+
+  for (char16_t ch : std::u16string_view(u"tieengs user, window ")) {
+    const uint16_t unit = static_cast<uint16_t>(ch);
+    EXPECT_FALSE(controller.HandleInput(&unit, 1, OKT_MOD_NONE).has_value());
+  }
+
+  // Switching back to an English keyboard layout resumes Telex automatically.
+  controller.SetSystemKeyboardCompatible(true);
+  EXPECT_TRUE(controller.is_effectively_active());
+  EXPECT_EQ(TypeString(controller, u"vieetj "), u"vi\u1ec7t ");
 }
 
 }  // namespace
