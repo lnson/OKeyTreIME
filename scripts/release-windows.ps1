@@ -270,8 +270,13 @@ if ($Publish) {
     $gh = Find-Tool @("gh")
     if ($gh) {
         Write-Host "==> Publishing $assetName to GitHub Release $Tag ($GitHubRepo)..."
-        & $gh release view $Tag --repo $GitHubRepo 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) {
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        & $gh release view $Tag --repo $GitHubRepo 2>&1 | Out-Null
+        $releaseExists = ($LASTEXITCODE -eq 0)
+        $ErrorActionPreference = $prevEap
+
+        if ($releaseExists) {
             Write-Host "    Release $Tag already exists - uploading/updating asset..."
             & $gh release upload $Tag $ZipPath --repo $GitHubRepo --clobber
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
