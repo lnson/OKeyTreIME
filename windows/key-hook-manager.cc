@@ -137,6 +137,9 @@ int TranslateKeyToUtf16(DWORD vk, DWORD scan_code, const ModifierSnapshot& mods,
   HWND fg = GetForegroundWindow();
   DWORD fg_thread = fg != nullptr ? GetWindowThreadProcessId(fg, nullptr) : 0;
   HKL layout = GetKeyboardLayout(fg_thread);
+  if (layout == nullptr) {
+    layout = GetKeyboardLayout(0);
+  }
 
   // Flag bit 2 (0x0004, Win10 1607+): do not modify keyboard dead-key state.
   constexpr UINT kDoNotChangeKeyboardState = 0x0004;
@@ -272,6 +275,16 @@ LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
     return 0;
   }
 
+  // Guard against unexpected hook re-entrancy.
+  if (in_keyboard_event_) {
+    return 0;
+  }
+  struct ReentrancyGuard {
+    bool& flag;
+    explicit ReentrancyGuard(bool& f) : flag(f) { flag = true; }
+    ~ReentrancyGuard() { flag = false; }
+  } guard(in_keyboard_event_);
+
   const bool is_key_down = (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN);
   const bool is_key_up = (wparam == WM_KEYUP || wparam == WM_SYSKEYUP);
   if (!is_key_down && !is_key_up) {
@@ -390,24 +403,40 @@ LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
 
 void KeyHookManager::SendEditAction(const ImeEditAction& action) {
   const int32_t extra_bs =
-      caret_reader_.GetSelectedRangeLength() > 0 ? 1 : 0;
+      (action.backspace_count > 0 && caret_reader_.GetSelectedRangeLength() > 0)
+          ? 1
+          : 0;
   const int32_t total_backspaces = action.backspace_count + extra_bs;
+
+  // If either Shift key is physically held (e.g. typing '?' via Shift+/ or
+  // pressing Left Shift + Right Shift to restore), temporarily release it
+  // around VK_BACK so target apps receive plain Backspace rather than
+  // Shift+Backspace, then restore the held Shift state afterwards.
+  const bool lshift_held =
+      total_backspaces > 0 && IsKeyDownAsync(VK_LSHIFT);
+  const bool rshift_held =
+      total_backspaces > 0 && IsKeyDownAsync(VK_RSHIFT);
 
   std::vector<INPUT> inputs;
   inputs.reserve(static_cast<size_t>(total_backspaces) * 2 +
-                 action.text.size() * 2);
+                 action.text.size() * 2 + 4);
+
+  auto push_vk = [&inputs](WORD vk, bool key_up) {
+    INPUT ev{};
+    ev.type = INPUT_KEYBOARD;
+    ev.ki.wVk = vk;
+    ev.ki.wScan = static_cast<WORD>(MapVirtualKeyW(vk, MAPVK_VK_TO_VSC));
+    ev.ki.dwFlags = key_up ? KEYEVENTF_KEYUP : 0;
+    ev.ki.dwExtraInfo = kMagicExtraInfo;
+    inputs.push_back(ev);
+  };
+
+  if (lshift_held) push_vk(VK_LSHIFT, /*key_up=*/true);
+  if (rshift_held) push_vk(VK_RSHIFT, /*key_up=*/true);
 
   for (int32_t i = 0; i < total_backspaces; ++i) {
-    INPUT down{};
-    down.type = INPUT_KEYBOARD;
-    down.ki.wVk = VK_BACK;
-    down.ki.wScan = static_cast<WORD>(MapVirtualKeyW(VK_BACK, MAPVK_VK_TO_VSC));
-    down.ki.dwExtraInfo = kMagicExtraInfo;
-    inputs.push_back(down);
-
-    INPUT up = down;
-    up.ki.dwFlags = KEYEVENTF_KEYUP;
-    inputs.push_back(up);
+    push_vk(VK_BACK, /*key_up=*/false);
+    push_vk(VK_BACK, /*key_up=*/true);
   }
 
   for (char16_t ch : action.text) {
@@ -422,6 +451,9 @@ void KeyHookManager::SendEditAction(const ImeEditAction& action) {
     up.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
     inputs.push_back(up);
   }
+
+  if (lshift_held) push_vk(VK_LSHIFT, /*key_up=*/false);
+  if (rshift_held) push_vk(VK_RSHIFT, /*key_up=*/false);
 
   if (!inputs.empty()) {
     SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));

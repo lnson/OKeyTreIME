@@ -27,8 +27,13 @@ struct ImeEditAction {
   bool operator==(const ImeEditAction& other) const = default;
 };
 
+// Returns true if `ch` terminates a word when extracting surrounding text from
+// an editor (standard Unicode word boundaries plus control chars and rich-text
+// DOM sentinels such as ZWSP U+200B, ZWNBSP U+FEFF, and ORC U+FFFC).
+bool IsCaretWordBoundary(uint16_t ch) noexcept;
+
 // Pure helper extracting the word surrounding `caret_location` in `text` using
-// `okeytre_is_word_boundary`.
+// `IsCaretWordBoundary`.
 SurroundingWord ExtractSurroundingWord(const uint16_t* text, int32_t text_len,
                                        int32_t text_offset,
                                        int32_t caret_location);

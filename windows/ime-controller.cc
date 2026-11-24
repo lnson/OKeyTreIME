@@ -8,6 +8,11 @@
 
 namespace okeytre::win {
 
+bool IsCaretWordBoundary(uint16_t ch) noexcept {
+  return ch < 0x0020 || ch == 0x200B || ch == 0xFEFF || ch == 0xFFFC ||
+         okeytre_is_word_boundary(ch);
+}
+
 SurroundingWord ExtractSurroundingWord(const uint16_t* text, int32_t text_len,
                                        int32_t text_offset,
                                        int32_t caret_location) {
@@ -19,12 +24,12 @@ SurroundingWord ExtractSurroundingWord(const uint16_t* text, int32_t text_len,
       std::clamp(caret_location - text_offset, 0, text_len);
 
   int32_t start = clamped_caret;
-  while (start > 0 && !okeytre_is_word_boundary(text[start - 1])) {
+  while (start > 0 && !IsCaretWordBoundary(text[start - 1])) {
     --start;
   }
 
   int32_t end = clamped_caret;
-  while (end < text_len && !okeytre_is_word_boundary(text[end])) {
+  while (end < text_len && !IsCaretWordBoundary(text[end])) {
     ++end;
   }
 
@@ -170,7 +175,8 @@ void ImeController::SeedCaretIfNeeded() {
     return;
   }
   const auto surrounding = caret_reader_();
-  if (!surrounding.has_value() || surrounding->word_utf16.empty()) {
+  if (!surrounding.has_value() || surrounding->word_utf16.empty() ||
+      surrounding->caret_offset <= 0) {
     return;
   }
   okeytre_buffer_seed_with_surrounding_text(
@@ -178,6 +184,39 @@ void ImeController::SeedCaretIfNeeded() {
       static_cast<int32_t>(surrounding->word_utf16.size()),
       surrounding->caret_offset);
 }
+
+namespace {
+
+bool ShouldSkipCaretSeedForInput(const uint16_t* input, int32_t input_len,
+                                 uint32_t modifiers) noexcept {
+  if (input == nullptr || input_len <= 0) {
+    return true;
+  }
+  if (input_len == 1) {
+    const uint16_t ch = input[0];
+    switch (ch) {
+      case 0x0009:  // Tab
+      case 0x000A:  // LF
+      case 0x000D:  // CR
+      case 0x001B:  // Escape
+      case 0xF700:  // Up
+      case 0xF701:  // Down
+      case 0xF729:  // Home
+      case 0xF72B:  // End
+      case 0xF72C:  // PageUp
+      case 0xF72D:  // PageDown
+        return true;
+      case 0xF702:  // Left
+      case 0xF703:  // Right
+        return (modifiers & OKT_MOD_SHIFT) != 0;
+      default:
+        break;
+    }
+  }
+  return false;
+}
+
+}  // namespace
 
 std::optional<ImeEditAction> ImeController::HandleInput(const uint16_t* input,
                                                         int32_t input_len,
@@ -191,7 +230,8 @@ std::optional<ImeEditAction> ImeController::HandleInput(const uint16_t* input,
 
   constexpr uint32_t kDisrupting =
       OKT_MOD_CONTROL | OKT_MOD_OPTION | OKT_MOD_COMMAND;
-  if ((modifiers & kDisrupting) == 0) {
+  if ((modifiers & kDisrupting) == 0 &&
+      !ShouldSkipCaretSeedForInput(input, input_len, modifiers)) {
     SeedCaretIfNeeded();
   }
 

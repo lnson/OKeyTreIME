@@ -72,6 +72,7 @@ class KeyHookManager {
   DualControlDetector dual_control_;
   AsyncCallbackFn on_toggle_requested_;
   AsyncCallbackFn on_foreground_changed_;
+  bool in_keyboard_event_ = false;
 };
 
 }  // namespace okeytre::win
