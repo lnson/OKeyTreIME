@@ -33,7 +33,7 @@ struct SettingsViewModel {
   bool is_checking_updates = false;
   bool did_confirm_up_to_date = false;
   std::optional<UpdateRelease> available_release;
-  std::wstring current_version = L"0.3.1";
+  std::wstring current_version = L"0.3.2";
 
   bool modern_tone = true;
   bool restore_invalid_words = true;

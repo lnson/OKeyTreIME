@@ -195,7 +195,7 @@ final class UpdateManager: ObservableObject {
            !version.hasPrefix("$(") {
             return version
         }
-        return "0.3.1"
+        return "0.3.2"
     }()
 
     @Published private(set) var availableRelease: UpdateRelease?
@@ -237,7 +237,7 @@ final class UpdateManager: ObservableObject {
         self.userDefaults = userDefaults
         self.currentVersion = currentVersion
             ?? AppVersion(Self.currentAppVersionString)
-            ?? AppVersion("0.3.1")!
+            ?? AppVersion("0.3.2")!
         self.dataLoader = dataLoader
         self.nowProvider = nowProvider
         self.openURLHandler = openURLHandler
