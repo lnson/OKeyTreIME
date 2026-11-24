@@ -12,6 +12,7 @@
 #   .\scripts\release-windows.ps1 0.4 -Open                # Bump Windows version to 0.4, build zip, reveal in Explorer
 #   .\scripts\release-windows.ps1 -Publish                 # Build & upload/create GitHub Release for current version
 #   .\scripts\release-windows.ps1 -PublishOnly             # Upload existing zip to GitHub Release without rebuilding
+#   .\scripts\release-windows.ps1 -Publish -SubmitSmartScreen # Also open Microsoft Security Intelligence submission
 
 [CmdletBinding()]
 param(
@@ -26,7 +27,8 @@ param(
     [switch]$Open,
     [switch]$Publish,
     [switch]$PublishOnly,
-    [switch]$Prerelease
+    [switch]$Prerelease,
+    [switch]$SubmitSmartScreen
 )
 
 $ErrorActionPreference = "Stop"
@@ -319,6 +321,15 @@ if ($Publish) {
     }
 }
 
-if ($Open) {
+if ($SubmitSmartScreen) {
+    $submitScript = Join-Path $ScriptDir "submit-smartscreen.ps1"
+    if (Test-Path $submitScript) {
+        if (Test-Path $StagedExe) {
+            & $submitScript -ExePath $StagedExe -Version $ResolvedVersion
+        } else {
+            & $submitScript -Version $ResolvedVersion
+        }
+    }
+} elseif ($Open) {
     Start-Process explorer.exe -ArgumentList "/select,`"$ZipPath`""
 }
