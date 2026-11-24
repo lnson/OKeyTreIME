@@ -92,8 +92,9 @@ void DrawFluentButton(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
 void DrawAppLogo(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
                  float corner_radius);
 
-// Renders a crisp DPI-aware vector tray HICON ("Vi |" active cursor, slashed
-// Off icon, or amber Warning triangle). Caller owns the returned HICON.
+// Renders a crisp DPI-aware tray HICON (bamboo-green calligraphic "V" when
+// active, red-framed slashed "V" when disabled, or amber Warning triangle).
+// Caller owns the returned HICON.
 HICON CreateTrayStatusIcon(TrayIconKind kind, bool dark_taskbar, UINT dpi);
 
 }  // namespace okeytre::win

@@ -310,10 +310,25 @@ void DrawAppLogo(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
 }
 
 HICON CreateTrayStatusIcon(TrayIconKind kind, bool dark_taskbar, UINT dpi) {
-  const int size = std::max(16, ScaleDpi(16, dpi));
+  const int sm_icon = GetSystemMetricsForDpi(SM_CXSMICON, dpi);
+  const int size = std::max({16, sm_icon, ScaleDpi(16, dpi)});
+
+  if (kind == TrayIconKind::kVietnameseActive || kind == TrayIconKind::kOff) {
+    const WORD res_id = (kind == TrayIconKind::kVietnameseActive)
+                            ? IDI_TRAY_VI_ICON
+                            : IDI_TRAY_OFF_ICON;
+    HICON loaded = static_cast<HICON>(LoadImageW(
+        GetModuleHandleW(nullptr), MAKEINTRESOURCEW(res_id), IMAGE_ICON, size,
+        size, LR_DEFAULTCOLOR));
+    if (loaded != nullptr) {
+      return loaded;
+    }
+  }
+
   Gdiplus::Bitmap bmp(size, size, PixelFormat32bppARGB);
   Gdiplus::Graphics g(&bmp);
-  g.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+  g.SetSmoothingMode(Gdiplus::SmoothingModeHighQuality);
+  g.SetPixelOffsetMode(Gdiplus::PixelOffsetModeHighQuality);
   g.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
   g.Clear(Gdiplus::Color(0, 0, 0, 0));
 
@@ -322,32 +337,8 @@ HICON CreateTrayStatusIcon(TrayIconKind kind, bool dark_taskbar, UINT dpi) {
                                          : Gdiplus::Color(255, 28, 28, 30);
 
   switch (kind) {
-    case TrayIconKind::kVietnameseActive: {
-      // Crisp "Vi" + vertical I-beam cursor mirroring macOS vietnameseCursorIcon.
-      const std::wstring family = PreferredFontFamily();
-      Gdiplus::Font font(family.c_str(), s * 0.64f, Gdiplus::FontStyleBold,
-                         Gdiplus::UnitPixel);
-      Gdiplus::SolidBrush text_brush(fg);
-      Gdiplus::StringFormat fmt;
-      fmt.SetAlignment(Gdiplus::StringAlignmentNear);
-      fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
-      Gdiplus::RectF text_rect(-s * 0.04f, s * 0.02f, s * 0.78f, s * 0.96f);
-      g.DrawString(L"Vi", 2, &font, text_rect, &fmt, &text_brush);
-
-      // Rounded I-beam on the right edge.
-      const float stroke = std::max(1.2f, s * 0.085f);
-      Gdiplus::Pen pen(fg, stroke);
-      pen.SetStartCap(Gdiplus::LineCapRound);
-      pen.SetEndCap(Gdiplus::LineCapRound);
-      const float cx = s * 0.84f;
-      const float top_y = s * 0.16f;
-      const float bot_y = s * 0.84f;
-      const float half_bar = s * 0.12f;
-      g.DrawLine(&pen, cx, top_y, cx, bot_y);
-      g.DrawLine(&pen, cx - half_bar, top_y, cx + half_bar, top_y);
-      g.DrawLine(&pen, cx - half_bar, bot_y, cx + half_bar, bot_y);
+    case TrayIconKind::kVietnameseActive:
       break;
-    }
 
     case TrayIconKind::kOff: {
       // Clean slashed circle ("nosign").

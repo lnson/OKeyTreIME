@@ -131,11 +131,13 @@ genrule(
         "resources/okeytre.manifest",
         "resources/okeytre.rc",
         "resources/resource.h",
+        "resources/tray-off.ico",
+        "resources/tray-vi.ico",
     ],
     outs = ["okeytre.res"],
     cmd = "echo 'Windows resource compilation requires Windows' >&2 && exit 1",
     cmd_bat = (
-        "powershell -NoProfile -ExecutionPolicy Bypass -Command \"" +
+        "%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"" +
         "$$rc = (Get-Command rc.exe -ErrorAction SilentlyContinue).Source; " +
         "if (-not $$rc) { $$rc = (Get-ChildItem 'C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.*\\x64\\rc.exe' | Sort-Object FullName -Descending | Select-Object -First 1).FullName }; " +
         "if (-not $$rc) { throw 'Windows SDK rc.exe not found' }; " +
