@@ -99,7 +99,7 @@ Write-Host "==> Built: $exePath"
 
 if ($Package) {
     $versionHeader = Get-Content (Join-Path $RepoRoot "windows\resources\resource.h") -Raw
-    $version = "0.3"
+    $version = "0.3.1"
     if ($versionHeader -match 'OKT_VERSION_STRING\s+"([^"]+)"') {
         $version = $Matches[1]
     }

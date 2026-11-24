@@ -13,7 +13,7 @@
 
 namespace okeytre::win {
 
-inline constexpr std::string_view kCurrentAppVersionString = "0.3";
+inline constexpr std::string_view kCurrentAppVersionString = "0.3.1";
 inline constexpr std::string_view kCurrentFeatureMilestoneVersionString = "0.3";
 
 // Semantic version parser and comparator with SemVer 2.0.0 prerelease ordering
