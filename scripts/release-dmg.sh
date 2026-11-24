@@ -318,16 +318,45 @@ if [[ "$PUBLISH_RELEASE" -eq 1 ]]; then
 
   echo "==> Publishing ${TAG} (${HEAD_SHA:0:7}) to GitHub (${GITHUB_REPO})..."
   if command -v gh >/dev/null 2>&1; then
-    GH_FLAGS=(--repo "$GITHUB_REPO" --target "$HEAD_SHA" --title "ÔKêyTre ${TAG}" --notes "$RELEASE_NOTES")
-    if [[ "$PRERELEASE" -eq 1 ]]; then
-      GH_FLAGS+=(--prerelease)
+    if gh release view "$TAG" --repo "$GITHUB_REPO" >/dev/null 2>&1; then
+      echo "    Release ${TAG} already exists - uploading/updating asset..."
+      gh release upload "$TAG" "$DMG_PATH" --repo "$GITHUB_REPO" --clobber
+      echo "✅ Published to GitHub Releases: https://github.com/${GITHUB_REPO}/releases/tag/${TAG}"
     else
-      GH_FLAGS+=(--latest)
+      GH_FLAGS=(--repo "$GITHUB_REPO" --target "$HEAD_SHA" --title "ÔKêyTre ${TAG}" --notes "$RELEASE_NOTES")
+      if [[ "$PRERELEASE" -eq 1 ]]; then
+        GH_FLAGS+=(--prerelease)
+      else
+        GH_FLAGS+=(--latest)
+      fi
+      gh release create "$TAG" "$DMG_PATH" "${GH_FLAGS[@]}"
     fi
-    gh release create "$TAG" "$DMG_PATH" "${GH_FLAGS[@]}"
   elif [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    IS_PRERELEASE=$([[ "$PRERELEASE" -eq 1 ]] && echo "true" || echo "false")
-    CREATE_PAYLOAD="$(python3 -c '
+    DMG_NAME="$(basename "$DMG_PATH")"
+    if RESPONSE="$(curl -fsSL \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${TAG}" 2>/dev/null)"; then
+      echo "    Release ${TAG} already exists - replacing existing asset if present..."
+      EXISTING_ASSET_ID="$(python3 -c '
+import json, sys
+name = sys.argv[1]
+for asset in json.loads(sys.stdin.read()).get("assets", []):
+    if asset.get("name") == name:
+        print(asset["id"])
+        break
+' "$DMG_NAME" <<<"$RESPONSE")"
+      if [[ -n "$EXISTING_ASSET_ID" ]]; then
+        curl -fsSL -X DELETE \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "https://api.github.com/repos/${GITHUB_REPO}/releases/assets/${EXISTING_ASSET_ID}" >/dev/null
+      fi
+    else
+      IS_PRERELEASE=$([[ "$PRERELEASE" -eq 1 ]] && echo "true" || echo "false")
+      CREATE_PAYLOAD="$(python3 -c '
 import json, sys
 tag, sha, notes, pre = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "true"
 print(json.dumps({
@@ -340,12 +369,13 @@ print(json.dumps({
 }))
 ' "$TAG" "$HEAD_SHA" "$RELEASE_NOTES" "$IS_PRERELEASE")"
 
-    RESPONSE="$(curl -fsSL -X POST \
-      -H "Accept: application/vnd.github+json" \
-      -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      "https://api.github.com/repos/${GITHUB_REPO}/releases" \
-      -d "$CREATE_PAYLOAD")"
+      RESPONSE="$(curl -fsSL -X POST \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/${GITHUB_REPO}/releases" \
+        -d "$CREATE_PAYLOAD")"
+    fi
 
     UPLOAD_URL="$(python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["upload_url"].split("{")[0])' <<<"$RESPONSE")"
     HTML_URL="$(python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["html_url"])' <<<"$RESPONSE")"
@@ -356,7 +386,7 @@ print(json.dumps({
       -H "X-GitHub-Api-Version: 2022-11-28" \
       -H "Content-Type: application/x-apple-diskimage" \
       --data-binary @"$DMG_PATH" \
-      "${UPLOAD_URL}?name=$(basename "$DMG_PATH")" >/dev/null
+      "${UPLOAD_URL}?name=${DMG_NAME}" >/dev/null
 
     echo "✅ Published release: ${HTML_URL}"
   else
