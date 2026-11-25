@@ -10,10 +10,7 @@ import CoreGraphics
 
 /// Supported Vietnamese input method styles (plus `.off` to pass keystrokes through untouched).
 enum InputMethodStyle: String, CaseIterable, Identifiable {
-    case off = "off"
-    case telex = "telex"
-    case vni = "vni"
-    case viqr = "viqr"
+    case off, telex, vni, viqr
 
     var id: String { rawValue }
 
@@ -42,17 +39,6 @@ enum InputMethodStyle: String, CaseIterable, Identifiable {
             return OKT_STYLE_VNI
         case .viqr:
             return OKT_STYLE_VIQR
-        }
-    }
-
-    fileprivate init(cStyle: OKTInputMethodStyle) {
-        switch cStyle {
-        case OKT_STYLE_VNI:
-            self = .vni
-        case OKT_STYLE_VIQR:
-            self = .viqr
-        default:
-            self = .telex
         }
     }
 }
@@ -91,7 +77,7 @@ final class InputMethodBuffer {
     static let maxAllowedBufferSize = Int(OKT_BUFFER_MAX_SIZE)
 
     private let rawBuffer: OpaquePointer
-    private var isOff: Bool
+    private(set) var style: InputMethodStyle
 
     deinit {
         okeytre_buffer_destroy(rawBuffer)
@@ -102,16 +88,11 @@ final class InputMethodBuffer {
         set { okeytre_buffer_set_max_size(rawBuffer, Int32(newValue)) }
     }
 
-    var style: InputMethodStyle {
-        isOff ? .off : InputMethodStyle(cStyle: okeytre_buffer_get_style(rawBuffer))
-    }
-
     func setStyle(_ newStyle: InputMethodStyle) {
+        style = newStyle
         if newStyle == .off {
-            isOff = true
             reset()
         } else {
-            isOff = false
             okeytre_buffer_set_style(rawBuffer, newStyle.cStyle)
         }
     }
@@ -142,27 +123,21 @@ final class InputMethodBuffer {
     }
 
     static func resolvedModernTone(from defaults: UserDefaults = .standard) -> Bool {
-        if let value = defaults.object(forKey: modernToneDefaultsKey) as? Bool {
-            return value
-        }
-        return defaultModernTone
+        defaults.object(forKey: modernToneDefaultsKey) as? Bool ?? defaultModernTone
     }
 
     static func resolvedRestoreInvalidWords(from defaults: UserDefaults = .standard) -> Bool {
-        if let value = defaults.object(forKey: restoreInvalidWordsDefaultsKey) as? Bool {
-            return value
-        }
-        return defaultRestoreInvalidWords
+        defaults.object(forKey: restoreInvalidWordsDefaultsKey) as? Bool ?? defaultRestoreInvalidWords
     }
 
     init(
         style: InputMethodStyle = .telex,
-        modernTone: Bool = InputMethodBuffer.defaultModernTone,
+        modernTone: Bool = defaultModernTone,
         uoHorn: Bool = false,
         ngToNgh: Bool = false,
         nghToNg: Bool = false,
-        restoreInvalidWords: Bool = InputMethodBuffer.defaultRestoreInvalidWords,
-        maxBufferSize: Int = InputMethodBuffer.defaultMaxBufferSize
+        restoreInvalidWords: Bool = defaultRestoreInvalidWords,
+        maxBufferSize: Int = defaultMaxBufferSize
     ) {
         self.rawBuffer = okeytre_buffer_create(
             style.cStyle,
@@ -173,7 +148,7 @@ final class InputMethodBuffer {
             Int32(maxBufferSize)
         )!
         okeytre_buffer_set_restore_invalid_words(self.rawBuffer, restoreInvalidWords)
-        self.isOff = (style == .off)
+        self.style = style
     }
 
     func reset() {
@@ -230,11 +205,10 @@ final class InputMethodBuffer {
 
     @discardableResult
     func restoreCurrentWord() -> Action? {
-        guard !isOff else { return nil }
-        let buffer = rawBuffer
+        guard style.isVietnameseEnabled else { return nil }
         return Self.decodeAction { outBuf, backspaceCount, outLen in
             okeytre_buffer_restore_current_word(
-                buffer,
+                rawBuffer,
                 &backspaceCount,
                 outBuf.baseAddress,
                 Int32(outBuf.count),
@@ -245,20 +219,17 @@ final class InputMethodBuffer {
 
     @discardableResult
     func handleInput(_ input: UnsafeBufferPointer<UniChar>, flags: CGEventFlags = []) -> Action? {
-        guard !isOff else { return nil }
-        let disruptingModifiers: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate]
-        if flags.intersection(disruptingModifiers).isEmpty {
+        guard style.isVietnameseEnabled else { return nil }
+        if flags.intersection(.disruptingModifiers).isEmpty {
             seedCaretIfNeeded()
         }
 
-        let modifiers = Self.toOKTModifiers(flags)
-        let buffer = rawBuffer
         return Self.decodeAction { outBuf, backspaceCount, outLen in
             okeytre_buffer_handle_input(
-                buffer,
+                rawBuffer,
                 input.baseAddress,
                 Int32(input.count),
-                modifiers,
+                Self.toOKTModifiers(flags),
                 &backspaceCount,
                 outBuf.baseAddress,
                 Int32(outBuf.count),

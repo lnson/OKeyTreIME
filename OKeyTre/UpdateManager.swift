@@ -227,13 +227,7 @@ final class UpdateManager: ObservableObject {
             NSWorkspace.shared.open(url)
         }
     ) {
-        let env = ProcessInfo.processInfo.environment
-        self.isAutomatedEnvironment = isAutomatedEnvironment ?? (
-            env["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
-                || env["XCTestConfigurationFilePath"] != nil
-                || env["XCTestBundlePath"] != nil
-                || env["XCTestSessionIdentifier"] != nil
-        )
+        self.isAutomatedEnvironment = isAutomatedEnvironment ?? ProcessInfo.isAutomatedEnvironment
         self.userDefaults = userDefaults
         self.currentVersion = currentVersion
             ?? AppVersion(Self.currentAppVersionString)
@@ -251,10 +245,7 @@ final class UpdateManager: ObservableObject {
     }
 
     static func resolvedAutoCheckEnabled(from defaults: UserDefaults = .standard) -> Bool {
-        if let value = defaults.object(forKey: autoCheckDefaultsKey) as? Bool {
-            return value
-        }
-        return defaultAutoCheck
+        defaults.object(forKey: autoCheckDefaultsKey) as? Bool ?? defaultAutoCheck
     }
 
     deinit {

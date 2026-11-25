@@ -87,8 +87,7 @@ struct DualShiftDetector {
             return false
         }
 
-        let disruptingModifiers: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate]
-        guard flags.intersection(disruptingModifiers).isEmpty else {
+        guard flags.intersection(.disruptingModifiers).isEmpty else {
             return false
         }
 
@@ -301,8 +300,7 @@ final class KeyTapManager: ObservableObject {
             .removeDuplicates()
             .dropFirst()
             .sink { [weak self] _ in
-                self?.dualShiftDetector.reset()
-                self?.inputMethodBuffer.reset()
+                self?.resetTypingState()
                 DispatchQueue.main.async {
                     MenuBarStatusView.refreshStatusBarTooltip()
                 }
@@ -314,9 +312,7 @@ final class KeyTapManager: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            self?.dualShiftDetector.reset()
-            self?.dualCommandDetector.reset()
-            self?.inputMethodBuffer.reset()
+            self?.resetTypingState(includeCommand: true)
             InputSourceManager.shared.updateCurrentSource()
             guard PermissionManager.shared.verifyPermissionNow() else { return }
             if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication {
@@ -378,8 +374,7 @@ final class KeyTapManager: ObservableObject {
             mouseMonitor = NSEvent.addGlobalMonitorForEvents(
                 matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
             ) { [weak self] _ in
-                self?.dualShiftDetector.reset()
-                self?.inputMethodBuffer.reset()
+                self?.resetTypingState()
             }
         }
 
@@ -395,19 +390,23 @@ final class KeyTapManager: ObservableObject {
             NSEvent.removeMonitor(monitor)
             mouseMonitor = nil
         }
-        dualShiftDetector.reset()
-        dualCommandDetector.reset()
-        inputMethodBuffer.reset()
+        resetTypingState(includeCommand: true)
         if hadTap {
             print("Event Tap turned off")
         }
     }
 
+    private func resetTypingState(includeCommand: Bool = false) {
+        dualShiftDetector.reset()
+        if includeCommand {
+            dualCommandDetector.reset()
+        }
+        inputMethodBuffer.reset()
+    }
+
     private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         if type == .tapDisabledByUserInput || type == .tapDisabledByTimeout {
-            dualShiftDetector.reset()
-            dualCommandDetector.reset()
-            inputMethodBuffer.reset()
+            resetTypingState(includeCommand: true)
             // Verify live authorization via `WindowServer` + cross-process AX IPC rather than
             // `AXIsProcessTrusted()`'s stale cache before ever re-enabling a disabled tap.
             if PermissionManager.shared.verifyPermissionNow() {
@@ -461,8 +460,7 @@ final class KeyTapManager: ObservableObject {
             return nil
         }
         guard isEffectivelyActive else {
-            dualShiftDetector.reset()
-            inputMethodBuffer.reset()
+            resetTypingState()
             return nil
         }
         if dualShiftDetector.shouldTriggerRestore(keyCode: keyCode, flags: flags) {
@@ -478,8 +476,7 @@ final class KeyTapManager: ObservableObject {
         dualCommandDetector.noteNonModifierKeyDown()
 
         guard isEffectivelyActive else {
-            dualShiftDetector.reset()
-            inputMethodBuffer.reset()
+            resetTypingState()
             return nil
         }
 
@@ -490,10 +487,8 @@ final class KeyTapManager: ObservableObject {
         // If Command (⌘), Control (⌃), or Option (⌥) is held down (e.g. Cmd+A, Cmd+C, Cmd+V,
         // Ctrl+A, Option+Left), reset the buffer and pass the event through untouched without
         // querying AXUIElement or combining with the existing buffer.
-        let disruptingModifiers: CGEventFlags = [.maskCommand, .maskControl, .maskAlternate]
-        if !flags.intersection(disruptingModifiers).isEmpty {
-            dualShiftDetector.reset()
-            inputMethodBuffer.reset()
+        if !flags.intersection(.disruptingModifiers).isEmpty {
+            resetTypingState()
             return nil
         }
 
