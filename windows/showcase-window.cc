@@ -18,7 +18,6 @@ namespace {
 constexpr wchar_t kShowcaseClassName[] = L"OKeyTreShowcaseWindowClass";
 
 enum ControlId : int {
-  kIdComboLanguage = 3001,
   kIdEditPractice = 3002,
 };
 
@@ -270,11 +269,8 @@ void ShowcaseWindow::UpdateFontsAndBrushes() {
   practice_font_ = CreateUiFont(11, FW_NORMAL, dpi_);
   brush_card_ = CreateSolidBrush(palette_.win32_card_bg);
 
-  if (combo_language_ != nullptr) {
-    SendMessageW(combo_language_, WM_SETFONT,
-                 reinterpret_cast<WPARAM>(ui_font_), TRUE);
-  }
   if (edit_practice_ != nullptr) {
+    ApplyControlTheme(edit_practice_, palette_.dark);
     SendMessageW(edit_practice_, WM_SETFONT,
                  reinterpret_cast<WPARAM>(practice_font_), TRUE);
   }
@@ -283,15 +279,9 @@ void ShowcaseWindow::UpdateFontsAndBrushes() {
 void ShowcaseWindow::CreateChildControls() {
   HINSTANCE hinst = GetModuleHandleW(nullptr);
 
-  combo_language_ = CreateWindowExW(
-      0, WC_COMBOBOXW, L"",
-      WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST, 0, 0, 128, 160,
-      hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdComboLanguage)),
-      hinst, nullptr);
-
   edit_practice_ = CreateWindowExW(
-      WS_EX_CLIENTEDGE, WC_EDITW, L"",
-      WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 0, 0, 560, 34, hwnd_,
+      0, WC_EDITW, L"", WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL, 0,
+      0, 560, 22, hwnd_,
       reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdEditPractice)), hinst,
       nullptr);
 
@@ -301,24 +291,6 @@ void ShowcaseWindow::CreateChildControls() {
 void ShowcaseWindow::SyncControlsFromModel() {
   if (hwnd_ == nullptr) return;
   updating_controls_ = true;
-
-  if (combo_language_ != nullptr) {
-    SendMessageW(combo_language_, CB_RESETCONTENT, 0, 0);
-    const std::wstring_view s_sys =
-        LanguageDisplayName(AppLanguage::kSystem, model_.language);
-    const std::wstring_view s_vi =
-        LanguageDisplayName(AppLanguage::kVietnamese, model_.language);
-    const std::wstring_view s_en =
-        LanguageDisplayName(AppLanguage::kEnglish, model_.language);
-    SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_sys.data()));
-    SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_vi.data()));
-    SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_en.data()));
-    SendMessageW(combo_language_, CB_SETCURSEL,
-                 static_cast<WPARAM>(model_.language), 0);
-  }
 
   if (edit_practice_ != nullptr) {
     const std::wstring_view placeholder =
@@ -338,15 +310,14 @@ void ShowcaseWindow::LayoutChildControls() {
   const int width = rc.right - rc.left;
   const int pad_x = ScaleDpi(26, dpi_);
 
-  if (combo_language_ != nullptr) {
-    const int cb_w = ScaleDpi(132, dpi_);
-    MoveWindow(combo_language_, width - pad_x - cb_w, ScaleDpi(12, dpi_), cb_w,
-               ScaleDpi(160, dpi_), TRUE);
-  }
-
   if (edit_practice_ != nullptr) {
-    MoveWindow(edit_practice_, pad_x, ScaleDpi(476, dpi_), width - pad_x * 2,
-               ScaleDpi(34, dpi_), TRUE);
+    const int inset_x = ScaleDpi(12, dpi_);
+    const int box_y = ScaleDpi(476, dpi_);
+    const int box_h = ScaleDpi(34, dpi_);
+    const int edit_h = ScaleDpi(20, dpi_);
+    const int edit_y = box_y + (box_h - edit_h) / 2;
+    MoveWindow(edit_practice_, pad_x + inset_x, edit_y,
+               width - (pad_x + inset_x) * 2, edit_h, TRUE);
   }
 }
 
@@ -379,12 +350,24 @@ void ShowcaseWindow::Paint() {
     const float pad_x = ScaleDpiF(26.0f, dpi_);
     const float content_w = static_cast<float>(width) - pad_x * 2.0f;
 
-    // Globe icon to the left of the language combobox.
+    // Fluent language selector + globe icon in top-right.
+    const float dd_w = ScaleDpiF(132.0f, dpi_);
+    const float dd_h = ScaleDpiF(26.0f, dpi_);
+    dropdown_language_rect_ = Gdiplus::RectF(
+        static_cast<float>(width) - pad_x - dd_w, ScaleDpiF(12.0f, dpi_), dd_w,
+        dd_h);
+    DrawFluentDropdown(
+        g, dropdown_language_rect_,
+        LanguageDisplayName(model_.language, model_.language),
+        hovered_target_ == HitTargetKind::kDropdownLanguage, palette_, dpi_);
+    hit_regions_.push_back(
+        {HitTargetKind::kDropdownLanguage, dropdown_language_rect_});
+
     const float globe_sz = ScaleDpiF(14.0f, dpi_);
-    const float globe_x = static_cast<float>(width) - pad_x -
-                          ScaleDpiF(132.0f, dpi_) - globe_sz -
+    const float globe_x = dropdown_language_rect_.X - globe_sz -
                           ScaleDpiF(7.0f, dpi_);
-    const float globe_y = ScaleDpiF(17.0f, dpi_);
+    const float globe_y =
+        dropdown_language_rect_.Y + (dd_h - globe_sz) * 0.5f;
     Gdiplus::Pen globe_pen(palette_.text_secondary, ScaleDpiF(1.2f, dpi_));
     g.DrawEllipse(&globe_pen, globe_x, globe_y, globe_sz, globe_sz);
     g.DrawEllipse(&globe_pen, globe_x + globe_sz * 0.26f, globe_y,
@@ -432,8 +415,19 @@ void ShowcaseWindow::Paint() {
     // 2x2 Feature Cards Grid
     PaintFeatureGrid(g, pad_x, ScaleDpiF(232.0f, dpi_), content_w);
 
-    // Practice Sandbox Header
+    // Practice Sandbox Header & Fluent Rounded Input Box
     PaintPracticeHeader(g, pad_x, ScaleDpiF(450.0f, dpi_), content_w);
+    Gdiplus::RectF practice_box(pad_x, ScaleDpiF(476.0f, dpi_), content_w,
+                                ScaleDpiF(34.0f, dpi_));
+    const float practice_r = ScaleDpiF(7.0f, dpi_);
+    const bool practice_focused =
+        (edit_practice_ != nullptr && GetFocus() == edit_practice_);
+    FillRoundedRect(g, practice_box, practice_r, palette_.card_bg);
+    StrokeRoundedRect(
+        g, practice_box, practice_r,
+        practice_focused ? palette_.accent_teal : palette_.control_border,
+        practice_focused ? 1.4f : 1.0f);
+    hit_regions_.push_back({HitTargetKind::kPracticeBox, practice_box});
 
     // Footer Bar
     PaintFooter(g, pad_x, ScaleDpiF(528.0f, dpi_), content_w);
@@ -634,12 +628,18 @@ void ShowcaseWindow::PaintFeatureGrid(Gdiplus::Graphics& g, float x, float y,
     title_fmt.SetFormatFlags(Gdiplus::StringFormatFlagsNoWrap);
     title_fmt.SetTrimming(Gdiplus::StringTrimmingEllipsisCharacter);
 
+    const float badge_space =
+        (cards[i].show_new_badge && !new_badge.empty())
+            ? MeasureTextWidth(g, new_badge, badge_font) +
+                  ScaleDpiF(18.0f, dpi_)
+            : 0.0f;
+    const float max_title_w = card_w - pad * 2.0f - badge_space;
     const float title_w =
-        std::min(card_w - pad * 2.0f - (cards[i].show_new_badge
-                                            ? ScaleDpiF(42.0f, dpi_)
-                                            : 0.0f),
-                 MeasureTextWidth(g, title, card_title_font) +
-                     ScaleDpiF(4.0f, dpi_));
+        (cards[i].show_new_badge && !new_badge.empty())
+            ? std::min(max_title_w,
+                       MeasureTextWidth(g, title, card_title_font) +
+                           ScaleDpiF(14.0f, dpi_))
+            : max_title_w;
     g.DrawString(title.data(), static_cast<INT>(title.size()),
                  &card_title_font,
                  Gdiplus::RectF(cx + pad, cy + ScaleDpiF(9.0f, dpi_), title_w,
@@ -789,8 +789,38 @@ ShowcaseWindow::HitTargetKind ShowcaseWindow::HitTest(int x, int y) const {
   return HitTargetKind::kNone;
 }
 
+void ShowcaseWindow::ShowLanguageMenu() {
+  HMENU menu = CreatePopupMenu();
+  if (menu == nullptr) {
+    return;
+  }
+  const AppLanguage langs[] = {AppLanguage::kSystem, AppLanguage::kVietnamese,
+                               AppLanguage::kEnglish};
+  for (int i = 0; i < 3; ++i) {
+    const UINT flags =
+        MF_STRING | (model_.language == langs[i] ? MF_CHECKED : 0);
+    AppendMenuW(menu, flags, static_cast<UINT_PTR>(i + 1),
+                LanguageDisplayName(langs[i], model_.language).data());
+  }
+  POINT pt{static_cast<LONG>(dropdown_language_rect_.X),
+           static_cast<LONG>(dropdown_language_rect_.GetBottom() +
+                             ScaleDpiF(2.0f, dpi_))};
+  RefreshNativeMenuTheme(palette_.dark);
+  ClientToScreen(hwnd_, &pt);
+  const UINT cmd = static_cast<UINT>(TrackPopupMenuEx(
+      menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY, pt.x,
+      pt.y, hwnd_, nullptr));
+  DestroyMenu(menu);
+  if (cmd >= 1 && cmd <= 3 && callbacks_.on_select_language) {
+    callbacks_.on_select_language(langs[cmd - 1]);
+  }
+}
+
 void ShowcaseWindow::HandleClick(HitTargetKind target) {
   switch (target) {
+    case HitTargetKind::kDropdownLanguage:
+      ShowLanguageMenu();
+      break;
     case HitTargetKind::kButtonSwitchToUs:
       if (callbacks_.on_switch_to_us) callbacks_.on_switch_to_us();
       break;
@@ -811,6 +841,11 @@ void ShowcaseWindow::HandleClick(HitTargetKind target) {
       break;
     case HitTargetKind::kButtonGetStarted:
       Close();
+      break;
+    case HitTargetKind::kPracticeBox:
+      if (edit_practice_ != nullptr) {
+        SetFocus(edit_practice_);
+      }
       break;
     case HitTargetKind::kNone:
       break;
@@ -884,7 +919,10 @@ LRESULT ShowcaseWindow::HandleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
     case WM_SETCURSOR:
       if (LOWORD(lparam) == HTCLIENT &&
           hovered_target_ != HitTargetKind::kNone) {
-        SetCursor(LoadCursorW(nullptr, IDC_HAND));
+        SetCursor(LoadCursorW(nullptr,
+                              hovered_target_ == HitTargetKind::kPracticeBox
+                                  ? IDC_IBEAM
+                                  : IDC_HAND));
         return TRUE;
       }
       break;
@@ -909,18 +947,17 @@ LRESULT ShowcaseWindow::HandleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
       if (updating_controls_) return 0;
       const int id = LOWORD(wparam);
       const int code = HIWORD(wparam);
-      if (id == kIdComboLanguage && code == CBN_SELCHANGE) {
-        const LRESULT idx = SendMessageW(combo_language_, CB_GETCURSEL, 0, 0);
-        if (idx >= 0 && idx <= 2 && callbacks_.on_select_language) {
-          callbacks_.on_select_language(static_cast<AppLanguage>(idx));
-        }
+      if (id == kIdEditPractice &&
+          (code == EN_SETFOCUS || code == EN_KILLFOCUS)) {
+        InvalidateRect(hwnd_, nullptr, FALSE);
         return 0;
       }
       break;
     }
 
     case WM_CTLCOLOREDIT:
-    case WM_CTLCOLORLISTBOX: {
+    case WM_CTLCOLORLISTBOX:
+    case WM_CTLCOLORSTATIC: {
       HDC dc = reinterpret_cast<HDC>(wparam);
       SetTextColor(dc, palette_.win32_text_primary);
       SetBkColor(dc, palette_.win32_card_bg);
@@ -933,7 +970,6 @@ LRESULT ShowcaseWindow::HandleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
 
     case WM_NCDESTROY:
       hwnd_ = nullptr;
-      combo_language_ = nullptr;
       edit_practice_ = nullptr;
       hovered_target_ = HitTargetKind::kNone;
       tracking_mouse_ = false;

@@ -52,11 +52,13 @@ class ShowcaseWindow {
  private:
   enum class HitTargetKind : uint8_t {
     kNone,
+    kDropdownLanguage,
     kButtonSwitchToUs,
     kSegmentTelex,
     kSegmentVni,
     kSegmentViqr,
     kButtonGetStarted,
+    kPracticeBox,
   };
 
   struct HitRegion {
@@ -81,6 +83,7 @@ class ShowcaseWindow {
 
   HitTargetKind HitTest(int x, int y) const;
   void HandleClick(HitTargetKind target);
+  void ShowLanguageMenu();
   std::wstring ResolveWindowTitle() const;
 
   ShowcaseCallbacks callbacks_;
@@ -88,7 +91,6 @@ class ShowcaseWindow {
   std::vector<HitRegion> hit_regions_;
 
   HWND hwnd_ = nullptr;
-  HWND combo_language_ = nullptr;
   HWND edit_practice_ = nullptr;
 
   HFONT ui_font_ = nullptr;
@@ -96,6 +98,7 @@ class ShowcaseWindow {
   HBRUSH brush_card_ = nullptr;
 
   ThemePalette palette_;
+  Gdiplus::RectF dropdown_language_rect_;
   UINT dpi_ = 96;
   HitTargetKind hovered_target_ = HitTargetKind::kNone;
   bool updating_controls_ = false;
