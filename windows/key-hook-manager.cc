@@ -6,6 +6,7 @@
 #include <array>
 #include <vector>
 
+#include "absl/cleanup/cleanup.h"
 #include "windows/input-source-manager.h"
 
 namespace okeytre::win {
@@ -279,11 +280,9 @@ LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
   if (in_keyboard_event_) {
     return 0;
   }
-  struct ReentrancyGuard {
-    bool& flag;
-    explicit ReentrancyGuard(bool& f) : flag(f) { flag = true; }
-    ~ReentrancyGuard() { flag = false; }
-  } guard(in_keyboard_event_);
+  in_keyboard_event_ = true;
+  const auto reset_guard =
+      absl::MakeCleanup([this]() { in_keyboard_event_ = false; });
 
   const bool is_key_down = (wparam == WM_KEYDOWN || wparam == WM_SYSKEYDOWN);
   const bool is_key_up = (wparam == WM_KEYUP || wparam == WM_SYSKEYUP);

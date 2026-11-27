@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <oleauto.h>
 #include <uiautomation.h>
+#include <wrl/client.h>
 
 #include <algorithm>
 #include <chrono>
@@ -24,42 +25,17 @@ constexpr auto kSelectionWaitBudget = std::chrono::milliseconds(25);
 constexpr int32_t kWindowRadiusChars = 64;
 constexpr int32_t kMaxClassicEditLen = 65536;
 
-template <typename T>
-class ComPtr {
- public:
-  ComPtr() = default;
-  ~ComPtr() { Reset(); }
-
-  ComPtr(const ComPtr&) = delete;
-  ComPtr& operator=(const ComPtr&) = delete;
-
-  T** Put() noexcept {
-    Reset();
-    return &ptr_;
-  }
-  T* Get() const noexcept { return ptr_; }
-  T* operator->() const noexcept { return ptr_; }
-  explicit operator bool() const noexcept { return ptr_ != nullptr; }
-
-  void Reset() noexcept {
-    if (ptr_ != nullptr) {
-      ptr_->Release();
-      ptr_ = nullptr;
-    }
-  }
-
- private:
-  T* ptr_ = nullptr;
-};
+using Microsoft::WRL::ComPtr;
 
 bool IsClassicEditClass(HWND hwnd) {
   wchar_t cls[64] = {};
   if (GetClassNameW(hwnd, cls, 64) == 0) {
     return false;
   }
+  // Matches RichEdit, RichEdit20W, RICHEDIT50W, RICHEDIT60W, etc.
+  constexpr std::wstring_view kRichEditPrefix = L"RichEdit";
   return _wcsicmp(cls, L"Edit") == 0 ||
-         _wcsnicmp(cls, L"RichEdit", 8) == 0 ||
-         _wcsnicmp(cls, L"RICHEDIT", 8) == 0;
+         _wcsnicmp(cls, kRichEditPrefix.data(), kRichEditPrefix.size()) == 0;
 }
 
 HWND GetFocusedControlHwnd() {
@@ -108,8 +84,6 @@ bool IsElementReadOnly(IUIAutomationElement* element) {
 
 }  // namespace
 
-CaretTextReader::CaretTextReader() = default;
-
 CaretTextReader::~CaretTextReader() {
   {
     std::lock_guard<std::mutex> lock(mu_);
@@ -136,15 +110,15 @@ void CaretTextReader::WorkerLoop() {
   ComPtr<IUIAutomation2> automation2;
   if (SUCCEEDED(CoCreateInstance(CLSID_CUIAutomation8, nullptr,
                                  CLSCTX_INPROC_SERVER,
-                                 IID_PPV_ARGS(automation2.Put()))) &&
-      automation2) {
+                                 IID_PPV_ARGS(&automation2))) &&
+      automation2 != nullptr) {
     automation2->put_ConnectionTimeout(kUiaRpcTimeoutMs);
     automation2->put_TransactionTimeout(kUiaRpcTimeoutMs);
-    automation2->QueryInterface(IID_PPV_ARGS(automation.Put()));
+    automation2.As(&automation);
   }
-  if (!automation) {
+  if (automation == nullptr) {
     CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER,
-                     IID_PPV_ARGS(automation.Put()));
+                     IID_PPV_ARGS(&automation));
   }
 
   for (;;) {
@@ -164,7 +138,7 @@ void CaretTextReader::WorkerLoop() {
 
     std::optional<SurroundingWord> surrounding;
     bool has_selection = false;
-    if (automation) {
+    if (automation != nullptr) {
       if (kind == WorkerRequestKind::kSurroundingText) {
         surrounding = ReadViaUIAutomationOnWorker(automation.Get());
       } else if (kind == WorkerRequestKind::kHasSelection) {
@@ -263,19 +237,19 @@ bool CaretTextReader::HasSelectionViaUIAutomationOnWorker(
   }
 
   ComPtr<IUIAutomationElement> focused;
-  if (FAILED(automation->GetFocusedElement(focused.Put())) || !focused) {
+  if (FAILED(automation->GetFocusedElement(&focused)) || focused == nullptr) {
     return false;
   }
 
   ComPtr<IUIAutomationTextPattern> text_pattern;
-  if (FAILED(focused->GetCurrentPatternAs(
-          UIA_TextPatternId, IID_PPV_ARGS(text_pattern.Put()))) ||
-      !text_pattern) {
+  if (FAILED(focused->GetCurrentPatternAs(UIA_TextPatternId,
+                                          IID_PPV_ARGS(&text_pattern))) ||
+      text_pattern == nullptr) {
     return false;
   }
 
   ComPtr<IUIAutomationTextRangeArray> selection;
-  if (FAILED(text_pattern->GetSelection(selection.Put())) || !selection) {
+  if (FAILED(text_pattern->GetSelection(&selection)) || selection == nullptr) {
     return false;
   }
 
@@ -285,7 +259,7 @@ bool CaretTextReader::HasSelectionViaUIAutomationOnWorker(
   }
 
   ComPtr<IUIAutomationTextRange> range;
-  if (FAILED(selection->GetElement(0, range.Put())) || !range) {
+  if (FAILED(selection->GetElement(0, &range)) || range == nullptr) {
     return false;
   }
 
@@ -312,7 +286,7 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaUIAutomationOnWorker(
   }
 
   ComPtr<IUIAutomationElement> focused;
-  if (FAILED(automation->GetFocusedElement(focused.Put())) || !focused) {
+  if (FAILED(automation->GetFocusedElement(&focused)) || focused == nullptr) {
     return std::nullopt;
   }
 
@@ -325,31 +299,32 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaUIAutomationOnWorker(
   ComPtr<IUIAutomationTextRange> caret_range;
   ComPtr<IUIAutomationTextPattern2> text_pattern2;
   if (SUCCEEDED(focused->GetCurrentPatternAs(UIA_TextPattern2Id,
-                                             IID_PPV_ARGS(text_pattern2.Put()))) &&
-      text_pattern2) {
+                                             IID_PPV_ARGS(&text_pattern2))) &&
+      text_pattern2 != nullptr) {
     BOOL is_active = FALSE;
-    if (SUCCEEDED(text_pattern2->GetCaretRange(&is_active, caret_range.Put())) &&
+    if (SUCCEEDED(text_pattern2->GetCaretRange(&is_active, &caret_range)) &&
         !is_active) {
       caret_range.Reset();
     }
   }
 
-  if (!caret_range) {
+  if (caret_range == nullptr) {
     ComPtr<IUIAutomationTextPattern> text_pattern;
     if (SUCCEEDED(focused->GetCurrentPatternAs(
-            UIA_TextPatternId, IID_PPV_ARGS(text_pattern.Put()))) &&
-        text_pattern) {
+            UIA_TextPatternId, IID_PPV_ARGS(&text_pattern))) &&
+        text_pattern != nullptr) {
       ComPtr<IUIAutomationTextRangeArray> selection;
-      if (SUCCEEDED(text_pattern->GetSelection(selection.Put())) && selection) {
+      if (SUCCEEDED(text_pattern->GetSelection(&selection)) &&
+          selection != nullptr) {
         int length = 0;
         if (SUCCEEDED(selection->get_Length(&length)) && length > 0) {
-          selection->GetElement(0, caret_range.Put());
+          selection->GetElement(0, &caret_range);
         }
       }
     }
   }
 
-  if (!caret_range) {
+  if (caret_range == nullptr) {
     return std::nullopt;
   }
 
@@ -368,7 +343,7 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaUIAutomationOnWorker(
   // after a rich-text sentinel like U+200B / U+FFFC), stop immediately so we
   // never seed placeholder text or trailing DOM sentinels.
   ComPtr<IUIAutomationTextRange> before_range;
-  if (FAILED(caret_range->Clone(before_range.Put())) || !before_range) {
+  if (FAILED(caret_range->Clone(&before_range)) || before_range == nullptr) {
     return std::nullopt;
   }
 
@@ -395,7 +370,7 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaUIAutomationOnWorker(
 
   ComPtr<IUIAutomationTextRange> after_range;
   std::wstring after_str;
-  if (SUCCEEDED(caret_range->Clone(after_range.Put())) && after_range) {
+  if (SUCCEEDED(caret_range->Clone(&after_range)) && after_range != nullptr) {
     after_range->MoveEndpointByRange(TextPatternRangeEndpoint_Start,
                                      caret_range.Get(),
                                      TextPatternRangeEndpoint_Start);

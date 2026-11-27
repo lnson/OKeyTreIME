@@ -39,8 +39,6 @@ constexpr UINT kUpToDateBannerDurationMs = 4000;
 
 }  // namespace
 
-App::App() = default;
-
 App::~App() {
   if (key_hook_) key_hook_->Stop();
   if (settings_window_) settings_window_->Close();

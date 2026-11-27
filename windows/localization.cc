@@ -3,9 +3,8 @@
 
 #include "windows/localization.h"
 
-#include <algorithm>
-#include <cctype>
-#include <unordered_map>
+#include "absl/container/flat_hash_map.h"
+#include "absl/strings/match.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -14,14 +13,6 @@
 namespace okeytre::win {
 
 namespace {
-
-std::string ToLowerAscii(std::string_view s) {
-  std::string out(s.size(), '\0');
-  for (size_t i = 0; i < s.size(); ++i) {
-    out[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(s[i])));
-  }
-  return out;
-}
 
 std::vector<std::string> GetSystemPreferredLanguages() {
   std::vector<std::string> result;
@@ -46,8 +37,9 @@ std::vector<std::string> GetSystemPreferredLanguages() {
   return result;
 }
 
-const std::unordered_map<std::string_view, std::wstring_view>& EnglishStrings() {
-  static const std::unordered_map<std::string_view, std::wstring_view> kMap = {
+const absl::flat_hash_map<std::string_view, std::wstring_view>&
+EnglishStrings() {
+  static const absl::flat_hash_map<std::string_view, std::wstring_view> kMap = {
       // System Tray Menu
       {"menu.input_source_warning.title", L"⚠️ Keyboard: %@"},
       {"menu.input_source_warning.subtitle",
@@ -198,9 +190,9 @@ const std::unordered_map<std::string_view, std::wstring_view>& EnglishStrings() 
   return kMap;
 }
 
-const std::unordered_map<std::string_view, std::wstring_view>&
+const absl::flat_hash_map<std::string_view, std::wstring_view>&
 VietnameseStrings() {
-  static const std::unordered_map<std::string_view, std::wstring_view> kMap = {
+  static const absl::flat_hash_map<std::string_view, std::wstring_view> kMap = {
       // System Tray Menu
       {"menu.input_source_warning.title", L"⚠️ Bàn phím: %@"},
       {"menu.input_source_warning.subtitle",
@@ -379,13 +371,14 @@ std::string_view ResolveLanguageCode(
       return "en";
     case AppLanguage::kSystem:
       for (const std::string& identifier : preferred_languages) {
-        const std::string lower = ToLowerAscii(identifier);
-        if (lower == "en" || lower.starts_with("en-") ||
-            lower.starts_with("en_")) {
+        if (absl::EqualsIgnoreCase(identifier, "en") ||
+            absl::StartsWithIgnoreCase(identifier, "en-") ||
+            absl::StartsWithIgnoreCase(identifier, "en_")) {
           return "en";
         }
-        if (lower == "vi" || lower.starts_with("vi-") ||
-            lower.starts_with("vi_")) {
+        if (absl::EqualsIgnoreCase(identifier, "vi") ||
+            absl::StartsWithIgnoreCase(identifier, "vi-") ||
+            absl::StartsWithIgnoreCase(identifier, "vi_")) {
           return "vi";
         }
       }

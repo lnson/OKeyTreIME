@@ -23,7 +23,7 @@ namespace okeytre::win {
 // stalls or suffers STA COM message-pump re-entrancy.
 class CaretTextReader {
  public:
-  CaretTextReader();
+  CaretTextReader() = default;
   ~CaretTextReader();
 
   CaretTextReader(const CaretTextReader&) = delete;

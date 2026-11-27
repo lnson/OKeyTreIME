@@ -7,6 +7,8 @@
 
 #include <string>
 
+#include "absl/cleanup/cleanup.h"
+
 namespace okeytre::win {
 
 namespace {
@@ -43,11 +45,11 @@ bool LaunchAtLoginManager::IsEnabled() const {
       ERROR_SUCCESS) {
     return false;
   }
+  const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
   DWORD type = 0;
   DWORD cb_data = 0;
   const LONG rc = RegQueryValueExW(hkey, kRunValueName, nullptr, &type, nullptr,
                                    &cb_data);
-  RegCloseKey(hkey);
   return rc == ERROR_SUCCESS && type == REG_SZ && cb_data > sizeof(wchar_t);
 }
 
@@ -59,12 +61,12 @@ bool LaunchAtLoginManager::SetEnabled(bool enabled) {
                       nullptr, &hkey, nullptr) != ERROR_SUCCESS) {
     return false;
   }
+  const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
 
   LONG rc = ERROR_SUCCESS;
   if (enabled) {
     const std::wstring cmd = GetCurrentExecutableQuotedPath();
     if (cmd.empty()) {
-      RegCloseKey(hkey);
       return false;
     }
     const DWORD cb = static_cast<DWORD>((cmd.size() + 1) * sizeof(wchar_t));
@@ -77,7 +79,6 @@ bool LaunchAtLoginManager::SetEnabled(bool enabled) {
     }
   }
 
-  RegCloseKey(hkey);
   return rc == ERROR_SUCCESS;
 }
 

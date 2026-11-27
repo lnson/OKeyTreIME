@@ -5,6 +5,8 @@
 
 #include <utility>
 
+#include "absl/cleanup/cleanup.h"
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -42,20 +44,19 @@ class RegistrySettingsBackend final : public SettingsBackend {
         ERROR_SUCCESS) {
       return std::nullopt;
     }
+    const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
     const std::wstring wkey = Utf8ToWide(key);
     DWORD type = 0;
     DWORD cb_data = 0;
     const LONG rc =
         RegQueryValueExW(hkey, wkey.c_str(), nullptr, &type, nullptr, &cb_data);
     if (rc != ERROR_SUCCESS || type != REG_SZ || cb_data == 0) {
-      RegCloseKey(hkey);
       return std::nullopt;
     }
     std::wstring wval(cb_data / sizeof(wchar_t), L'\0');
     const LONG rc2 = RegQueryValueExW(hkey, wkey.c_str(), nullptr, &type,
                                       reinterpret_cast<LPBYTE>(wval.data()),
                                       &cb_data);
-    RegCloseKey(hkey);
     if (rc2 != ERROR_SUCCESS) {
       return std::nullopt;
     }
@@ -71,13 +72,13 @@ class RegistrySettingsBackend final : public SettingsBackend {
                         KEY_WRITE, nullptr, &hkey, nullptr) != ERROR_SUCCESS) {
       return;
     }
+    const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
     const std::wstring wkey = Utf8ToWide(key);
     const std::wstring wval = Utf8ToWide(value);
     const DWORD cb_data =
         static_cast<DWORD>((wval.size() + 1) * sizeof(wchar_t));
     RegSetValueExW(hkey, wkey.c_str(), 0, REG_SZ,
                    reinterpret_cast<const BYTE*>(wval.c_str()), cb_data);
-    RegCloseKey(hkey);
   }
 
   void RemoveKey(std::string_view key) override {
@@ -86,9 +87,9 @@ class RegistrySettingsBackend final : public SettingsBackend {
                       &hkey) != ERROR_SUCCESS) {
       return;
     }
+    const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
     const std::wstring wkey = Utf8ToWide(key);
     RegDeleteValueW(hkey, wkey.c_str());
-    RegCloseKey(hkey);
   }
 
   std::optional<int64_t> GetInt64(std::string_view key) const override {
@@ -97,13 +98,13 @@ class RegistrySettingsBackend final : public SettingsBackend {
         ERROR_SUCCESS) {
       return std::nullopt;
     }
+    const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
     const std::wstring wkey = Utf8ToWide(key);
     DWORD type = 0;
     uint64_t qword = 0;
     DWORD cb_data = sizeof(qword);
     const LONG rc = RegQueryValueExW(hkey, wkey.c_str(), nullptr, &type,
                                      reinterpret_cast<LPBYTE>(&qword), &cb_data);
-    RegCloseKey(hkey);
     if (rc != ERROR_SUCCESS) {
       return std::nullopt;
     }
@@ -122,11 +123,11 @@ class RegistrySettingsBackend final : public SettingsBackend {
                         KEY_WRITE, nullptr, &hkey, nullptr) != ERROR_SUCCESS) {
       return;
     }
+    const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
     const std::wstring wkey = Utf8ToWide(key);
     const uint64_t qword = static_cast<uint64_t>(value);
     RegSetValueExW(hkey, wkey.c_str(), 0, REG_QWORD,
                    reinterpret_cast<const BYTE*>(&qword), sizeof(qword));
-    RegCloseKey(hkey);
   }
 
   std::optional<bool> GetBool(std::string_view key) const override {
@@ -143,11 +144,11 @@ class RegistrySettingsBackend final : public SettingsBackend {
                         KEY_WRITE, nullptr, &hkey, nullptr) != ERROR_SUCCESS) {
       return;
     }
+    const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
     const std::wstring wkey = Utf8ToWide(key);
     const DWORD dword = value ? 1u : 0u;
     RegSetValueExW(hkey, wkey.c_str(), 0, REG_DWORD,
                    reinterpret_cast<const BYTE*>(&dword), sizeof(dword));
-    RegCloseKey(hkey);
   }
 
   bool HasKey(std::string_view key) const override {
@@ -156,10 +157,10 @@ class RegistrySettingsBackend final : public SettingsBackend {
         ERROR_SUCCESS) {
       return false;
     }
+    const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
     const std::wstring wkey = Utf8ToWide(key);
     const LONG rc =
         RegQueryValueExW(hkey, wkey.c_str(), nullptr, nullptr, nullptr, nullptr);
-    RegCloseKey(hkey);
     return rc == ERROR_SUCCESS;
   }
 };
@@ -205,48 +206,46 @@ std::wstring InputStyleDisplayName(InputStyle style, AppLanguage language) {
 
 std::optional<std::string> InMemorySettingsBackend::GetString(
     std::string_view key) const {
-  const auto it = strings_.find(std::string(key));
+  const auto it = strings_.find(key);
   if (it == strings_.end()) return std::nullopt;
   return it->second;
 }
 
 void InMemorySettingsBackend::SetString(std::string_view key,
                                         std::string_view value) {
-  strings_[std::string(key)] = std::string(value);
+  strings_.insert_or_assign(std::string(key), std::string(value));
 }
 
 void InMemorySettingsBackend::RemoveKey(std::string_view key) {
-  const std::string k(key);
-  strings_.erase(k);
-  ints_.erase(k);
-  bools_.erase(k);
+  strings_.erase(key);
+  ints_.erase(key);
+  bools_.erase(key);
 }
 
 std::optional<int64_t> InMemorySettingsBackend::GetInt64(
     std::string_view key) const {
-  const auto it = ints_.find(std::string(key));
+  const auto it = ints_.find(key);
   if (it == ints_.end()) return std::nullopt;
   return it->second;
 }
 
 void InMemorySettingsBackend::SetInt64(std::string_view key, int64_t value) {
-  ints_[std::string(key)] = value;
+  ints_.insert_or_assign(std::string(key), value);
 }
 
 std::optional<bool> InMemorySettingsBackend::GetBool(
     std::string_view key) const {
-  const auto it = bools_.find(std::string(key));
+  const auto it = bools_.find(key);
   if (it == bools_.end()) return std::nullopt;
   return it->second;
 }
 
 void InMemorySettingsBackend::SetBool(std::string_view key, bool value) {
-  bools_[std::string(key)] = value;
+  bools_.insert_or_assign(std::string(key), value);
 }
 
 bool InMemorySettingsBackend::HasKey(std::string_view key) const {
-  const std::string k(key);
-  return strings_.contains(k) || ints_.contains(k) || bools_.contains(k);
+  return strings_.contains(key) || ints_.contains(key) || bools_.contains(key);
 }
 
 std::unique_ptr<SettingsBackend> CreateRegistrySettingsBackend() {

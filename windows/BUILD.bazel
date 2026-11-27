@@ -14,6 +14,7 @@ cc_library(
     name = "app_version",
     srcs = ["app-version.cc"],
     hdrs = ["app-version.h"],
+    deps = ["@abseil-cpp//absl/strings"],
 )
 
 cc_test(
@@ -30,6 +31,10 @@ cc_library(
     name = "localization",
     srcs = ["localization.cc"],
     hdrs = ["localization.h"],
+    deps = [
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/strings",
+    ],
 )
 
 cc_test(
@@ -69,6 +74,8 @@ cc_library(
     deps = [
         ":app_version",
         ":localization",
+        "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 
@@ -86,7 +93,10 @@ cc_library(
     name = "update_parser",
     srcs = ["update-parser.cc"],
     hdrs = ["update-parser.h"],
-    deps = [":app_version"],
+    deps = [
+        ":app_version",
+        "@abseil-cpp//absl/strings",
+    ],
 )
 
 cc_test(
@@ -192,6 +202,9 @@ cc_library(
         ":shortcut_detectors",
         ":update_parser",
         "//OKeyTre/ime/core:OKeyTreEngineLib",
+        "@abseil-cpp//absl/base:no_destructor",
+        "@abseil-cpp//absl/cleanup",
+        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 

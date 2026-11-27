@@ -9,8 +9,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 
+#include "absl/container/flat_hash_map.h"
 #include "windows/app-version.h"
 #include "windows/localization.h"
 
@@ -67,9 +67,9 @@ class InMemorySettingsBackend final : public SettingsBackend {
   bool HasKey(std::string_view key) const override;
 
  private:
-  std::unordered_map<std::string, std::string> strings_;
-  std::unordered_map<std::string, int64_t> ints_;
-  std::unordered_map<std::string, bool> bools_;
+  absl::flat_hash_map<std::string, std::string> strings_;
+  absl::flat_hash_map<std::string, int64_t> ints_;
+  absl::flat_hash_map<std::string, bool> bools_;
 };
 
 std::unique_ptr<SettingsBackend> CreateRegistrySettingsBackend();

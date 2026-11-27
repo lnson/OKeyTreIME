@@ -26,7 +26,7 @@ namespace okeytre::win {
 // manager, Settings window, and Feature Showcase window.
 class App {
  public:
-  App();
+  App() = default;
   ~App();
 
   App(const App&) = delete;

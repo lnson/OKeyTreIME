@@ -4,44 +4,40 @@
 #include "windows/update-parser.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cstdint>
 #include <vector>
+
+#include "absl/strings/ascii.h"
+#include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
+#include "absl/strings/strip.h"
 
 namespace okeytre::win {
 
 namespace {
 
-std::string ToLowerAscii(std::string_view s) {
-  std::string out(s.size(), '\0');
-  for (size_t i = 0; i < s.size(); ++i) {
-    out[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(s[i])));
-  }
-  return out;
-}
-
 // Minimal, strict RFC 8259 JSON parser tailored for GitHub release payloads
 // (avoids pulling in an external JSON library dependency).
 class JsonCursor {
  public:
-  explicit JsonCursor(std::string_view src) : src_(src) {}
+  explicit JsonCursor(std::string_view src) : rem_(src) {}
 
   void SkipWhitespace() {
-    while (pos_ < src_.size() &&
-           (src_[pos_] == ' ' || src_[pos_] == '\t' || src_[pos_] == '\r' ||
-            src_[pos_] == '\n')) {
-      ++pos_;
+    while (!rem_.empty() &&
+           (rem_.front() == ' ' || rem_.front() == '\t' ||
+            rem_.front() == '\r' || rem_.front() == '\n')) {
+      rem_.remove_prefix(1);
     }
   }
 
-  bool AtEnd() const { return pos_ >= src_.size(); }
+  bool AtEnd() const { return rem_.empty(); }
 
-  char Peek() const { return pos_ < src_.size() ? src_[pos_] : '\0'; }
+  char Peek() const { return rem_.empty() ? '\0' : rem_.front(); }
 
   bool Consume(char expected) {
     SkipWhitespace();
-    if (pos_ < src_.size() && src_[pos_] == expected) {
-      ++pos_;
+    if (!rem_.empty() && rem_.front() == expected) {
+      rem_.remove_prefix(1);
       return true;
     }
     return false;
@@ -49,19 +45,20 @@ class JsonCursor {
 
   std::optional<std::string> ParseString() {
     SkipWhitespace();
-    if (pos_ >= src_.size() || src_[pos_] != '"') {
+    if (!absl::ConsumePrefix(&rem_, "\"")) {
       return std::nullopt;
     }
-    ++pos_;
     std::string out;
-    while (pos_ < src_.size()) {
-      const char c = src_[pos_++];
+    while (!rem_.empty()) {
+      const char c = rem_.front();
+      rem_.remove_prefix(1);
       if (c == '"') {
         return out;
       }
       if (c == '\\') {
-        if (pos_ >= src_.size()) return std::nullopt;
-        const char esc = src_[pos_++];
+        if (rem_.empty()) return std::nullopt;
+        const char esc = rem_.front();
+        rem_.remove_prefix(1);
         switch (esc) {
           case '"':
           case '\\':
@@ -84,21 +81,17 @@ class JsonCursor {
             out.push_back('\t');
             break;
           case 'u': {
-            if (pos_ + 4 > src_.size()) return std::nullopt;
+            if (rem_.size() < 4) return std::nullopt;
+            const std::string_view hex = rem_.substr(0, 4);
             uint32_t code = 0;
-            for (int i = 0; i < 4; ++i) {
-              const char h = src_[pos_++];
-              code <<= 4;
-              if (h >= '0' && h <= '9') {
-                code |= static_cast<uint32_t>(h - '0');
-              } else if (h >= 'a' && h <= 'f') {
-                code |= static_cast<uint32_t>(10 + (h - 'a'));
-              } else if (h >= 'A' && h <= 'F') {
-                code |= static_cast<uint32_t>(10 + (h - 'A'));
-              } else {
-                return std::nullopt;
-              }
+            if (!std::all_of(hex.begin(), hex.end(),
+                             [](unsigned char ch) {
+                               return absl::ascii_isxdigit(ch);
+                             }) ||
+                !absl::SimpleHexAtoi(hex, &code)) {
+              return std::nullopt;
             }
+            rem_.remove_prefix(4);
             if (code < 0x80) {
               out.push_back(static_cast<char>(code));
             } else if (code < 0x800) {
@@ -123,14 +116,8 @@ class JsonCursor {
 
   std::optional<bool> ParseBool() {
     SkipWhitespace();
-    if (src_.substr(pos_).starts_with("true")) {
-      pos_ += 4;
-      return true;
-    }
-    if (src_.substr(pos_).starts_with("false")) {
-      pos_ += 5;
-      return false;
-    }
+    if (absl::ConsumePrefix(&rem_, "true")) return true;
+    if (absl::ConsumePrefix(&rem_, "false")) return false;
     return std::nullopt;
   }
 
@@ -142,8 +129,7 @@ class JsonCursor {
       return ParseString().has_value();
     }
     if (c == '{') {
-      ++pos_;
-      SkipWhitespace();
+      rem_.remove_prefix(1);
       if (Consume('}')) return true;
       while (true) {
         if (!ParseString().has_value()) return false;
@@ -154,8 +140,7 @@ class JsonCursor {
       }
     }
     if (c == '[') {
-      ++pos_;
-      SkipWhitespace();
+      rem_.remove_prefix(1);
       if (Consume(']')) return true;
       while (true) {
         if (!SkipValue()) return false;
@@ -163,26 +148,19 @@ class JsonCursor {
         if (!Consume(',')) return false;
       }
     }
-    if (src_.substr(pos_).starts_with("true")) {
-      pos_ += 4;
-      return true;
-    }
-    if (src_.substr(pos_).starts_with("false")) {
-      pos_ += 5;
-      return true;
-    }
-    if (src_.substr(pos_).starts_with("null")) {
-      pos_ += 4;
+    if (absl::ConsumePrefix(&rem_, "true") ||
+        absl::ConsumePrefix(&rem_, "false") ||
+        absl::ConsumePrefix(&rem_, "null")) {
       return true;
     }
     // Number
-    if (c == '-' || (c >= '0' && c <= '9')) {
-      ++pos_;
-      while (pos_ < src_.size()) {
-        const char n = src_[pos_];
-        if ((n >= '0' && n <= '9') || n == '.' || n == 'e' || n == 'E' ||
-            n == '+' || n == '-') {
-          ++pos_;
+    if (c == '-' || absl::ascii_isdigit(static_cast<unsigned char>(c))) {
+      rem_.remove_prefix(1);
+      while (!rem_.empty()) {
+        const char n = rem_.front();
+        if (absl::ascii_isdigit(static_cast<unsigned char>(n)) || n == '.' ||
+            n == 'e' || n == 'E' || n == '+' || n == '-') {
+          rem_.remove_prefix(1);
         } else {
           break;
         }
@@ -193,8 +171,7 @@ class JsonCursor {
   }
 
  private:
-  std::string_view src_;
-  size_t pos_ = 0;
+  std::string_view rem_;
 };
 
 struct RawAsset {
@@ -203,40 +180,34 @@ struct RawAsset {
 };
 
 bool IsWindowsAssetName(std::string_view name) {
-  const std::string lower = ToLowerAscii(name);
-  if (lower.ends_with(".exe") || lower.ends_with(".msi")) {
+  if (absl::EndsWithIgnoreCase(name, ".exe") ||
+      absl::EndsWithIgnoreCase(name, ".msi")) {
     return true;
   }
-  if (lower.ends_with(".zip") &&
-      (lower.find("win") != std::string::npos ||
-       lower.find("x64") != std::string::npos)) {
-    return true;
-  }
-  return false;
+  return absl::EndsWithIgnoreCase(name, ".zip") &&
+         (absl::StrContainsIgnoreCase(name, "win") ||
+          absl::StrContainsIgnoreCase(name, "x64"));
 }
 
 }  // namespace
 
 bool IsValidatedGitHubUrl(std::string_view url) {
   constexpr std::string_view kHttps = "https://";
-  if (url.size() <= kHttps.size()) {
-    return false;
-  }
-  if (ToLowerAscii(url.substr(0, kHttps.size())) != kHttps) {
+  if (url.size() <= kHttps.size() || !absl::StartsWithIgnoreCase(url, kHttps)) {
     return false;
   }
   const std::string_view rest = url.substr(kHttps.size());
   const size_t slash = rest.find('/');
-  std::string_view authority =
+  const std::string_view authority =
       slash == std::string_view::npos ? rest : rest.substr(0, slash);
   // Reject userinfo (`user@host`) and ports for strictness.
-  if (authority.find('@') != std::string_view::npos ||
-      authority.find(':') != std::string_view::npos || authority.empty()) {
+  if (authority.empty() || absl::StrContains(authority, '@') ||
+      absl::StrContains(authority, ':')) {
     return false;
   }
-  const std::string host = ToLowerAscii(authority);
-  return host == "github.com" || host.ends_with(".github.com") ||
-         host.ends_with(".githubusercontent.com");
+  return absl::EqualsIgnoreCase(authority, "github.com") ||
+         absl::EndsWithIgnoreCase(authority, ".github.com") ||
+         absl::EndsWithIgnoreCase(authority, ".githubusercontent.com");
 }
 
 std::optional<UpdateRelease> ParseLatestGitHubRelease(

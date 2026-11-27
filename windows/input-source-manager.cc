@@ -11,7 +11,9 @@
 
 #include <cwchar>
 #include <iterator>
-#include <unordered_map>
+
+#include "absl/base/no_destructor.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace okeytre::win {
 
@@ -26,10 +28,11 @@ struct SpecialLayoutInfo {
 // `(HIWORD(hkl) & 0xF000) == 0xF000`) to its underlying KLID language and name.
 // This detects IME/keyboard variants such as Windows built-in Vietnamese Telex
 // (`0001042a`) or VNI (`0002042a`) even when installed under `en-US` (`0409`).
-const std::unordered_map<uint16_t, SpecialLayoutInfo>& GetSpecialLayoutMap() {
-  static const std::unordered_map<uint16_t, SpecialLayoutInfo>* const kMap =
-      []() {
-        auto* table = new std::unordered_map<uint16_t, SpecialLayoutInfo>();
+const absl::flat_hash_map<uint16_t, SpecialLayoutInfo>& GetSpecialLayoutMap() {
+  static const absl::NoDestructor<
+      absl::flat_hash_map<uint16_t, SpecialLayoutInfo>>
+      kMap([]() {
+        absl::flat_hash_map<uint16_t, SpecialLayoutInfo> table;
         HKEY layouts_key = nullptr;
         if (RegOpenKeyExW(
                 HKEY_LOCAL_MACHINE,
@@ -82,15 +85,15 @@ const std::unordered_map<uint16_t, SpecialLayoutInfo>& GetSpecialLayoutMap() {
                   (text_type == REG_SZ || text_type == REG_EXPAND_SZ)) {
                 info.layout_text.assign(text_buf);
               }
-              table->try_emplace(static_cast<uint16_t>(special_id & 0x0FFFu),
-                                 std::move(info));
+              table.try_emplace(static_cast<uint16_t>(special_id & 0x0FFFu),
+                                std::move(info));
             }
           }
           RegCloseKey(subkey);
         }
         RegCloseKey(layouts_key);
         return table;
-      }();
+      }());
   return *kMap;
 }
 
@@ -118,7 +121,7 @@ LANGID ResolveLayoutLangId(HKL hkl, const std::wstring** out_special_text) {
   if ((device_id & 0xF000u) != 0xF000u) {
     return static_cast<LANGID>(device_id);
   }
-  const std::unordered_map<uint16_t, SpecialLayoutInfo>& special_map =
+  const absl::flat_hash_map<uint16_t, SpecialLayoutInfo>& special_map =
       GetSpecialLayoutMap();
   const auto it = special_map.find(static_cast<uint16_t>(device_id & 0x0FFFu));
   if (it != special_map.end()) {
