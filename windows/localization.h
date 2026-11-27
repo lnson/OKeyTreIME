@@ -9,6 +9,8 @@
 #include <string_view>
 #include <vector>
 
+#include "windows/localization-keys.generated.h"
+
 namespace okeytre::win {
 
 enum class AppLanguage : uint8_t {
@@ -30,17 +32,18 @@ std::string_view ResolveLanguageCode(
 // language code ("en" or "vi").
 std::string_view ResolveSystemLanguageCode(AppLanguage language);
 
-// Looks up a localized UTF-16 string by key. Falls back to English and then
-// to the key itself if missing.
-std::wstring Localized(AppLanguage language, std::string_view key);
+// Looks up a localized UTF-16 string by compile-time generated `L10nKey`.
+// Returns a null-terminated view into static storage.
+std::wstring_view Localized(AppLanguage language, L10nKey key);
 
 // Looks up a localized UTF-16 format string and replaces "%@" with `arg`.
-std::wstring LocalizedFormat(AppLanguage language, std::string_view key,
+std::wstring LocalizedFormat(AppLanguage language, L10nKey key,
                              std::wstring_view arg);
 
 // Display name for an `AppLanguage` option in the active UI language.
-std::wstring LanguageDisplayName(AppLanguage option,
-                                 AppLanguage active_language);
+// Returns a null-terminated view into static storage.
+std::wstring_view LanguageDisplayName(AppLanguage option,
+                                      AppLanguage active_language);
 
 // UTF-8 <-> UTF-16 helpers (safe on both Windows and POSIX).
 std::wstring Utf8ToWide(std::string_view utf8);

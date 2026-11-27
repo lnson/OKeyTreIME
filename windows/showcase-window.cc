@@ -71,8 +71,8 @@ enum class TokenKind {
 };
 
 struct DemoToken {
+  std::wstring_view text;
   TokenKind kind;
-  std::wstring text;
 };
 
 void DrawDemoTokenRow(Gdiplus::Graphics& g, float x, float y, float height,
@@ -178,10 +178,10 @@ void ShowcaseWindow::EnsureWindowClass() {
 
 std::wstring ShowcaseWindow::ResolveWindowTitle() const {
   if (model_.mode == ShowcaseMode::kFeatureUpdate) {
-    return LocalizedFormat(model_.language, "showcase.whats_new.title",
+    return LocalizedFormat(model_.language, L10nKey::kShowcaseWhatsNewTitle,
                            model_.milestone_version);
   }
-  return Localized(model_.language, "showcase.window_title");
+  return std::wstring(Localized(model_.language, L10nKey::kShowcaseWindowTitle));
 }
 
 void ShowcaseWindow::Show(const ShowcaseViewModel& model) {
@@ -304,27 +304,27 @@ void ShowcaseWindow::SyncControlsFromModel() {
 
   if (combo_language_ != nullptr) {
     SendMessageW(combo_language_, CB_RESETCONTENT, 0, 0);
-    const std::wstring s_sys =
+    const std::wstring_view s_sys =
         LanguageDisplayName(AppLanguage::kSystem, model_.language);
-    const std::wstring s_vi =
+    const std::wstring_view s_vi =
         LanguageDisplayName(AppLanguage::kVietnamese, model_.language);
-    const std::wstring s_en =
+    const std::wstring_view s_en =
         LanguageDisplayName(AppLanguage::kEnglish, model_.language);
     SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_sys.c_str()));
+                 reinterpret_cast<LPARAM>(s_sys.data()));
     SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_vi.c_str()));
+                 reinterpret_cast<LPARAM>(s_vi.data()));
     SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_en.c_str()));
+                 reinterpret_cast<LPARAM>(s_en.data()));
     SendMessageW(combo_language_, CB_SETCURSEL,
                  static_cast<WPARAM>(model_.language), 0);
   }
 
   if (edit_practice_ != nullptr) {
-    const std::wstring placeholder =
-        Localized(model_.language, "showcase.practice.placeholder");
+    const std::wstring_view placeholder =
+        Localized(model_.language, L10nKey::kShowcasePracticePlaceholder);
     SendMessageW(edit_practice_, EM_SETCUEBANNER, TRUE,
-                 reinterpret_cast<LPARAM>(placeholder.c_str()));
+                 reinterpret_cast<LPARAM>(placeholder.data()));
   }
 
   updating_controls_ = false;
@@ -406,20 +406,20 @@ void ShowcaseWindow::Paint() {
 
     const std::wstring header_title =
         (model_.mode == ShowcaseMode::kFeatureUpdate)
-            ? LocalizedFormat(model_.language, "showcase.whats_new.title",
+            ? LocalizedFormat(model_.language, L10nKey::kShowcaseWhatsNewTitle,
                               model_.milestone_version)
-            : Localized(model_.language, "showcase.title");
+            : std::wstring(Localized(model_.language, L10nKey::kShowcaseTitle));
     DrawCenteredText(g, header_title, hero_font, palette_.text_primary,
                      Gdiplus::RectF(pad_x, ScaleDpiF(98.0f, dpi_), content_w,
                                     ScaleDpiF(28.0f, dpi_)));
 
-    const std::wstring subtitle =
-        Localized(model_.language, "showcase.subtitle");
+    const std::wstring_view subtitle =
+        Localized(model_.language, L10nKey::kShowcaseSubtitle);
     Gdiplus::SolidBrush sub_brush(palette_.text_secondary);
     Gdiplus::StringFormat wrap_center;
     wrap_center.SetAlignment(Gdiplus::StringAlignmentCenter);
     wrap_center.SetLineAlignment(Gdiplus::StringAlignmentNear);
-    g.DrawString(subtitle.c_str(), static_cast<INT>(subtitle.size()), &sub_font,
+    g.DrawString(subtitle.data(), static_cast<INT>(subtitle.size()), &sub_font,
                  Gdiplus::RectF(pad_x + ScaleDpiF(18.0f, dpi_),
                                 ScaleDpiF(130.0f, dpi_),
                                 content_w - ScaleDpiF(36.0f, dpi_),
@@ -476,7 +476,7 @@ void ShowcaseWindow::PaintStatusBanner(Gdiplus::Graphics& g, float x, float y,
                             : palette_.accent_orange);
     Gdiplus::Font btn_font(font_name.c_str(), ScaleDpiF(11.5f, dpi_),
                            Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-    DrawCenteredText(g, Localized(model_.language, "action.switch_to_us"),
+    DrawCenteredText(g, Localized(model_.language, L10nKey::kActionSwitchToUs),
                      btn_font, palette_.text_on_accent, btn);
     hit_regions_.push_back({HitTargetKind::kButtonSwitchToUs, btn});
 
@@ -489,7 +489,7 @@ void ShowcaseWindow::PaintStatusBanner(Gdiplus::Graphics& g, float x, float y,
     fmt.SetTrimming(Gdiplus::StringTrimmingEllipsisCharacter);
 
     const std::wstring title = LocalizedFormat(
-        model_.language, "menu.input_source_warning.title",
+        model_.language, L10nKey::kMenuInputSourceWarningTitle,
         model_.keyboard_name);
     Gdiplus::SolidBrush primary_brush(palette_.text_primary);
     g.DrawString(title.c_str(), static_cast<INT>(title.size()), &bold_font,
@@ -497,10 +497,10 @@ void ShowcaseWindow::PaintStatusBanner(Gdiplus::Graphics& g, float x, float y,
                                 ScaleDpiF(17.0f, dpi_)),
                  &fmt, &primary_brush);
 
-    const std::wstring desc =
-        Localized(model_.language, "menu.input_source_warning.subtitle");
+    const std::wstring_view desc =
+        Localized(model_.language, L10nKey::kMenuInputSourceWarningSubtitle);
     Gdiplus::SolidBrush sec_brush(palette_.text_secondary);
-    g.DrawString(desc.c_str(), static_cast<INT>(desc.size()), &sub_font,
+    g.DrawString(desc.data(), static_cast<INT>(desc.size()), &sub_font,
                  Gdiplus::RectF(text_x, y + ScaleDpiF(22.0f, dpi_), text_w,
                                 ScaleDpiF(15.0f, dpi_)),
                  &fmt, &sec_brush);
@@ -524,14 +524,14 @@ void ShowcaseWindow::PaintStatusBanner(Gdiplus::Graphics& g, float x, float y,
     g.DrawLine(&check_pen, ix + icon_sz * 0.44f, iy + icon_sz * 0.70f,
                ix + icon_sz * 0.75f, iy + icon_sz * 0.34f);
 
-    const std::wstring ready =
-        Localized(model_.language, "showcase.status.ready");
+    const std::wstring_view ready =
+        Localized(model_.language, L10nKey::kShowcaseStatusReady);
     Gdiplus::SolidBrush primary_brush(palette_.text_primary);
     Gdiplus::StringFormat fmt;
     fmt.SetAlignment(Gdiplus::StringAlignmentNear);
     fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
     fmt.SetFormatFlags(Gdiplus::StringFormatFlagsNoWrap);
-    g.DrawString(ready.c_str(), static_cast<INT>(ready.size()), &bold_font,
+    g.DrawString(ready.data(), static_cast<INT>(ready.size()), &bold_font,
                  Gdiplus::RectF(ix + icon_sz + ScaleDpiF(10.0f, dpi_), y,
                                 w - icon_sz - ScaleDpiF(32.0f, dpi_), h),
                  &fmt, &primary_brush);
@@ -555,60 +555,60 @@ void ShowcaseWindow::PaintFeatureGrid(Gdiplus::Graphics& g, float x, float y,
   const float pad = ScaleDpiF(12.0f, dpi_);
 
   const bool is_update = (model_.mode == ShowcaseMode::kFeatureUpdate);
-  const std::wstring new_badge =
-      is_update ? Localized(model_.language, "showcase.badge.new") : L"";
+  const std::wstring_view new_badge =
+      is_update ? Localized(model_.language, L10nKey::kShowcaseBadgeNew) : L"";
 
   struct CardDef {
-    std::string_view title_key;
-    std::string_view desc_key;
-    bool show_new_badge;
     std::vector<DemoToken> tokens;
+    L10nKey title_key;
+    L10nKey desc_key;
+    bool show_new_badge;
   };
 
   const CardDef cards[4] = {
-      {"showcase.card.auto_restore.title",
-       "showcase.card.auto_restore.desc",
-       is_update,
-       {
-           {TokenKind::kTypedPill, L"úer"},
-           {TokenKind::kOperator, L"+"},
-           {TokenKind::kKeycap, L"Space"},
-           {TokenKind::kOperator, L"→"},
-           {TokenKind::kResultPill, L"user␣"},
-       }},
-      {"showcase.card.dual_shift.title",
-       "showcase.card.dual_shift.desc",
-       is_update,
-       {
-           {TokenKind::kTypedPill, L"rồ␣"},
-           {TokenKind::kOperator, L"+"},
-           {TokenKind::kKeycap, L"⇧ L"},
-           {TokenKind::kKeycap, L"⇧ R"},
-           {TokenKind::kOperator, L"→"},
-           {TokenKind::kResultPill, L"roof␣"},
-       }},
-      {"showcase.card.diacritics.title",
-       "showcase.card.diacritics.desc",
-       false,
-       {
-           {TokenKind::kTypedPill, L"tieng"},
-           {TokenKind::kOperator, L"+"},
-           {TokenKind::kKeycap, L"e"},
-           {TokenKind::kKeycap, L"s"},
-           {TokenKind::kOperator, L"→"},
-           {TokenKind::kResultPill, L"tiếng"},
-       }},
-      {"showcase.card.toggle.title",
-       "showcase.card.toggle.desc",
-       false,
-       {
-           {TokenKind::kKeycap, L"Ctrl L"},
-           {TokenKind::kOperator, L"+"},
-           {TokenKind::kKeycap, L"Ctrl R"},
-           {TokenKind::kOperator, L"→"},
-           {TokenKind::kResultPill,
-            Localized(model_.language, "showcase.card.toggle.result")},
-       }},
+      {{
+           {L"úer", TokenKind::kTypedPill},
+           {L"+", TokenKind::kOperator},
+           {L"Space", TokenKind::kKeycap},
+           {L"→", TokenKind::kOperator},
+           {L"user␣", TokenKind::kResultPill},
+       },
+       L10nKey::kShowcaseCardAutoRestoreTitle,
+       L10nKey::kShowcaseCardAutoRestoreDesc,
+       is_update},
+      {{
+           {L"rồ␣", TokenKind::kTypedPill},
+           {L"+", TokenKind::kOperator},
+           {L"⇧ L", TokenKind::kKeycap},
+           {L"⇧ R", TokenKind::kKeycap},
+           {L"→", TokenKind::kOperator},
+           {L"roof␣", TokenKind::kResultPill},
+       },
+       L10nKey::kShowcaseCardDualShiftTitle,
+       L10nKey::kShowcaseCardDualShiftDesc,
+       is_update},
+      {{
+           {L"tieng", TokenKind::kTypedPill},
+           {L"+", TokenKind::kOperator},
+           {L"e", TokenKind::kKeycap},
+           {L"s", TokenKind::kKeycap},
+           {L"→", TokenKind::kOperator},
+           {L"tiếng", TokenKind::kResultPill},
+       },
+       L10nKey::kShowcaseCardDiacriticsTitle,
+       L10nKey::kShowcaseCardDiacriticsDesc,
+       false},
+      {{
+           {L"Ctrl L", TokenKind::kKeycap},
+           {L"+", TokenKind::kOperator},
+           {L"Ctrl R", TokenKind::kKeycap},
+           {L"→", TokenKind::kOperator},
+           {Localized(model_.language, L10nKey::kShowcaseCardToggleResult),
+            TokenKind::kResultPill},
+       },
+       L10nKey::kShowcaseCardToggleTitle,
+       L10nKey::kShowcaseCardToggleDesc,
+       false},
   };
 
   Gdiplus::StringFormat left_fmt;
@@ -625,7 +625,8 @@ void ShowcaseWindow::PaintFeatureGrid(Gdiplus::Graphics& g, float x, float y,
     FillRoundedRect(g, box, card_r, palette_.card_bg);
     StrokeRoundedRect(g, box, card_r, palette_.card_border, 1.0f);
 
-    const std::wstring title = Localized(model_.language, cards[i].title_key);
+    const std::wstring_view title =
+        Localized(model_.language, cards[i].title_key);
     Gdiplus::SolidBrush teal_brush(palette_.accent_teal);
     Gdiplus::StringFormat title_fmt;
     title_fmt.SetAlignment(Gdiplus::StringAlignmentNear);
@@ -639,7 +640,7 @@ void ShowcaseWindow::PaintFeatureGrid(Gdiplus::Graphics& g, float x, float y,
                                             : 0.0f),
                  MeasureTextWidth(g, title, card_title_font) +
                      ScaleDpiF(4.0f, dpi_));
-    g.DrawString(title.c_str(), static_cast<INT>(title.size()),
+    g.DrawString(title.data(), static_cast<INT>(title.size()),
                  &card_title_font,
                  Gdiplus::RectF(cx + pad, cy + ScaleDpiF(9.0f, dpi_), title_w,
                                 ScaleDpiF(16.0f, dpi_)),
@@ -659,9 +660,10 @@ void ShowcaseWindow::PaintFeatureGrid(Gdiplus::Graphics& g, float x, float y,
     DrawDemoTokenRow(g, cx + pad, cy + ScaleDpiF(30.0f, dpi_),
                      ScaleDpiF(21.0f, dpi_), cards[i].tokens, palette_, dpi_);
 
-    const std::wstring desc = Localized(model_.language, cards[i].desc_key);
+    const std::wstring_view desc =
+        Localized(model_.language, cards[i].desc_key);
     Gdiplus::SolidBrush sec_brush(palette_.text_secondary);
-    g.DrawString(desc.c_str(), static_cast<INT>(desc.size()), &desc_font,
+    g.DrawString(desc.data(), static_cast<INT>(desc.size()), &desc_font,
                  Gdiplus::RectF(cx + pad, cy + ScaleDpiF(56.0f, dpi_),
                                 card_w - pad * 2.0f, ScaleDpiF(34.0f, dpi_)),
                  &left_fmt, &sec_brush);
@@ -676,17 +678,17 @@ void ShowcaseWindow::PaintPracticeHeader(Gdiplus::Graphics& g, float x, float y,
   Gdiplus::Font pill_font(font_name.c_str(), ScaleDpiF(10.5f, dpi_),
                           Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
 
-  const std::wstring label =
-      Localized(model_.language, "showcase.practice.label");
+  const std::wstring_view label =
+      Localized(model_.language, L10nKey::kShowcasePracticeLabel);
   Gdiplus::SolidBrush sec_brush(palette_.text_secondary);
   Gdiplus::StringFormat fmt;
   fmt.SetAlignment(Gdiplus::StringAlignmentNear);
   fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
-  g.DrawString(label.c_str(), static_cast<INT>(label.size()), &label_font,
+  g.DrawString(label.data(), static_cast<INT>(label.size()), &label_font,
                Gdiplus::RectF(x, y, w * 0.7f, ScaleDpiF(20.0f, dpi_)), &fmt,
                &sec_brush);
 
-  const std::wstring style_name =
+  const std::wstring_view style_name =
       InputStyleDisplayName(model_.style, model_.language);
   const float pill_w =
       MeasureTextWidth(g, style_name, pill_font) + ScaleDpiF(16.0f, dpi_);
@@ -710,7 +712,8 @@ void ShowcaseWindow::PaintFooter(Gdiplus::Graphics& g, float x, float y,
                          Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
 
   const float h = ScaleDpiF(34.0f, dpi_);
-  const std::wstring lbl = Localized(model_.language, "menu.input_style");
+  const std::wstring_view lbl =
+      Localized(model_.language, L10nKey::kMenuInputStyle);
   const float lbl_w =
       MeasureTextWidth(g, lbl, label_font) + ScaleDpiF(10.0f, dpi_);
 
@@ -718,7 +721,7 @@ void ShowcaseWindow::PaintFooter(Gdiplus::Graphics& g, float x, float y,
   Gdiplus::StringFormat fmt;
   fmt.SetAlignment(Gdiplus::StringAlignmentNear);
   fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
-  g.DrawString(lbl.c_str(), static_cast<INT>(lbl.size()), &label_font,
+  g.DrawString(lbl.data(), static_cast<INT>(lbl.size()), &label_font,
                Gdiplus::RectF(x, y, lbl_w, h), &fmt, &sec_brush);
 
   // Segmented control: Telex | VNI | VIQR
@@ -768,7 +771,7 @@ void ShowcaseWindow::PaintFooter(Gdiplus::Graphics& g, float x, float y,
   const float btn_w = ScaleDpiF(132.0f, dpi_);
   Gdiplus::RectF start_btn(x + w - btn_w, y, btn_w, h);
   DrawFluentButton(g, start_btn,
-                   Localized(model_.language, "showcase.action.get_started"),
+                   Localized(model_.language, L10nKey::kShowcaseActionGetStarted),
                    /*is_primary=*/true,
                    hovered_target_ == HitTargetKind::kButtonGetStarted,
                    /*is_disabled=*/false, palette_, dpi_);

@@ -30,7 +30,10 @@ cc_test(
 cc_binary(
     name = "localization_codegen",
     srcs = ["localization-codegen.cc"],
-    deps = ["@abseil-cpp//absl/container:flat_hash_map"],
+    deps = [
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+    ],
 )
 
 genrule(
@@ -41,14 +44,18 @@ genrule(
         "resources/en.overrides.strings",
         "resources/vi.overrides.strings",
     ],
-    outs = ["localization-tables.generated.h"],
+    outs = [
+        "localization-keys.generated.h",
+        "localization-tables.generated.h",
+    ],
     cmd = (
         "$(location :localization_codegen) " +
         "$(location //:OKeyTre/en.lproj/Localizable.strings) " +
         "$(location resources/en.overrides.strings) " +
         "$(location //:OKeyTre/vi.lproj/Localizable.strings) " +
         "$(location resources/vi.overrides.strings) " +
-        "$@"
+        "$(location localization-keys.generated.h) " +
+        "$(location localization-tables.generated.h)"
     ),
     tools = [":localization_codegen"],
 )
@@ -57,12 +64,13 @@ cc_library(
     name = "localization",
     srcs = [
         "localization.cc",
-        ":generate_localization_tables",
+        "localization-tables.generated.h",
     ],
-    hdrs = ["localization.h"],
+    hdrs = [
+        "localization.h",
+        "localization-keys.generated.h",
+    ],
     deps = [
-        "@abseil-cpp//absl/base:no_destructor",
-        "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/strings",
         "@simdutf",
     ],

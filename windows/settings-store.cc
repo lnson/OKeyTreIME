@@ -190,7 +190,8 @@ std::optional<InputStyle> InputStyleFromRaw(std::string_view raw) noexcept {
   return std::nullopt;
 }
 
-std::wstring InputStyleDisplayName(InputStyle style, AppLanguage language) {
+std::wstring_view InputStyleDisplayName(InputStyle style,
+                                        AppLanguage language) {
   switch (style) {
     case InputStyle::kTelex:
       return L"Telex";
@@ -199,7 +200,7 @@ std::wstring InputStyleDisplayName(InputStyle style, AppLanguage language) {
     case InputStyle::kVIQR:
       return L"VIQR";
     case InputStyle::kOff:
-      return Localized(language, "menu.input_style.off");
+      return Localized(language, L10nKey::kMenuInputStyleOff);
   }
   return L"Telex";
 }

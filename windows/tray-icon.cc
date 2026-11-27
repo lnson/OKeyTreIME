@@ -129,11 +129,12 @@ void TrayIcon::ApplyIconAndTooltip() {
 
 std::wstring TrayIcon::BuildTooltip(const TrayState& state) {
   std::wstring base = LocalizedFormat(
-      state.language, "menu.tooltip.mode",
+      state.language, L10nKey::kMenuTooltipMode,
       InputStyleDisplayName(state.style, state.language));
   if (state.style != InputStyle::kOff && !state.is_english_keyboard) {
     base += L" · ";
-    base += LocalizedFormat(state.language, "menu.input_source_warning.title",
+    base += LocalizedFormat(state.language,
+                            L10nKey::kMenuInputSourceWarningTitle,
                             state.keyboard_name);
   }
   return base;
@@ -180,39 +181,39 @@ void TrayIcon::ShowContextMenu() {
   // 1. Optional Update Available banner section
   if (state_.visible_update.has_value()) {
     const std::wstring title = LocalizedFormat(
-        lang, "menu.update_available.title",
+        lang, L10nKey::kMenuUpdateAvailableTitle,
         Utf8ToWide(state_.visible_update->display_version()));
     AppendMenuW(menu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, title.c_str());
     AppendMenuW(menu, MF_STRING, kCmdDownloadUpdate,
-                Localized(lang, "action.download_update").c_str());
+                Localized(lang, L10nKey::kActionDownloadUpdate).data());
     AppendMenuW(menu, MF_STRING, kCmdSkipUpdate,
-                Localized(lang, "action.skip_version").c_str());
+                Localized(lang, L10nKey::kActionSkipVersion).data());
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
   }
 
   // 2. Optional Non-English keyboard warning section
   if (state_.style != InputStyle::kOff && !state_.is_english_keyboard) {
     const std::wstring warn_title = LocalizedFormat(
-        lang, "menu.input_source_warning.title", state_.keyboard_name);
-    const std::wstring warn_sub =
-        Localized(lang, "menu.input_source_warning.subtitle");
+        lang, L10nKey::kMenuInputSourceWarningTitle, state_.keyboard_name);
+    const std::wstring_view warn_sub =
+        Localized(lang, L10nKey::kMenuInputSourceWarningSubtitle);
     AppendMenuW(menu, MF_STRING | MF_DISABLED | MF_GRAYED, 0,
                 warn_title.c_str());
-    AppendMenuW(menu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, warn_sub.c_str());
+    AppendMenuW(menu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, warn_sub.data());
     AppendMenuW(menu, MF_STRING, kCmdSwitchToUs,
-                Localized(lang, "action.switch_to_us").c_str());
+                Localized(lang, L10nKey::kActionSwitchToUs).data());
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
   }
 
   // 3. Inline Input Method radio items (Off / Telex / VNI / VIQR)
   AppendMenuW(menu, MF_STRING, kCmdStyleOff,
-              InputStyleDisplayName(InputStyle::kOff, lang).c_str());
+              InputStyleDisplayName(InputStyle::kOff, lang).data());
   AppendMenuW(menu, MF_STRING, kCmdStyleTelex,
-              InputStyleDisplayName(InputStyle::kTelex, lang).c_str());
+              InputStyleDisplayName(InputStyle::kTelex, lang).data());
   AppendMenuW(menu, MF_STRING, kCmdStyleVni,
-              InputStyleDisplayName(InputStyle::kVNI, lang).c_str());
+              InputStyleDisplayName(InputStyle::kVNI, lang).data());
   AppendMenuW(menu, MF_STRING, kCmdStyleViqr,
-              InputStyleDisplayName(InputStyle::kVIQR, lang).c_str());
+              InputStyleDisplayName(InputStyle::kVIQR, lang).data());
 
   UINT checked_style_cmd = kCmdStyleTelex;
   switch (state_.style) {
@@ -238,20 +239,20 @@ void TrayIcon::ShowContextMenu() {
   AppendMenuW(menu,
               MF_STRING | (state_.restore_invalid_words ? MF_CHECKED : 0),
               kCmdToggleRestoreInvalid,
-              Localized(lang, "menu.restore_invalid_words").c_str());
+              Localized(lang, L10nKey::kMenuRestoreInvalidWords).data());
 
   AppendMenuW(menu, MF_STRING | (state_.launch_at_login ? MF_CHECKED : 0),
               kCmdToggleLaunchAtLogin,
-              Localized(lang, "menu.launch_at_login").c_str());
+              Localized(lang, L10nKey::kMenuLaunchAtLogin).data());
 
   HMENU lang_menu = CreatePopupMenu();
   if (lang_menu != nullptr) {
     AppendMenuW(lang_menu, MF_STRING, kCmdLangSystem,
-                LanguageDisplayName(AppLanguage::kSystem, lang).c_str());
+                LanguageDisplayName(AppLanguage::kSystem, lang).data());
     AppendMenuW(lang_menu, MF_STRING, kCmdLangVietnamese,
-                LanguageDisplayName(AppLanguage::kVietnamese, lang).c_str());
+                LanguageDisplayName(AppLanguage::kVietnamese, lang).data());
     AppendMenuW(lang_menu, MF_STRING, kCmdLangEnglish,
-                LanguageDisplayName(AppLanguage::kEnglish, lang).c_str());
+                LanguageDisplayName(AppLanguage::kEnglish, lang).data());
 
     UINT checked_lang_cmd = kCmdLangSystem;
     if (lang == AppLanguage::kVietnamese) checked_lang_cmd = kCmdLangVietnamese;
@@ -260,21 +261,22 @@ void TrayIcon::ShowContextMenu() {
                        checked_lang_cmd, MF_BYCOMMAND);
 
     AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(lang_menu),
-                Localized(lang, "menu.language").c_str());
+                Localized(lang, L10nKey::kMenuLanguage).data());
   }
 
   AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
   // 5. Feature Showcase & Settings
   AppendMenuW(menu, MF_STRING, kCmdShowcase,
-              Localized(lang, "menu.showcase").c_str());
+              Localized(lang, L10nKey::kMenuShowcase).data());
   AppendMenuW(menu, MF_STRING, kCmdSettings,
-              Localized(lang, "menu.settings").c_str());
+              Localized(lang, L10nKey::kMenuSettings).data());
 
   AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
   // 6. Quit
-  AppendMenuW(menu, MF_STRING, kCmdQuit, Localized(lang, "menu.quit").c_str());
+  AppendMenuW(menu, MF_STRING, kCmdQuit,
+              Localized(lang, L10nKey::kMenuQuit).data());
 
   POINT pt{};
   GetCursorPos(&pt);

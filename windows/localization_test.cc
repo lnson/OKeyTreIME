@@ -19,30 +19,30 @@ TEST(LocalizationTest, ResolvesPreferredLanguages) {
 }
 
 TEST(LocalizationTest, FormatsLocalizedStrings) {
-  EXPECT_EQ(Localized(AppLanguage::kEnglish, "menu.input_style.off"), L"Off");
-  EXPECT_EQ(Localized(AppLanguage::kVietnamese, "menu.input_style.off"),
+  EXPECT_EQ(Localized(AppLanguage::kEnglish, L10nKey::kMenuInputStyleOff),
+            L"Off");
+  EXPECT_EQ(Localized(AppLanguage::kVietnamese, L10nKey::kMenuInputStyleOff),
             L"Tắt");
-  EXPECT_EQ(
-      LocalizedFormat(AppLanguage::kEnglish, "menu.tooltip.mode", L"Telex"),
-      L"ÔKêyTre: Telex");
-  EXPECT_EQ(LocalizedFormat(AppLanguage::kVietnamese, "settings.sidebar.version",
-                            L"0.3"),
+  EXPECT_EQ(LocalizedFormat(AppLanguage::kEnglish, L10nKey::kMenuTooltipMode,
+                            L"Telex"),
+            L"ÔKêyTre: Telex");
+  EXPECT_EQ(LocalizedFormat(AppLanguage::kVietnamese,
+                            L10nKey::kSettingsSidebarVersion, L"0.3"),
             L"Phiên bản 0.3");
-  EXPECT_EQ(Localized(AppLanguage::kEnglish, "missing.key.example"),
-            L"missing.key.example");
+  EXPECT_EQ(Localized(AppLanguage::kEnglish, L10nKey::kCount), L"");
 }
 
 TEST(LocalizationTest, AppliesWindowsOverridesOverSharedStrings) {
   EXPECT_NE(Localized(AppLanguage::kEnglish,
-                      "settings.general.input_style.description")
+                      L10nKey::kSettingsGeneralInputStyleDescription)
                 .find(L"Left Ctrl + Right Ctrl"),
             std::wstring::npos);
   EXPECT_NE(Localized(AppLanguage::kVietnamese,
-                      "settings.general.input_style.description")
+                      L10nKey::kSettingsGeneralInputStyleDescription)
                 .find(L"Ctrl Trái + Ctrl Phải"),
             std::wstring::npos);
   EXPECT_EQ(Localized(AppLanguage::kEnglish,
-                      "settings.orthography.modern_tone.title"),
+                      L10nKey::kSettingsOrthographyModernToneTitle),
             L"Use modern Vietnamese orthography (\"oà, oé, uý\")");
 }
 

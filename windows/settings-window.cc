@@ -149,9 +149,9 @@ void SettingsWindow::Show(const SettingsViewModel& model) {
     const int x = (GetSystemMetrics(SM_CXSCREEN) - win_w) / 2;
     const int y = (GetSystemMetrics(SM_CYSCREEN) - win_h) / 2;
 
-    const std::wstring title =
-        Localized(model_.language, "settings.window_title");
-    hwnd_ = CreateWindowExW(0, kSettingsClassName, title.c_str(), style, x, y,
+    const std::wstring_view title =
+        Localized(model_.language, L10nKey::kSettingsWindowTitle);
+    hwnd_ = CreateWindowExW(0, kSettingsClassName, title.data(), style, x, y,
                             win_w, win_h, nullptr, nullptr, hinst, this);
     if (hwnd_ == nullptr) {
       return;
@@ -181,9 +181,9 @@ void SettingsWindow::Update(const SettingsViewModel& model) {
   if (hwnd_ == nullptr) {
     return;
   }
-  const std::wstring title =
-      Localized(model_.language, "settings.window_title");
-  SetWindowTextW(hwnd_, title.c_str());
+  const std::wstring_view title =
+      Localized(model_.language, L10nKey::kSettingsWindowTitle);
+  SetWindowTextW(hwnd_, title.data());
   SyncControlsFromModel();
   LayoutChildControls();
   InvalidateRect(hwnd_, nullptr, FALSE);
@@ -271,18 +271,18 @@ void SettingsWindow::SyncControlsFromModel() {
   // Populate Language ComboBox.
   if (combo_language_ != nullptr) {
     SendMessageW(combo_language_, CB_RESETCONTENT, 0, 0);
-    const std::wstring s_sys =
+    const std::wstring_view s_sys =
         LanguageDisplayName(AppLanguage::kSystem, model_.language);
-    const std::wstring s_vi =
+    const std::wstring_view s_vi =
         LanguageDisplayName(AppLanguage::kVietnamese, model_.language);
-    const std::wstring s_en =
+    const std::wstring_view s_en =
         LanguageDisplayName(AppLanguage::kEnglish, model_.language);
     SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_sys.c_str()));
+                 reinterpret_cast<LPARAM>(s_sys.data()));
     SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_vi.c_str()));
+                 reinterpret_cast<LPARAM>(s_vi.data()));
     SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_en.c_str()));
+                 reinterpret_cast<LPARAM>(s_en.data()));
     SendMessageW(combo_language_, CB_SETCURSEL,
                  static_cast<WPARAM>(model_.language), 0);
   }
@@ -293,9 +293,9 @@ void SettingsWindow::SyncControlsFromModel() {
     const InputStyle styles[] = {InputStyle::kOff, InputStyle::kTelex,
                                  InputStyle::kVNI, InputStyle::kVIQR};
     for (InputStyle s : styles) {
-      const std::wstring name = InputStyleDisplayName(s, model_.language);
+      const std::wstring_view name = InputStyleDisplayName(s, model_.language);
       SendMessageW(combo_style_, CB_ADDSTRING, 0,
-                   reinterpret_cast<LPARAM>(name.c_str()));
+                   reinterpret_cast<LPARAM>(name.data()));
     }
     SendMessageW(combo_style_, CB_SETCURSEL, static_cast<WPARAM>(model_.style),
                  0);
@@ -416,18 +416,18 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
                              Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
 
   struct NavItem {
+    Gdiplus::Color badge_color;
+    L10nKey key;
     SettingsSection section;
     HitTargetKind target;
-    std::string_view key;
-    Gdiplus::Color badge_color;
   };
   const NavItem items[] = {
-      {SettingsSection::kGeneral, HitTargetKind::kNavGeneral,
-       "settings.section.general", palette_.accent_teal},
-      {SettingsSection::kCorrection, HitTargetKind::kNavCorrection,
-       "settings.section.correction", palette_.accent_blue},
-      {SettingsSection::kAdvanced, HitTargetKind::kNavAdvanced,
-       "settings.section.advanced", palette_.accent_gray},
+      {palette_.accent_teal, L10nKey::kSettingsSectionGeneral,
+       SettingsSection::kGeneral, HitTargetKind::kNavGeneral},
+      {palette_.accent_blue, L10nKey::kSettingsSectionCorrection,
+       SettingsSection::kCorrection, HitTargetKind::kNavCorrection},
+      {palette_.accent_gray, L10nKey::kSettingsSectionAdvanced,
+       SettingsSection::kAdvanced, HitTargetKind::kNavAdvanced},
   };
 
   float row_y = ScaleDpiF(18.0f, dpi_);
@@ -456,7 +456,7 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
                              row_rect.Y,
                              row_rect.Width - badge_sz - ScaleDpiF(26.0f, dpi_),
                              row_h);
-    const std::wstring label = Localized(model_.language, item.key);
+    const std::wstring_view label = Localized(model_.language, item.key);
     DrawTextLeft(g, label, selected ? nav_font_sel : nav_font,
                  palette_.text_primary, text_rect);
 
@@ -492,15 +492,17 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
   center_fmt.SetAlignment(Gdiplus::StringAlignmentCenter);
   center_fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
 
-  const std::wstring app_name = Localized(model_.language, "app.name");
+  const std::wstring_view app_name =
+      Localized(model_.language, L10nKey::kAppName);
   Gdiplus::SolidBrush primary_brush(palette_.text_primary);
   Gdiplus::RectF name_rect(0.0f, logo_rect.GetBottom() + ScaleDpiF(6.0f, dpi_),
                            sidebar_w, ScaleDpiF(18.0f, dpi_));
-  g.DrawString(app_name.c_str(), static_cast<INT>(app_name.size()), &app_font,
+  g.DrawString(app_name.data(), static_cast<INT>(app_name.size()), &app_font,
                name_rect, &center_fmt, &primary_brush);
 
   const std::wstring ver_str = LocalizedFormat(
-      model_.language, "settings.sidebar.version", model_.current_version);
+      model_.language, L10nKey::kSettingsSidebarVersion,
+      model_.current_version);
   Gdiplus::SolidBrush secondary_brush(palette_.text_secondary);
   Gdiplus::RectF ver_rect(0.0f, name_rect.GetBottom() + ScaleDpiF(1.0f, dpi_),
                           sidebar_w, ScaleDpiF(16.0f, dpi_));
@@ -525,11 +527,11 @@ void SettingsWindow::PaintDetailPane(Gdiplus::Graphics& g, int width,
   Gdiplus::Font title_font(font_name.c_str(), ScaleDpiF(20.0f, dpi_),
                            Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
 
-  std::string_view title_key = "settings.section.general";
+  L10nKey title_key = L10nKey::kSettingsSectionGeneral;
   if (section_ == SettingsSection::kCorrection) {
-    title_key = "settings.section.correction";
+    title_key = L10nKey::kSettingsSectionCorrection;
   } else if (section_ == SettingsSection::kAdvanced) {
-    title_key = "settings.section.advanced";
+    title_key = L10nKey::kSettingsSectionAdvanced;
   }
 
   Gdiplus::RectF title_rect(x, ScaleDpiF(16.0f, dpi_), w,
@@ -570,7 +572,7 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
   Gdiplus::Pen div_pen(palette_.divider, 1.0f);
 
   // --- Section 1: System ---
-  DrawTextLeft(g, Localized(model_.language, "settings.general.system.header"),
+  DrawTextLeft(g, Localized(model_.language, L10nKey::kSettingsGeneralSystemHeader),
                hdr_font, palette_.text_secondary,
                Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
                               ScaleDpiF(20.0f, dpi_)));
@@ -584,13 +586,14 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
 
   // Row 1: Input Method (ComboBox sits at right).
   const float text_w1 = w - pad * 2.0f - ScaleDpiF(134.0f, dpi_);
-  DrawTextLeft(g, Localized(model_.language, "menu.input_style"),
+  DrawTextLeft(g, Localized(model_.language, L10nKey::kMenuInputStyle),
                row_title_font, palette_.text_primary,
                Gdiplus::RectF(x + pad, y + ScaleDpiF(11.0f, dpi_), text_w1,
                               ScaleDpiF(20.0f, dpi_)));
   DrawTextLeft(
       g,
-      Localized(model_.language, "settings.general.input_style.description"),
+      Localized(model_.language,
+                L10nKey::kSettingsGeneralInputStyleDescription),
       desc_font, palette_.text_secondary,
       Gdiplus::RectF(x + pad, y + ScaleDpiF(32.0f, dpi_), text_w1,
                      ScaleDpiF(34.0f, dpi_)),
@@ -601,17 +604,18 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
 
   // Row 2: Launch at Login toggle.
   const float text_w2 = w - pad * 2.0f - toggle_w - ScaleDpiF(16.0f, dpi_);
-  DrawTextLeft(g, Localized(model_.language, "menu.launch_at_login"),
+  DrawTextLeft(g, Localized(model_.language, L10nKey::kMenuLaunchAtLogin),
                row_title_font, palette_.text_primary,
                Gdiplus::RectF(x + pad, div1_y + ScaleDpiF(11.0f, dpi_), text_w2,
                               ScaleDpiF(20.0f, dpi_)));
-  DrawTextLeft(g,
-               Localized(model_.language,
-                         "settings.general.launch_at_login.description"),
-               desc_font, palette_.text_secondary,
-               Gdiplus::RectF(x + pad, div1_y + ScaleDpiF(32.0f, dpi_), text_w2,
-                              ScaleDpiF(28.0f, dpi_)),
-               /*wrap=*/true);
+  DrawTextLeft(
+      g,
+      Localized(model_.language,
+                L10nKey::kSettingsGeneralLaunchAtLoginDescription),
+      desc_font, palette_.text_secondary,
+      Gdiplus::RectF(x + pad, div1_y + ScaleDpiF(32.0f, dpi_), text_w2,
+                     ScaleDpiF(28.0f, dpi_)),
+      /*wrap=*/true);
   Gdiplus::RectF login_toggle(x + w - pad - toggle_w,
                               div1_y + (row2_h - toggle_h) * 0.5f, toggle_w,
                               toggle_h);
@@ -622,7 +626,7 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
 
   // --- Section 2: Updates ---
   y = sys_card.GetBottom() + ScaleDpiF(20.0f, dpi_);
-  DrawTextLeft(g, Localized(model_.language, "settings.updates.header"),
+  DrawTextLeft(g, Localized(model_.language, L10nKey::kSettingsUpdatesHeader),
                hdr_font, palette_.text_secondary,
                Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
                               ScaleDpiF(20.0f, dpi_)));
@@ -637,12 +641,13 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
 
   // Update Row 1: Auto-check toggle
   DrawTextLeft(
-      g, Localized(model_.language, "settings.updates.auto_check.title"),
+      g, Localized(model_.language, L10nKey::kSettingsUpdatesAutoCheckTitle),
       row_title_font, palette_.text_primary,
       Gdiplus::RectF(x + pad, y + ScaleDpiF(10.0f, dpi_), text_w2,
                      ScaleDpiF(20.0f, dpi_)));
   DrawTextLeft(
-      g, Localized(model_.language, "settings.updates.auto_check.description"),
+      g,
+      Localized(model_.language, L10nKey::kSettingsUpdatesAutoCheckDescription),
       desc_font, palette_.text_secondary,
       Gdiplus::RectF(x + pad, y + ScaleDpiF(31.0f, dpi_), text_w2,
                      ScaleDpiF(32.0f, dpi_)),
@@ -667,7 +672,7 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
   Gdiplus::RectF check_btn(right_edge - check_btn_w, btn_y, check_btn_w, btn_h);
   DrawFluentButton(
       g, check_btn,
-      Localized(model_.language, "settings.sidebar.check_updates"),
+      Localized(model_.language, L10nKey::kSettingsSidebarCheckUpdates),
       /*is_primary=*/false,
       hovered_target_ == HitTargetKind::kButtonCheckUpdates,
       model_.is_checking_updates, palette_, dpi_);
@@ -678,7 +683,7 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
     const float dl_btn_w = ScaleDpiF(128.0f, dpi_);
     Gdiplus::RectF dl_btn(right_edge - dl_btn_w, btn_y, dl_btn_w, btn_h);
     DrawFluentButton(g, dl_btn,
-                     Localized(model_.language, "action.download_update"),
+                     Localized(model_.language, L10nKey::kActionDownloadUpdate),
                      /*is_primary=*/true,
                      hovered_target_ == HitTargetKind::kButtonDownloadUpdate,
                      /*is_disabled=*/false, palette_, dpi_);
@@ -694,14 +699,14 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
 
   if (model_.available_release.has_value()) {
     const std::wstring avail = LocalizedFormat(
-        model_.language, "settings.updates.available_status",
+        model_.language, L10nKey::kSettingsUpdatesAvailableStatus,
         Utf8ToWide(model_.available_release->display_version()));
     DrawTextLeft(g, avail, row_title_bold, palette_.text_primary,
                  Gdiplus::RectF(x + pad, main_y, status_w,
                                 ScaleDpiF(20.0f, dpi_)));
   } else {
     const std::wstring cur = LocalizedFormat(
-        model_.language, "settings.updates.current_version",
+        model_.language, L10nKey::kSettingsUpdatesCurrentVersion,
         model_.current_version);
     DrawTextLeft(g, cur, row_title_font, palette_.text_primary,
                  Gdiplus::RectF(x + pad, main_y, status_w,
@@ -710,13 +715,14 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
 
   if (model_.is_checking_updates) {
     DrawTextLeft(
-        g, Localized(model_.language, "settings.sidebar.checking_updates"),
+        g,
+        Localized(model_.language, L10nKey::kSettingsSidebarCheckingUpdates),
         desc_font, palette_.text_secondary,
         Gdiplus::RectF(x + pad, u_div1_y + ScaleDpiF(32.0f, dpi_), status_w,
                        ScaleDpiF(18.0f, dpi_)));
   } else if (model_.did_confirm_up_to_date) {
     DrawTextLeft(
-        g, Localized(model_.language, "settings.sidebar.up_to_date"),
+        g, Localized(model_.language, L10nKey::kSettingsSidebarUpToDate),
         desc_font, palette_.accent_green,
         Gdiplus::RectF(x + pad, u_div1_y + ScaleDpiF(32.0f, dpi_), status_w,
                        ScaleDpiF(18.0f, dpi_)));
@@ -729,14 +735,15 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
   const float link_w = ScaleDpiF(122.0f, dpi_);
   const float text_w3 = w - pad * 2.0f - link_w - ScaleDpiF(12.0f, dpi_);
   DrawTextLeft(
-      g, Localized(model_.language, "settings.updates.manual_download.title"),
+      g,
+      Localized(model_.language, L10nKey::kSettingsUpdatesManualDownloadTitle),
       row_title_font, palette_.text_primary,
       Gdiplus::RectF(x + pad, u_div2_y + ScaleDpiF(10.0f, dpi_), text_w3,
                      ScaleDpiF(20.0f, dpi_)));
   DrawTextLeft(
       g,
       Localized(model_.language,
-                "settings.updates.manual_download.description"),
+                L10nKey::kSettingsUpdatesManualDownloadDescription),
       desc_font, palette_.text_secondary,
       Gdiplus::RectF(x + pad, u_div2_y + ScaleDpiF(31.0f, dpi_), text_w3,
                      ScaleDpiF(32.0f, dpi_)),
@@ -746,7 +753,8 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
                            u_div2_y + (u_row3_h - ScaleDpiF(24.0f, dpi_)) * 0.5f,
                            link_w, ScaleDpiF(24.0f, dpi_));
   const std::wstring link_text =
-      Localized(model_.language, "settings.updates.manual_download.link") +
+      std::wstring(Localized(model_.language,
+                             L10nKey::kSettingsUpdatesManualDownloadLink)) +
       L" ↗";
   const bool link_hovered =
       (hovered_target_ == HitTargetKind::kLinkManualDownload);
@@ -780,9 +788,8 @@ void SettingsWindow::PaintCorrectionPane(Gdiplus::Graphics& g, float x, float y,
   const float text_w = w - pad * 2.0f - toggle_w - ScaleDpiF(16.0f, dpi_);
   Gdiplus::Pen div_pen(palette_.divider, 1.0f);
 
-  auto draw_toggle_row = [&](float row_y, float row_h, std::string_view title_k,
-                             std::string_view desc_k, bool value,
-                             HitTargetKind target) {
+  auto draw_toggle_row = [&](float row_y, float row_h, L10nKey title_k,
+                             L10nKey desc_k, bool value, HitTargetKind target) {
     DrawTextLeft(g, Localized(model_.language, title_k), row_title_font,
                  palette_.text_primary,
                  Gdiplus::RectF(x + pad, row_y + ScaleDpiF(10.0f, dpi_), text_w,
@@ -800,23 +807,23 @@ void SettingsWindow::PaintCorrectionPane(Gdiplus::Graphics& g, float x, float y,
   };
 
   // Section 1: Tone Placement
-  DrawTextLeft(g, Localized(model_.language, "settings.orthography.header"),
-               hdr_font, palette_.text_secondary,
-               Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
-                              ScaleDpiF(20.0f, dpi_)));
+  DrawTextLeft(
+      g, Localized(model_.language, L10nKey::kSettingsOrthographyHeader),
+      hdr_font, palette_.text_secondary,
+      Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w, ScaleDpiF(20.0f, dpi_)));
   y += ScaleDpiF(22.0f, dpi_);
 
   const float h_tone = ScaleDpiF(68.0f, dpi_);
   Gdiplus::RectF tone_card(x, y, w, h_tone);
   FillRoundedRect(g, tone_card, card_r, palette_.card_bg);
   StrokeRoundedRect(g, tone_card, card_r, palette_.card_border, 1.0f);
-  draw_toggle_row(y, h_tone, "settings.orthography.modern_tone.title",
-                  "settings.orthography.modern_tone.description",
+  draw_toggle_row(y, h_tone, L10nKey::kSettingsOrthographyModernToneTitle,
+                  L10nKey::kSettingsOrthographyModernToneDescription,
                   model_.modern_tone, HitTargetKind::kToggleModernTone);
 
   // Section 2: Non-Vietnamese Words
   y = tone_card.GetBottom() + ScaleDpiF(14.0f, dpi_);
-  DrawTextLeft(g, Localized(model_.language, "settings.english.header"),
+  DrawTextLeft(g, Localized(model_.language, L10nKey::kSettingsEnglishHeader),
                hdr_font, palette_.text_secondary,
                Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
                               ScaleDpiF(20.0f, dpi_)));
@@ -826,17 +833,17 @@ void SettingsWindow::PaintCorrectionPane(Gdiplus::Graphics& g, float x, float y,
   Gdiplus::RectF eng_card(x, y, w, h_eng);
   FillRoundedRect(g, eng_card, card_r, palette_.card_bg);
   StrokeRoundedRect(g, eng_card, card_r, palette_.card_border, 1.0f);
-  draw_toggle_row(y, h_eng, "settings.english.restore_invalid.title",
-                  "settings.english.restore_invalid.description",
+  draw_toggle_row(y, h_eng, L10nKey::kSettingsEnglishRestoreInvalidTitle,
+                  L10nKey::kSettingsEnglishRestoreInvalidDescription,
                   model_.restore_invalid_words,
                   HitTargetKind::kToggleRestoreInvalid);
 
   // Section 3: Spelling & Diphthongs
   y = eng_card.GetBottom() + ScaleDpiF(14.0f, dpi_);
-  DrawTextLeft(g, Localized(model_.language, "settings.correction.header"),
-               hdr_font, palette_.text_secondary,
-               Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
-                              ScaleDpiF(20.0f, dpi_)));
+  DrawTextLeft(
+      g, Localized(model_.language, L10nKey::kSettingsCorrectionHeader),
+      hdr_font, palette_.text_secondary,
+      Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w, ScaleDpiF(20.0f, dpi_)));
   y += ScaleDpiF(22.0f, dpi_);
 
   const float h_row = ScaleDpiF(64.0f, dpi_);
@@ -844,20 +851,20 @@ void SettingsWindow::PaintCorrectionPane(Gdiplus::Graphics& g, float x, float y,
   FillRoundedRect(g, corr_card, card_r, palette_.card_bg);
   StrokeRoundedRect(g, corr_card, card_r, palette_.card_border, 1.0f);
 
-  draw_toggle_row(y, h_row, "settings.correction.uo_horn.title",
-                  "settings.correction.uo_horn.description", model_.uo_horn,
+  draw_toggle_row(y, h_row, L10nKey::kSettingsCorrectionUoHornTitle,
+                  L10nKey::kSettingsCorrectionUoHornDescription, model_.uo_horn,
                   HitTargetKind::kToggleUoHorn);
   g.DrawLine(&div_pen, x + pad, y + h_row, x + w - pad, y + h_row);
 
-  draw_toggle_row(y + h_row, h_row, "settings.correction.ng_to_ngh.title",
-                  "settings.correction.ng_to_ngh.description",
+  draw_toggle_row(y + h_row, h_row, L10nKey::kSettingsCorrectionNgToNghTitle,
+                  L10nKey::kSettingsCorrectionNgToNghDescription,
                   model_.ng_to_ngh, HitTargetKind::kToggleNgToNgh);
   g.DrawLine(&div_pen, x + pad, y + h_row * 2.0f, x + w - pad,
              y + h_row * 2.0f);
 
   draw_toggle_row(y + h_row * 2.0f, h_row,
-                  "settings.correction.ngh_to_ng.title",
-                  "settings.correction.ngh_to_ng.description",
+                  L10nKey::kSettingsCorrectionNghToNgTitle,
+                  L10nKey::kSettingsCorrectionNghToNgDescription,
                   model_.ngh_to_ng, HitTargetKind::kToggleNghToNg);
 }
 
@@ -874,7 +881,7 @@ void SettingsWindow::PaintAdvancedPane(Gdiplus::Graphics& g, float x, float y,
   const float card_r = ScaleDpiF(8.0f, dpi_);
   const float pad = ScaleDpiF(16.0f, dpi_);
 
-  DrawTextLeft(g, Localized(model_.language, "settings.advanced.header"),
+  DrawTextLeft(g, Localized(model_.language, L10nKey::kSettingsAdvancedHeader),
                hdr_font, palette_.text_secondary,
                Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
                               ScaleDpiF(20.0f, dpi_)));
@@ -887,13 +894,15 @@ void SettingsWindow::PaintAdvancedPane(Gdiplus::Graphics& g, float x, float y,
 
   const float text_w = w - pad * 2.0f - ScaleDpiF(96.0f, dpi_);
   DrawTextLeft(
-      g, Localized(model_.language, "settings.advanced.buffer_size.title"),
+      g,
+      Localized(model_.language, L10nKey::kSettingsAdvancedBufferSizeTitle),
       row_title_font, palette_.text_primary,
       Gdiplus::RectF(x + pad, y + ScaleDpiF(12.0f, dpi_), text_w,
                      ScaleDpiF(20.0f, dpi_)));
   DrawTextLeft(
       g,
-      Localized(model_.language, "settings.advanced.buffer_size.description"),
+      Localized(model_.language,
+                L10nKey::kSettingsAdvancedBufferSizeDescription),
       desc_font, palette_.text_secondary,
       Gdiplus::RectF(x + pad, y + ScaleDpiF(34.0f, dpi_), text_w,
                      ScaleDpiF(46.0f, dpi_)),

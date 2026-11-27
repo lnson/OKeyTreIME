@@ -147,7 +147,7 @@ bool IsEnglishKeyboardLayout(HKL hkl) noexcept {
 
 std::wstring GetKeyboardLayoutDisplayName(HKL hkl, AppLanguage language) {
   if (hkl == nullptr) {
-    return Localized(language, "input_source.unknown");
+    return std::wstring(Localized(language, L10nKey::kInputSourceUnknown));
   }
   const std::wstring* special_text = nullptr;
   const LANGID input_lang = LOWORD(reinterpret_cast<uintptr_t>(hkl));
@@ -167,7 +167,7 @@ std::wstring GetKeyboardLayoutDisplayName(HKL hkl, AppLanguage language) {
       return std::wstring(display_name);
     }
   }
-  return Localized(language, "input_source.unknown");
+  return std::wstring(Localized(language, L10nKey::kInputSourceUnknown));
 }
 
 }  // namespace
@@ -219,24 +219,25 @@ void InputSourceManager::CheckAndWarnOnStartup(AppLanguage language) {
     return;
   }
 
-  const std::wstring title =
-      Localized(language, "alert.non_english_keyboard.title");
+  const std::wstring_view title =
+      Localized(language, L10nKey::kAlertNonEnglishKeyboardTitle);
   const std::wstring message = LocalizedFormat(
-      language, "alert.non_english_keyboard.message", current_source_name_);
-  const std::wstring btn_switch = Localized(language, "action.switch_to_us");
-  const std::wstring btn_settings = Localized(
-      language, "alert.non_english_keyboard.open_keyboard_settings");
-  const std::wstring btn_ignore =
-      Localized(language, "alert.non_english_keyboard.ignore");
+      language, L10nKey::kAlertNonEnglishKeyboardMessage, current_source_name_);
+  const std::wstring_view btn_switch =
+      Localized(language, L10nKey::kActionSwitchToUs);
+  const std::wstring_view btn_settings = Localized(
+      language, L10nKey::kAlertNonEnglishKeyboardOpenKeyboardSettings);
+  const std::wstring_view btn_ignore =
+      Localized(language, L10nKey::kAlertNonEnglishKeyboardIgnore);
 
   constexpr int kBtnSwitchId = 1001;
   constexpr int kBtnSettingsId = 1002;
   constexpr int kBtnIgnoreId = 1003;
 
   const TASKDIALOG_BUTTON buttons[] = {
-      {kBtnSwitchId, btn_switch.c_str()},
-      {kBtnSettingsId, btn_settings.c_str()},
-      {kBtnIgnoreId, btn_ignore.c_str()},
+      {kBtnSwitchId, btn_switch.data()},
+      {kBtnSettingsId, btn_settings.data()},
+      {kBtnIgnoreId, btn_ignore.data()},
   };
 
   TASKDIALOGCONFIG cfg{};
@@ -244,7 +245,7 @@ void InputSourceManager::CheckAndWarnOnStartup(AppLanguage language) {
   cfg.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
   cfg.pszWindowTitle = L"ÔKêyTre";
   cfg.pszMainIcon = TD_WARNING_ICON;
-  cfg.pszMainInstruction = title.c_str();
+  cfg.pszMainInstruction = title.data();
   cfg.pszContent = message.c_str();
   cfg.cButtons = static_cast<UINT>(std::size(buttons));
   cfg.pButtons = buttons;

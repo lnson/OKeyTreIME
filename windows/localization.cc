@@ -87,23 +87,20 @@ std::string_view ResolveSystemLanguageCode(AppLanguage language) {
   return ResolveLanguageCode(language, GetSystemPreferredLanguages());
 }
 
-std::wstring Localized(AppLanguage language, std::string_view key) {
+std::wstring_view Localized(AppLanguage language, L10nKey key) {
+  const size_t idx = static_cast<size_t>(key);
+  if (idx >= static_cast<size_t>(L10nKey::kCount)) {
+    return L"";
+  }
   const std::string_view code = ResolveSystemLanguageCode(language);
-  const auto& table = (code == "en") ? generated::EnglishStrings()
-                                     : generated::VietnameseStrings();
-  if (const auto it = table.find(key); it != table.end()) {
-    return std::wstring(it->second);
-  }
-  const auto& fallback = generated::EnglishStrings();
-  if (const auto it = fallback.find(key); it != fallback.end()) {
-    return std::wstring(it->second);
-  }
-  return Utf8ToWide(key);
+  const auto& table = (code == "en") ? generated::kEnglishStrings
+                                     : generated::kVietnameseStrings;
+  return table[idx];
 }
 
-std::wstring LocalizedFormat(AppLanguage language, std::string_view key,
+std::wstring LocalizedFormat(AppLanguage language, L10nKey key,
                              std::wstring_view arg) {
-  std::wstring result = Localized(language, key);
+  std::wstring result(Localized(language, key));
   const size_t pos = result.find(L"%@");
   if (pos != std::wstring::npos) {
     result.replace(pos, 2, arg);
@@ -111,17 +108,17 @@ std::wstring LocalizedFormat(AppLanguage language, std::string_view key,
   return result;
 }
 
-std::wstring LanguageDisplayName(AppLanguage option,
-                                 AppLanguage active_language) {
+std::wstring_view LanguageDisplayName(AppLanguage option,
+                                      AppLanguage active_language) {
   switch (option) {
     case AppLanguage::kSystem:
-      return Localized(active_language, "language.system");
+      return Localized(active_language, L10nKey::kLanguageSystem);
     case AppLanguage::kVietnamese:
       return L"Tiếng Việt";
     case AppLanguage::kEnglish:
       return L"English";
   }
-  return Localized(active_language, "language.system");
+  return Localized(active_language, L10nKey::kLanguageSystem);
 }
 
 std::wstring Utf8ToWide(std::string_view utf8) {
