@@ -281,6 +281,9 @@ void TrayIcon::ShowContextMenu() {
   POINT pt{};
   GetCursorPos(&pt);
 
+  // Match the Windows taskbar theme (dark flyout vs. light taskbar).
+  RefreshNativeMenuTheme(IsTaskbarDarkMode());
+
   // Required by Win32 shell guidelines so clicking outside dismisses the menu.
   SetForegroundWindow(owner_hwnd_);
   const UINT cmd = static_cast<UINT>(TrackPopupMenuEx(

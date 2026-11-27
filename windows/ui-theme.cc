@@ -148,6 +148,46 @@ void ApplyWindowThemeAttributes(HWND hwnd, bool dark_mode) {
                         sizeof(kDwmwcpRound));
 }
 
+void ApplyControlTheme(HWND hwnd, bool dark_mode) {
+  if (hwnd == nullptr) {
+    return;
+  }
+  SetWindowTheme(hwnd, dark_mode ? L"DarkMode_CFD" : L"Explorer", nullptr);
+}
+
+void RefreshNativeMenuTheme(bool dark_mode) {
+  HMODULE uxtheme = GetModuleHandleW(L"uxtheme.dll");
+  if (uxtheme == nullptr) {
+    uxtheme = LoadLibraryExW(L"uxtheme.dll", nullptr,
+                             LOAD_LIBRARY_SEARCH_SYSTEM32);
+  }
+  if (uxtheme == nullptr) {
+    return;
+  }
+
+  enum class PreferredAppMode : int {
+    kDefault = 0,
+    kAllowDark = 1,
+    kForceDark = 2,
+    kForceLight = 3,
+    kMax = 4,
+  };
+  using SetPreferredAppModeFn = PreferredAppMode(WINAPI*)(PreferredAppMode);
+  using FlushMenuThemesFn = void(WINAPI*)();
+
+  auto set_preferred_app_mode = reinterpret_cast<SetPreferredAppModeFn>(
+      GetProcAddress(uxtheme, MAKEINTRESOURCEA(135)));
+  auto flush_menu_themes = reinterpret_cast<FlushMenuThemesFn>(
+      GetProcAddress(uxtheme, MAKEINTRESOURCEA(136)));
+  if (set_preferred_app_mode != nullptr) {
+    set_preferred_app_mode(dark_mode ? PreferredAppMode::kForceDark
+                                     : PreferredAppMode::kForceLight);
+  }
+  if (flush_menu_themes != nullptr) {
+    flush_menu_themes();
+  }
+}
+
 int ScaleDpi(int value, UINT dpi) noexcept {
   return MulDiv(value, static_cast<int>(dpi), 96);
 }
@@ -291,6 +331,45 @@ void DrawFluentButton(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
   fmt.SetFormatFlags(Gdiplus::StringFormatFlagsNoWrap);
   g.DrawString(text.data(), static_cast<INT>(text.size()), &font, rect, &fmt,
                &brush);
+}
+
+void DrawFluentDropdown(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
+                        std::wstring_view text, bool is_hovered,
+                        const ThemePalette& palette, UINT dpi) {
+  const float radius = ScaleDpiF(6.0f, dpi);
+  const Gdiplus::Color fill =
+      is_hovered ? palette.hover_bg : palette.control_bg;
+  FillRoundedRect(g, rect, radius, fill);
+  StrokeRoundedRect(g, rect, radius, palette.control_border, 1.0f);
+
+  const float pad_l = ScaleDpiF(10.0f, dpi);
+  const float chev_area = ScaleDpiF(22.0f, dpi);
+  const std::wstring family = PreferredFontFamily();
+  Gdiplus::Font font(family.c_str(), ScaleDpiF(12.0f, dpi),
+                     Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+  Gdiplus::SolidBrush text_brush(palette.text_primary);
+  Gdiplus::StringFormat fmt;
+  fmt.SetAlignment(Gdiplus::StringAlignmentNear);
+  fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
+  fmt.SetFormatFlags(Gdiplus::StringFormatFlagsNoWrap);
+  fmt.SetTrimming(Gdiplus::StringTrimmingEllipsisCharacter);
+  Gdiplus::RectF text_rect(rect.X + pad_l, rect.Y,
+                           std::max(0.0f, rect.Width - pad_l - chev_area),
+                           rect.Height);
+  g.DrawString(text.data(), static_cast<INT>(text.size()), &font, text_rect,
+               &fmt, &text_brush);
+
+  // Subtle downward chevron.
+  const float cx = rect.GetRight() - ScaleDpiF(12.0f, dpi);
+  const float cy = rect.Y + rect.Height * 0.5f;
+  const float hw = ScaleDpiF(3.5f, dpi);
+  const float hh = ScaleDpiF(2.0f, dpi);
+  Gdiplus::Pen pen(palette.text_secondary, ScaleDpiF(1.3f, dpi));
+  pen.SetStartCap(Gdiplus::LineCapRound);
+  pen.SetEndCap(Gdiplus::LineCapRound);
+  pen.SetLineJoin(Gdiplus::LineJoinRound);
+  g.DrawLine(&pen, cx - hw, cy - hh, cx, cy + hh);
+  g.DrawLine(&pen, cx, cy + hh, cx + hw, cy - hh);
 }
 
 void DrawAppLogo(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,

@@ -64,6 +64,13 @@ ThemePalette GetThemePalette(bool dark_mode);
 // Applies Windows 11 dark titlebar and rounded corners when supported.
 void ApplyWindowThemeAttributes(HWND hwnd, bool dark_mode);
 
+// Applies light/dark UxTheme styling to native Win32 child controls.
+void ApplyControlTheme(HWND hwnd, bool dark_mode);
+
+// Configures Win32 native popup menus (`TrackPopupMenuEx`) to render in
+// light or dark mode on Windows 10 1903+ and Windows 11.
+void RefreshNativeMenuTheme(bool dark_mode);
+
 int ScaleDpi(int value, UINT dpi) noexcept;
 float ScaleDpiF(float value, UINT dpi) noexcept;
 
@@ -89,6 +96,10 @@ void DrawToggleSwitch(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
 void DrawFluentButton(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
                       std::wstring_view text, bool is_primary, bool is_hovered,
                       bool is_disabled, const ThemePalette& palette, UINT dpi);
+
+void DrawFluentDropdown(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
+                        std::wstring_view text, bool is_hovered,
+                        const ThemePalette& palette, UINT dpi);
 
 void DrawAppLogo(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
                  float corner_radius);
