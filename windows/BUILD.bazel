@@ -202,9 +202,12 @@ cc_library(
         ":shortcut_detectors",
         ":update_parser",
         "//OKeyTre/ime/core:OKeyTreEngineLib",
+        "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/base:no_destructor",
         "@abseil-cpp//absl/cleanup",
         "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/synchronization",
+        "@abseil-cpp//absl/time",
     ],
 )
 

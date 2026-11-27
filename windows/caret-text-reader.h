@@ -4,12 +4,13 @@
 #ifndef OKEYTRE_WINDOWS_CARET_TEXT_READER_H_
 #define OKEYTRE_WINDOWS_CARET_TEXT_READER_H_
 
-#include <condition_variable>
 #include <cstdint>
-#include <mutex>
 #include <optional>
 #include <thread>
 
+#include "absl/base/thread_annotations.h"
+#include "absl/synchronization/mutex.h"
+#include "absl/time/time.h"
 #include "windows/ime-controller.h"
 
 struct IUIAutomation;
@@ -38,9 +39,11 @@ class CaretTextReader {
   int32_t GetSelectedRangeLength();
 
  private:
-  enum class WorkerRequestKind { kNone, kSurroundingText, kHasSelection };
+  enum class WorkerRequestKind : uint8_t { kNone, kSurroundingText, kHasSelection };
 
-  void EnsureWorkerStarted();
+  void EnsureWorkerStarted() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
+  bool RunWorkerRequest(WorkerRequestKind kind, absl::Duration budget)
+      ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   void WorkerLoop();
   std::optional<SurroundingWord> ReadViaUIAutomationOnWorker(
       IUIAutomation* automation);
@@ -48,18 +51,18 @@ class CaretTextReader {
   std::optional<SurroundingWord> ReadViaWin32Edit();
   int32_t SelectionLengthViaWin32Edit();
 
-  std::mutex mu_;
-  std::condition_variable cv_request_;
-  std::condition_variable cv_response_;
+  absl::Mutex mu_;
   std::thread worker_;
-  bool worker_started_ = false;
-  bool stop_ = false;
-  bool in_flight_ = false;
-  WorkerRequestKind request_kind_ = WorkerRequestKind::kNone;
-  uint64_t request_id_ = 0;
-  uint64_t completed_id_ = 0;
-  std::optional<SurroundingWord> worker_surrounding_result_;
-  bool worker_has_selection_result_ = false;
+  uint64_t request_id_ ABSL_GUARDED_BY(mu_) = 0;
+  uint64_t completed_id_ ABSL_GUARDED_BY(mu_) = 0;
+  std::optional<SurroundingWord> worker_surrounding_result_
+      ABSL_GUARDED_BY(mu_);
+  WorkerRequestKind request_kind_ ABSL_GUARDED_BY(mu_) =
+      WorkerRequestKind::kNone;
+  bool worker_started_ ABSL_GUARDED_BY(mu_) = false;
+  bool stop_ ABSL_GUARDED_BY(mu_) = false;
+  bool in_flight_ ABSL_GUARDED_BY(mu_) = false;
+  bool worker_has_selection_result_ ABSL_GUARDED_BY(mu_) = false;
 };
 
 }  // namespace okeytre::win

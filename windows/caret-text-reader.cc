@@ -9,7 +9,6 @@
 #include <wrl/client.h>
 
 #include <algorithm>
-#include <chrono>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -20,8 +19,8 @@ namespace {
 
 constexpr UINT kSendMsgTimeoutMs = 50;
 constexpr DWORD kUiaRpcTimeoutMs = 50;
-constexpr auto kSurroundingWaitBudget = std::chrono::milliseconds(35);
-constexpr auto kSelectionWaitBudget = std::chrono::milliseconds(25);
+constexpr absl::Duration kSurroundingWaitBudget = absl::Milliseconds(35);
+constexpr absl::Duration kSelectionWaitBudget = absl::Milliseconds(25);
 constexpr int32_t kWindowRadiusChars = 64;
 constexpr int32_t kMaxClassicEditLen = 65536;
 
@@ -86,10 +85,9 @@ bool IsElementReadOnly(IUIAutomationElement* element) {
 
 CaretTextReader::~CaretTextReader() {
   {
-    std::lock_guard<std::mutex> lock(mu_);
+    absl::MutexLock lock(mu_);
     stop_ = true;
   }
-  cv_request_.notify_one();
   if (worker_.joinable()) {
     worker_.join();
   }
@@ -101,6 +99,25 @@ void CaretTextReader::EnsureWorkerStarted() {
   }
   worker_started_ = true;
   worker_ = std::thread(&CaretTextReader::WorkerLoop, this);
+}
+
+bool CaretTextReader::RunWorkerRequest(WorkerRequestKind kind,
+                                       absl::Duration budget) {
+  EnsureWorkerStarted();
+
+  // If a previous cross-process UIA query is still unwinding, skip rather than
+  // blocking the low-level keyboard hook.
+  if (in_flight_) {
+    return false;
+  }
+
+  in_flight_ = true;
+  request_kind_ = kind;
+  const uint64_t my_id = ++request_id_;
+  auto done = [this, my_id]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
+    return completed_id_ >= my_id || stop_;
+  };
+  return mu_.AwaitWithTimeout(absl::Condition(&done), budget) && !stop_;
 }
 
 void CaretTextReader::WorkerLoop() {
@@ -125,10 +142,11 @@ void CaretTextReader::WorkerLoop() {
     uint64_t target_id = 0;
     WorkerRequestKind kind = WorkerRequestKind::kNone;
     {
-      std::unique_lock<std::mutex> lock(mu_);
-      cv_request_.wait(lock, [this]() {
+      absl::MutexLock lock(mu_);
+      auto has_work = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_) {
         return stop_ || request_id_ != completed_id_;
-      });
+      };
+      mu_.Await(absl::Condition(&has_work));
       if (stop_) {
         break;
       }
@@ -147,13 +165,12 @@ void CaretTextReader::WorkerLoop() {
     }
 
     {
-      std::lock_guard<std::mutex> lock(mu_);
+      absl::MutexLock lock(mu_);
       worker_surrounding_result_ = std::move(surrounding);
       worker_has_selection_result_ = has_selection;
       completed_id_ = target_id;
       in_flight_ = false;
     }
-    cv_response_.notify_one();
   }
 
   automation.Reset();
@@ -170,27 +187,9 @@ std::optional<SurroundingWord> CaretTextReader::GetSurroundingText() {
     return ReadViaWin32Edit();
   }
 
-  std::unique_lock<std::mutex> lock(mu_);
-  EnsureWorkerStarted();
-
-  // If a previous cross-process UIA query is still unwinding, skip rather than
-  // blocking the low-level keyboard hook.
-  if (in_flight_) {
-    return std::nullopt;
-  }
-
-  in_flight_ = true;
-  request_kind_ = WorkerRequestKind::kSurroundingText;
-  const uint64_t my_id = ++request_id_;
-  lock.unlock();
-  cv_request_.notify_one();
-
-  lock.lock();
-  const bool finished = cv_response_.wait_for(
-      lock, kSurroundingWaitBudget, [this, my_id]() {
-        return completed_id_ >= my_id || stop_;
-      });
-  if (!finished || stop_) {
+  absl::MutexLock lock(mu_);
+  if (!RunWorkerRequest(WorkerRequestKind::kSurroundingText,
+                        kSurroundingWaitBudget)) {
     return std::nullopt;
   }
   return std::move(worker_surrounding_result_);
@@ -206,25 +205,9 @@ int32_t CaretTextReader::GetSelectedRangeLength() {
   // Query UI Automation on the MTA worker thread (no STA message pumping) with
   // a tight timeout so browser Omnibox inline autocomplete selections (e.g.
   // "a[ccount.apple.com]") are cleared cleanly before rewriting.
-  std::unique_lock<std::mutex> lock(mu_);
-  EnsureWorkerStarted();
-
-  if (in_flight_) {
-    return 0;
-  }
-
-  in_flight_ = true;
-  request_kind_ = WorkerRequestKind::kHasSelection;
-  const uint64_t my_id = ++request_id_;
-  lock.unlock();
-  cv_request_.notify_one();
-
-  lock.lock();
-  const bool finished = cv_response_.wait_for(
-      lock, kSelectionWaitBudget, [this, my_id]() {
-        return completed_id_ >= my_id || stop_;
-      });
-  if (!finished || stop_) {
+  absl::MutexLock lock(mu_);
+  if (!RunWorkerRequest(WorkerRequestKind::kHasSelection,
+                        kSelectionWaitBudget)) {
     return 0;
   }
   return worker_has_selection_result_ ? 1 : 0;

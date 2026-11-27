@@ -128,10 +128,10 @@ UpdateManager::UpdateManager(SettingsStore& settings, HWND notify_hwnd,
                              UINT notify_msg)
     : settings_(settings),
       notify_hwnd_(notify_hwnd),
-      notify_msg_(notify_msg),
       current_version_(AppVersion::Parse(kCurrentAppVersionString).value()),
-      is_auto_check_enabled_(settings.GetAutoCheckUpdates()),
-      skipped_version_(settings.GetSkippedUpdateVersion()) {}
+      skipped_version_(settings.GetSkippedUpdateVersion()),
+      notify_msg_(notify_msg),
+      is_auto_check_enabled_(settings.GetAutoCheckUpdates()) {}
 
 UpdateManager::~UpdateManager() { shutting_down_.store(true); }
 
@@ -216,7 +216,7 @@ void UpdateManager::StartCheckThread(bool user_initiated) {
     }
 
     {
-      std::lock_guard<std::mutex> lock(result_mutex_);
+      absl::MutexLock lock(result_mutex_);
       pending_result_ = std::move(result);
     }
 
@@ -229,7 +229,7 @@ void UpdateManager::StartCheckThread(bool user_initiated) {
 void UpdateManager::HandleAsyncCheckFinished() {
   std::optional<PendingResult> result;
   {
-    std::lock_guard<std::mutex> lock(result_mutex_);
+    absl::MutexLock lock(result_mutex_);
     result = std::move(pending_result_);
     pending_result_.reset();
   }
