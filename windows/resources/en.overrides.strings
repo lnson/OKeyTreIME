@@ -1,0 +1,8 @@
+/* Windows-specific overrides on top of OKeyTre/en.lproj/Localizable.strings */
+"settings.general.input_style.description" = "Press Left Ctrl + Right Ctrl simultaneously to quickly toggle between Off and your active input method.";
+"settings.general.launch_at_login.description" = "Automatically start ÔKêyTre in the system tray when you sign in to Windows.";
+"settings.updates.manual_download.description" = "Open the releases page to view release notes or download the latest Windows release manually.";
+"settings.advanced.buffer_size.description" = "Maximum number of characters retained in the buffer to support backspacing into previous words in apps that don't expose text around the caret (such as Windows Terminal).";
+"alert.non_english_keyboard.message" = "The current keyboard is \"%@\". For ÔKêyTre to work accurately without typing conflicts, you should switch to the English (U.S.) keyboard.";
+"showcase.subtitle" = "ÔKêyTre lives quietly in your Windows system tray with smart shortcuts for effortless bilingual Vietnamese and English typing.";
+"showcase.card.toggle.desc" = "Press both Ctrl keys together to switch between Off and your active input style.";

@@ -28,6 +28,22 @@ TEST(LocalizationTest, FormatsLocalizedStrings) {
   EXPECT_EQ(LocalizedFormat(AppLanguage::kVietnamese, "settings.sidebar.version",
                             L"0.3"),
             L"Phiên bản 0.3");
+  EXPECT_EQ(Localized(AppLanguage::kEnglish, "missing.key.example"),
+            L"missing.key.example");
+}
+
+TEST(LocalizationTest, AppliesWindowsOverridesOverSharedStrings) {
+  EXPECT_NE(Localized(AppLanguage::kEnglish,
+                      "settings.general.input_style.description")
+                .find(L"Left Ctrl + Right Ctrl"),
+            std::wstring::npos);
+  EXPECT_NE(Localized(AppLanguage::kVietnamese,
+                      "settings.general.input_style.description")
+                .find(L"Ctrl Trái + Ctrl Phải"),
+            std::wstring::npos);
+  EXPECT_EQ(Localized(AppLanguage::kEnglish,
+                      "settings.orthography.modern_tone.title"),
+            L"Use modern Vietnamese orthography (\"oà, oé, uý\")");
 }
 
 TEST(LocalizationTest, LanguageRawRoundTrip) {

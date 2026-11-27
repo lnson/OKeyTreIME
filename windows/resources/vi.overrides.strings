@@ -1,0 +1,9 @@
+/* Windows-specific overrides on top of OKeyTre/vi.lproj/Localizable.strings */
+"settings.general.input_style.description" = "Nhấn đồng thời Ctrl Trái + Ctrl Phải để chuyển nhanh giữa Tắt và kiểu gõ đang dùng.";
+"settings.general.launch_at_login.description" = "Tự động mở ÔKêyTre trên khay hệ thống khi đăng nhập vào Windows.";
+"settings.general.language.description" = "Chọn ngôn ngữ hiển thị cho menu và cửa sổ cài đặt.";
+"settings.updates.manual_download.description" = "Mở trang phát hành để xem ghi chú thay đổi hoặc tải trực tiếp bản Windows mới nhất.";
+"settings.advanced.buffer_size.description" = "Số ký tự tối đa được lưu trong bộ đệm để hỗ trợ xóa lùi (Backspace) về các từ trước đó trong những ứng dụng không hỗ trợ đọc văn bản quanh con trỏ (như Windows Terminal).";
+"alert.non_english_keyboard.message" = "Bàn phím hiện tại là \"%@\". Để ÔKêyTre hoạt động chính xác và không bị xung đột gõ, bạn nên chuyển sang bàn phím tiếng Anh (U.S.).";
+"showcase.subtitle" = "Bộ gõ tiếng Việt nằm gọn trên khay hệ thống Windows với các phím tắt thông minh giúp gõ xen kẽ tiếng Việt và tiếng Anh tự nhiên.";
+"showcase.card.toggle.desc" = "Nhấn đồng thời hai phím Ctrl để chuyển nhanh giữa Tắt và kiểu gõ đang chọn.";
