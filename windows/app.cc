@@ -254,46 +254,46 @@ void App::WireSubsystems() {
 
 TrayState App::BuildTrayState() const {
   return TrayState{
+      .keyboard_name = input_source_manager_->current_source_name(),
+      .visible_update = update_manager_->visible_available_release(),
       .style = ime_controller_->input_style(),
       .language = settings_->GetAppLanguage(),
       .restore_invalid_words = ime_controller_->restore_invalid_words(),
       .launch_at_login = launch_at_login_->IsEnabled(),
       .is_english_keyboard = input_source_manager_->is_english(),
-      .keyboard_name = input_source_manager_->current_source_name(),
-      .visible_update = update_manager_->visible_available_release(),
   };
 }
 
 SettingsViewModel App::BuildSettingsViewModel() const {
   return SettingsViewModel{
+      .available_release = update_manager_->available_release(),
+      .current_version =
+          Utf8ToWide(update_manager_->current_version().description()),
+      .max_buffer_size = ime_controller_->max_buffer_size(),
+      .min_buffer_size = OKT_BUFFER_MIN_SIZE,
+      .max_allowed_buffer_size = OKT_BUFFER_MAX_SIZE,
       .language = settings_->GetAppLanguage(),
       .style = ime_controller_->input_style(),
       .launch_at_login = launch_at_login_->IsEnabled(),
       .auto_check_updates = update_manager_->is_auto_check_enabled(),
       .is_checking_updates = update_manager_->is_checking(),
       .did_confirm_up_to_date = update_manager_->did_confirm_up_to_date(),
-      .available_release = update_manager_->available_release(),
-      .current_version =
-          Utf8ToWide(update_manager_->current_version().description()),
       .modern_tone = ime_controller_->modern_tone(),
       .restore_invalid_words = ime_controller_->restore_invalid_words(),
       .uo_horn = ime_controller_->uo_horn(),
       .ng_to_ngh = ime_controller_->ng_to_ngh(),
       .ngh_to_ng = ime_controller_->ngh_to_ng(),
-      .max_buffer_size = ime_controller_->max_buffer_size(),
-      .min_buffer_size = OKT_BUFFER_MIN_SIZE,
-      .max_allowed_buffer_size = OKT_BUFFER_MAX_SIZE,
   };
 }
 
 ShowcaseViewModel App::BuildShowcaseViewModel(ShowcaseMode mode) const {
   return ShowcaseViewModel{
+      .keyboard_name = input_source_manager_->current_source_name(),
+      .milestone_version = Utf8ToWide(kCurrentFeatureMilestoneVersionString),
       .mode = mode,
       .language = settings_->GetAppLanguage(),
       .style = ime_controller_->input_style(),
       .is_english_keyboard = input_source_manager_->is_english(),
-      .keyboard_name = input_source_manager_->current_source_name(),
-      .milestone_version = Utf8ToWide(kCurrentFeatureMilestoneVersionString),
   };
 }
 

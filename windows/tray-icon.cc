@@ -40,9 +40,9 @@ UINT GetSystemTrayDpi(HWND hwnd) {
 }  // namespace
 
 TrayIcon::TrayIcon(HWND owner_hwnd, UINT callback_msg, TrayCallbacks callbacks)
-    : owner_hwnd_(owner_hwnd),
-      callback_msg_(callback_msg),
-      callbacks_(std::move(callbacks)) {}
+    : callbacks_(std::move(callbacks)),
+      owner_hwnd_(owner_hwnd),
+      callback_msg_(callback_msg) {}
 
 TrayIcon::~TrayIcon() { Destroy(); }
 

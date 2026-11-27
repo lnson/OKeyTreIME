@@ -19,31 +19,31 @@
 
 namespace okeytre::win {
 
-enum class SettingsSection {
+enum class SettingsSection : uint8_t {
   kGeneral = 0,
   kCorrection = 1,
   kAdvanced = 2,
 };
 
 struct SettingsViewModel {
+  std::optional<UpdateRelease> available_release;
+  std::wstring current_version;
+
+  int32_t max_buffer_size = 16;
+  int32_t min_buffer_size = 10;
+  int32_t max_allowed_buffer_size = 512;
+
   AppLanguage language = AppLanguage::kSystem;
   InputStyle style = InputStyle::kTelex;
   bool launch_at_login = false;
   bool auto_check_updates = true;
   bool is_checking_updates = false;
   bool did_confirm_up_to_date = false;
-  std::optional<UpdateRelease> available_release;
-  std::wstring current_version = L"0.3.2";
-
   bool modern_tone = true;
   bool restore_invalid_words = true;
   bool uo_horn = false;
   bool ng_to_ngh = false;
   bool ngh_to_ng = false;
-
-  int32_t max_buffer_size = 16;
-  int32_t min_buffer_size = 10;
-  int32_t max_allowed_buffer_size = 512;
 };
 
 struct SettingsCallbacks {
@@ -79,7 +79,7 @@ class SettingsWindow {
   bool IsVisible() const;
 
  private:
-  enum class HitTargetKind {
+  enum class HitTargetKind : uint8_t {
     kNone,
     kNavGeneral,
     kNavCorrection,
@@ -122,9 +122,7 @@ class SettingsWindow {
 
   SettingsCallbacks callbacks_;
   SettingsViewModel model_;
-  SettingsSection section_ = SettingsSection::kGeneral;
-  ThemePalette palette_;
-  UINT dpi_ = 96;
+  std::vector<HitRegion> hit_regions_;
 
   HWND hwnd_ = nullptr;
   HWND combo_language_ = nullptr;
@@ -136,7 +134,9 @@ class SettingsWindow {
   HBRUSH brush_sidebar_ = nullptr;
   HBRUSH brush_card_ = nullptr;
 
-  std::vector<HitRegion> hit_regions_;
+  ThemePalette palette_;
+  UINT dpi_ = 96;
+  SettingsSection section_ = SettingsSection::kGeneral;
   HitTargetKind hovered_target_ = HitTargetKind::kNone;
   bool updating_controls_ = false;
   bool tracking_mouse_ = false;

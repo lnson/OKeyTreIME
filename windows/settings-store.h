@@ -16,7 +16,7 @@
 
 namespace okeytre::win {
 
-enum class InputStyle {
+enum class InputStyle : uint8_t {
   kOff = 0,
   kTelex = 1,
   kVNI = 2,
@@ -27,7 +27,7 @@ std::string_view InputStyleToRaw(InputStyle style) noexcept;
 std::optional<InputStyle> InputStyleFromRaw(std::string_view raw) noexcept;
 std::wstring InputStyleDisplayName(InputStyle style, AppLanguage language);
 
-enum class ShowcaseMode {
+enum class ShowcaseMode : uint8_t {
   kNone = 0,
   kFirstInstall = 1,
   kFeatureUpdate = 2,

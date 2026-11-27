@@ -6,6 +6,7 @@
 
 #include <windows.h>
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -17,12 +18,12 @@
 namespace okeytre::win {
 
 struct ShowcaseViewModel {
+  std::wstring keyboard_name;
+  std::wstring milestone_version;
   ShowcaseMode mode = ShowcaseMode::kFirstInstall;
   AppLanguage language = AppLanguage::kSystem;
   InputStyle style = InputStyle::kTelex;
   bool is_english_keyboard = true;
-  std::wstring keyboard_name = L"English (United States)";
-  std::wstring milestone_version = L"0.3";
 };
 
 struct ShowcaseCallbacks {
@@ -49,7 +50,7 @@ class ShowcaseWindow {
   bool IsVisible() const;
 
  private:
-  enum class HitTargetKind {
+  enum class HitTargetKind : uint8_t {
     kNone,
     kButtonSwitchToUs,
     kSegmentTelex,
@@ -84,8 +85,7 @@ class ShowcaseWindow {
 
   ShowcaseCallbacks callbacks_;
   ShowcaseViewModel model_;
-  ThemePalette palette_;
-  UINT dpi_ = 96;
+  std::vector<HitRegion> hit_regions_;
 
   HWND hwnd_ = nullptr;
   HWND combo_language_ = nullptr;
@@ -95,7 +95,8 @@ class ShowcaseWindow {
   HFONT practice_font_ = nullptr;
   HBRUSH brush_card_ = nullptr;
 
-  std::vector<HitRegion> hit_regions_;
+  ThemePalette palette_;
+  UINT dpi_ = 96;
   HitTargetKind hovered_target_ = HitTargetKind::kNone;
   bool updating_controls_ = false;
   bool tracking_mouse_ = false;

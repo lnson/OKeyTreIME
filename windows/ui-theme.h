@@ -8,13 +8,12 @@
 #include <objidl.h>
 #include <gdiplus.h>
 
+#include <cstdint>
 #include <string_view>
 
 namespace okeytre::win {
 
 struct ThemePalette {
-  bool dark = false;
-
   Gdiplus::Color window_bg;
   Gdiplus::Color sidebar_bg;
   Gdiplus::Color card_bg;
@@ -46,9 +45,11 @@ struct ThemePalette {
   COLORREF win32_card_bg = RGB(255, 255, 255);
   COLORREF win32_text_primary = RGB(27, 27, 27);
   COLORREF win32_text_secondary = RGB(95, 95, 95);
+
+  bool dark = false;
 };
 
-enum class TrayIconKind {
+enum class TrayIconKind : uint8_t {
   kVietnameseActive = 0,
   kOff = 1,
   kWarning = 2,

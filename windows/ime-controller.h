@@ -21,8 +21,8 @@ struct SurroundingWord {
 };
 
 struct ImeEditAction {
-  int32_t backspace_count = 0;
   std::u16string text;
+  int32_t backspace_count = 0;
 
   bool operator==(const ImeEditAction& other) const = default;
 };

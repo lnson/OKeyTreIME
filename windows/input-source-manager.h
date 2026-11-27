@@ -46,9 +46,9 @@ class InputSourceManager {
   void CheckAndWarnOnStartup(AppLanguage language);
 
  private:
-  bool is_english_ = true;
-  std::wstring current_source_name_ = L"English (United States)";
+  std::wstring current_source_name_;
   ChangedFn on_changed_;
+  bool is_english_ = true;
 };
 
 }  // namespace okeytre::win

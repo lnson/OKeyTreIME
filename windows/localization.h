@@ -4,13 +4,14 @@
 #ifndef OKEYTRE_WINDOWS_LOCALIZATION_H_
 #define OKEYTRE_WINDOWS_LOCALIZATION_H_
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace okeytre::win {
 
-enum class AppLanguage {
+enum class AppLanguage : uint8_t {
   kSystem = 0,
   kVietnamese = 1,
   kEnglish = 2,
