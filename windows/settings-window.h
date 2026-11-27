@@ -84,6 +84,8 @@ class SettingsWindow {
     kNavGeneral,
     kNavCorrection,
     kNavAdvanced,
+    kDropdownLanguage,
+    kDropdownStyle,
     kToggleLaunchAtLogin,
     kToggleAutoCheck,
     kButtonDownloadUpdate,
@@ -119,14 +121,14 @@ class SettingsWindow {
 
   HitTargetKind HitTest(int x, int y) const;
   void HandleClick(HitTargetKind target);
+  void ShowLanguageMenu();
+  void ShowStyleMenu();
 
   SettingsCallbacks callbacks_;
   SettingsViewModel model_;
   std::vector<HitRegion> hit_regions_;
 
   HWND hwnd_ = nullptr;
-  HWND combo_language_ = nullptr;
-  HWND combo_style_ = nullptr;
   HWND edit_buffer_size_ = nullptr;
   HWND updown_buffer_size_ = nullptr;
 
@@ -135,6 +137,8 @@ class SettingsWindow {
   HBRUSH brush_card_ = nullptr;
 
   ThemePalette palette_;
+  Gdiplus::RectF dropdown_language_rect_;
+  Gdiplus::RectF dropdown_style_rect_;
   UINT dpi_ = 96;
   SettingsSection section_ = SettingsSection::kGeneral;
   HitTargetKind hovered_target_ = HitTargetKind::kNone;

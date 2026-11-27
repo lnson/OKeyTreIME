@@ -19,8 +19,6 @@ namespace {
 constexpr wchar_t kSettingsClassName[] = L"OKeyTreSettingsWindowClass";
 
 enum ControlId : int {
-  kIdComboLanguage = 2001,
-  kIdComboStyle = 2002,
   kIdEditBufferSize = 2003,
   kIdUpDownBufferSize = 2004,
 };
@@ -219,8 +217,10 @@ void SettingsWindow::UpdateFontsAndBrushes() {
   brush_sidebar_ = CreateSolidBrush(palette_.win32_sidebar_bg);
   brush_card_ = CreateSolidBrush(palette_.win32_card_bg);
 
-  for (HWND child :
-       {combo_language_, combo_style_, edit_buffer_size_, updown_buffer_size_}) {
+  ApplyControlTheme(edit_buffer_size_, palette_.dark);
+  ApplyControlTheme(updown_buffer_size_, palette_.dark);
+
+  for (HWND child : {edit_buffer_size_, updown_buffer_size_}) {
     if (child != nullptr) {
       SendMessageW(child, WM_SETFONT, reinterpret_cast<WPARAM>(ui_font_), TRUE);
     }
@@ -230,28 +230,16 @@ void SettingsWindow::UpdateFontsAndBrushes() {
 void SettingsWindow::CreateChildControls() {
   HINSTANCE hinst = GetModuleHandleW(nullptr);
 
-  combo_language_ = CreateWindowExW(
-      0, WC_COMBOBOXW, L"",
-      WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST, 0, 0, 120, 160,
-      hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdComboLanguage)),
-      hinst, nullptr);
-
-  combo_style_ = CreateWindowExW(
-      0, WC_COMBOBOXW, L"",
-      WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST, 0, 0, 120, 160,
-      hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdComboStyle)),
-      hinst, nullptr);
-
   edit_buffer_size_ = CreateWindowExW(
-      WS_EX_CLIENTEDGE, WC_EDITW, L"16",
-      WS_CHILD | WS_TABSTOP | ES_NUMBER | ES_RIGHT | ES_AUTOHSCROLL, 0, 0, 64,
-      26, hwnd_,
+      0, WC_EDITW, L"16",
+      WS_CHILD | WS_TABSTOP | ES_NUMBER | ES_RIGHT | ES_AUTOHSCROLL, 0, 0, 56,
+      20, hwnd_,
       reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdEditBufferSize)), hinst,
       nullptr);
 
   updown_buffer_size_ = CreateWindowExW(
       0, UPDOWN_CLASSW, L"",
-      WS_CHILD | UDS_ALIGNRIGHT | UDS_ARROWKEYS | UDS_HOTTRACK, 0, 0, 18, 26,
+      WS_CHILD | UDS_ALIGNRIGHT | UDS_ARROWKEYS | UDS_HOTTRACK, 0, 0, 18, 22,
       hwnd_,
       reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdUpDownBufferSize)), hinst,
       nullptr);
@@ -267,39 +255,6 @@ void SettingsWindow::CreateChildControls() {
 void SettingsWindow::SyncControlsFromModel() {
   if (hwnd_ == nullptr) return;
   updating_controls_ = true;
-
-  // Populate Language ComboBox.
-  if (combo_language_ != nullptr) {
-    SendMessageW(combo_language_, CB_RESETCONTENT, 0, 0);
-    const std::wstring_view s_sys =
-        LanguageDisplayName(AppLanguage::kSystem, model_.language);
-    const std::wstring_view s_vi =
-        LanguageDisplayName(AppLanguage::kVietnamese, model_.language);
-    const std::wstring_view s_en =
-        LanguageDisplayName(AppLanguage::kEnglish, model_.language);
-    SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_sys.data()));
-    SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_vi.data()));
-    SendMessageW(combo_language_, CB_ADDSTRING, 0,
-                 reinterpret_cast<LPARAM>(s_en.data()));
-    SendMessageW(combo_language_, CB_SETCURSEL,
-                 static_cast<WPARAM>(model_.language), 0);
-  }
-
-  // Populate Input Style ComboBox.
-  if (combo_style_ != nullptr) {
-    SendMessageW(combo_style_, CB_RESETCONTENT, 0, 0);
-    const InputStyle styles[] = {InputStyle::kOff, InputStyle::kTelex,
-                                 InputStyle::kVNI, InputStyle::kVIQR};
-    for (InputStyle s : styles) {
-      const std::wstring_view name = InputStyleDisplayName(s, model_.language);
-      SendMessageW(combo_style_, CB_ADDSTRING, 0,
-                   reinterpret_cast<LPARAM>(name.data()));
-    }
-    SendMessageW(combo_style_, CB_SETCURSEL, static_cast<WPARAM>(model_.style),
-                 0);
-  }
 
   // Sync Buffer Size Edit & UpDown.
   if (edit_buffer_size_ != nullptr) {
@@ -317,49 +272,29 @@ void SettingsWindow::LayoutChildControls() {
   RECT rc{};
   GetClientRect(hwnd_, &rc);
   const int width = rc.right - rc.left;
-  const int height = rc.bottom - rc.top;
   const int sidebar_w = ScaleDpi(kSidebarWidthDip, dpi_);
-
-  // Sidebar footer language combobox (positioned above the 64px app logo).
-  if (combo_language_ != nullptr) {
-    const int cb_w = ScaleDpi(136, dpi_);
-    const int cb_h = ScaleDpi(26, dpi_);
-    const int cb_x = (sidebar_w - cb_w) / 2 + ScaleDpi(10, dpi_);
-    const int cb_y = height - ScaleDpi(156, dpi_);
-    MoveWindow(combo_language_, cb_x, cb_y, cb_w, ScaleDpi(180, dpi_), TRUE);
-    SendMessageW(combo_language_, CB_SETITEMHEIGHT, static_cast<WPARAM>(-1),
-                 cb_h - ScaleDpi(6, dpi_));
-  }
-
   const int content_x = sidebar_w + ScaleDpi(24, dpi_);
   const int content_w = std::max(ScaleDpi(320, dpi_),
                                  width - sidebar_w - ScaleDpi(48, dpi_));
 
-  // General pane Input Style combobox.
-  if (combo_style_ != nullptr) {
-    const bool show = (section_ == SettingsSection::kGeneral);
-    ShowWindow(combo_style_, show ? SW_SHOW : SW_HIDE);
-    if (show) {
-      const int cb_w = ScaleDpi(118, dpi_);
-      const int cb_x = content_x + content_w - ScaleDpi(16, dpi_) - cb_w;
-      const int cb_y = ScaleDpi(106, dpi_);
-      MoveWindow(combo_style_, cb_x, cb_y, cb_w, ScaleDpi(180, dpi_), TRUE);
-    }
-  }
-
-  // Advanced pane Buffer Size edit + updown.
+  // Advanced pane Buffer Size edit + updown inside the rounded input box.
   if (edit_buffer_size_ != nullptr && updown_buffer_size_ != nullptr) {
     const bool show = (section_ == SettingsSection::kAdvanced);
     ShowWindow(edit_buffer_size_, show ? SW_SHOW : SW_HIDE);
     ShowWindow(updown_buffer_size_, show ? SW_SHOW : SW_HIDE);
     if (show) {
-      const int edit_w = ScaleDpi(74, dpi_);
-      const int edit_h = ScaleDpi(26, dpi_);
-      const int edit_x = content_x + content_w - ScaleDpi(16, dpi_) - edit_w;
-      const int edit_y = ScaleDpi(112, dpi_);
-      MoveWindow(edit_buffer_size_, edit_x, edit_y, edit_w, edit_h, TRUE);
-      SendMessageW(updown_buffer_size_, UDM_SETBUDDY,
-                   reinterpret_cast<WPARAM>(edit_buffer_size_), 0);
+      const int box_w = ScaleDpi(78, dpi_);
+      const int box_h = ScaleDpi(28, dpi_);
+      const int box_x = content_x + content_w - ScaleDpi(16, dpi_) - box_w;
+      const int box_y = ScaleDpi(111, dpi_);
+      const int updown_w = ScaleDpi(18, dpi_);
+      const int edit_h = ScaleDpi(18, dpi_);
+      const int pad_x = ScaleDpi(6, dpi_);
+      MoveWindow(edit_buffer_size_, box_x + pad_x,
+                 box_y + (box_h - edit_h) / 2, box_w - updown_w - pad_x - 2,
+                 edit_h, TRUE);
+      MoveWindow(updown_buffer_size_, box_x + box_w - updown_w - 2, box_y + 2,
+                 updown_w, box_h - 4, TRUE);
     }
   }
 }
@@ -464,13 +399,25 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
     row_y += row_h + ScaleDpiF(4.0f, dpi_);
   }
 
-  // Sidebar bottom footer: Globe glyph beside language combobox, app logo,
-  // app name, and version string.
+  // Sidebar bottom footer: Globe glyph beside Fluent language dropdown, app
+  // logo, app name, and version string.
+  const float dd_w = ScaleDpiF(136.0f, dpi_);
+  const float dd_h = ScaleDpiF(26.0f, dpi_);
+  dropdown_language_rect_ = Gdiplus::RectF(
+      (sidebar_w - dd_w) * 0.5f + ScaleDpiF(10.0f, dpi_),
+      static_cast<float>(height) - ScaleDpiF(156.0f, dpi_), dd_w, dd_h);
+  DrawFluentDropdown(
+      g, dropdown_language_rect_,
+      LanguageDisplayName(model_.language, model_.language),
+      hovered_target_ == HitTargetKind::kDropdownLanguage, palette_, dpi_);
+  hit_regions_.push_back(
+      {HitTargetKind::kDropdownLanguage, dropdown_language_rect_});
+
   const float globe_sz = ScaleDpiF(15.0f, dpi_);
-  const float globe_x = (sidebar_w - ScaleDpiF(136.0f, dpi_)) * 0.5f -
-                        ScaleDpiF(12.0f, dpi_);
+  const float globe_x = dropdown_language_rect_.X - globe_sz -
+                        ScaleDpiF(7.0f, dpi_);
   const float globe_y =
-      static_cast<float>(height) - ScaleDpiF(151.0f, dpi_);
+      dropdown_language_rect_.Y + (dd_h - globe_sz) * 0.5f;
   Gdiplus::Pen globe_pen(palette_.text_secondary, ScaleDpiF(1.2f, dpi_));
   g.DrawEllipse(&globe_pen, globe_x, globe_y, globe_sz, globe_sz);
   g.DrawEllipse(&globe_pen, globe_x + globe_sz * 0.26f, globe_y,
@@ -584,7 +531,7 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
   FillRoundedRect(g, sys_card, card_r, palette_.card_bg);
   StrokeRoundedRect(g, sys_card, card_r, palette_.card_border, 1.0f);
 
-  // Row 1: Input Method (ComboBox sits at right).
+  // Row 1: Input Method (Fluent dropdown at right).
   const float text_w1 = w - pad * 2.0f - ScaleDpiF(134.0f, dpi_);
   DrawTextLeft(g, Localized(model_.language, L10nKey::kMenuInputStyle),
                row_title_font, palette_.text_primary,
@@ -598,6 +545,17 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
       Gdiplus::RectF(x + pad, y + ScaleDpiF(32.0f, dpi_), text_w1,
                      ScaleDpiF(34.0f, dpi_)),
       /*wrap=*/true);
+  const float style_dd_w = ScaleDpiF(118.0f, dpi_);
+  const float style_dd_h = ScaleDpiF(28.0f, dpi_);
+  dropdown_style_rect_ = Gdiplus::RectF(x + w - pad - style_dd_w,
+                                        y + (row1_h - style_dd_h) * 0.5f,
+                                        style_dd_w, style_dd_h);
+  DrawFluentDropdown(
+      g, dropdown_style_rect_,
+      InputStyleDisplayName(model_.style, model_.language),
+      hovered_target_ == HitTargetKind::kDropdownStyle, palette_, dpi_);
+  hit_regions_.push_back(
+      {HitTargetKind::kDropdownStyle, dropdown_style_rect_});
 
   const float div1_y = y + row1_h;
   g.DrawLine(&div_pen, x + pad, div1_y, x + w - pad, div1_y);
@@ -907,6 +865,17 @@ void SettingsWindow::PaintAdvancedPane(Gdiplus::Graphics& g, float x, float y,
       Gdiplus::RectF(x + pad, y + ScaleDpiF(34.0f, dpi_), text_w,
                      ScaleDpiF(46.0f, dpi_)),
       /*wrap=*/true);
+
+  const float box_w = ScaleDpiF(78.0f, dpi_);
+  const float box_h = ScaleDpiF(28.0f, dpi_);
+  Gdiplus::RectF buf_box(x + w - pad - box_w, y + (card_h - box_h) * 0.5f,
+                         box_w, box_h);
+  const bool buf_focused =
+      (edit_buffer_size_ != nullptr && GetFocus() == edit_buffer_size_);
+  FillRoundedRect(g, buf_box, ScaleDpiF(6.0f, dpi_), palette_.card_bg);
+  StrokeRoundedRect(g, buf_box, ScaleDpiF(6.0f, dpi_),
+                    buf_focused ? palette_.accent_teal : palette_.control_border,
+                    buf_focused ? 1.4f : 1.0f);
 }
 
 SettingsWindow::HitTargetKind SettingsWindow::HitTest(int x, int y) const {
@@ -920,8 +889,63 @@ SettingsWindow::HitTargetKind SettingsWindow::HitTest(int x, int y) const {
   return HitTargetKind::kNone;
 }
 
+void SettingsWindow::ShowLanguageMenu() {
+  HMENU menu = CreatePopupMenu();
+  if (menu == nullptr) return;
+  const AppLanguage langs[] = {AppLanguage::kSystem, AppLanguage::kVietnamese,
+                               AppLanguage::kEnglish};
+  for (int i = 0; i < 3; ++i) {
+    const UINT flags =
+        MF_STRING | (model_.language == langs[i] ? MF_CHECKED : 0);
+    AppendMenuW(menu, flags, static_cast<UINT_PTR>(i + 1),
+                LanguageDisplayName(langs[i], model_.language).data());
+  }
+  POINT pt{static_cast<LONG>(dropdown_language_rect_.X),
+           static_cast<LONG>(dropdown_language_rect_.GetBottom() +
+                             ScaleDpiF(2.0f, dpi_))};
+  RefreshNativeMenuTheme(palette_.dark);
+  ClientToScreen(hwnd_, &pt);
+  const UINT cmd = static_cast<UINT>(TrackPopupMenuEx(
+      menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY, pt.x,
+      pt.y, hwnd_, nullptr));
+  DestroyMenu(menu);
+  if (cmd >= 1 && cmd <= 3 && callbacks_.on_select_language) {
+    callbacks_.on_select_language(langs[cmd - 1]);
+  }
+}
+
+void SettingsWindow::ShowStyleMenu() {
+  HMENU menu = CreatePopupMenu();
+  if (menu == nullptr) return;
+  const InputStyle styles[] = {InputStyle::kOff, InputStyle::kTelex,
+                               InputStyle::kVNI, InputStyle::kVIQR};
+  for (int i = 0; i < 4; ++i) {
+    const UINT flags = MF_STRING | (model_.style == styles[i] ? MF_CHECKED : 0);
+    AppendMenuW(menu, flags, static_cast<UINT_PTR>(i + 1),
+                InputStyleDisplayName(styles[i], model_.language).data());
+  }
+  POINT pt{static_cast<LONG>(dropdown_style_rect_.X),
+           static_cast<LONG>(dropdown_style_rect_.GetBottom() +
+                             ScaleDpiF(2.0f, dpi_))};
+  RefreshNativeMenuTheme(palette_.dark);
+  ClientToScreen(hwnd_, &pt);
+  const UINT cmd = static_cast<UINT>(TrackPopupMenuEx(
+      menu, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_RETURNCMD | TPM_NONOTIFY, pt.x,
+      pt.y, hwnd_, nullptr));
+  DestroyMenu(menu);
+  if (cmd >= 1 && cmd <= 4 && callbacks_.on_select_style) {
+    callbacks_.on_select_style(styles[cmd - 1]);
+  }
+}
+
 void SettingsWindow::HandleClick(HitTargetKind target) {
   switch (target) {
+    case HitTargetKind::kDropdownLanguage:
+      ShowLanguageMenu();
+      break;
+    case HitTargetKind::kDropdownStyle:
+      ShowStyleMenu();
+      break;
     case HitTargetKind::kNavGeneral:
       if (section_ != SettingsSection::kGeneral) {
         section_ = SettingsSection::kGeneral;
@@ -1098,19 +1122,9 @@ LRESULT SettingsWindow::HandleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
       if (updating_controls_) return 0;
       const int id = LOWORD(wparam);
       const int code = HIWORD(wparam);
-      if (id == kIdComboLanguage && code == CBN_SELCHANGE) {
-        const LRESULT idx = SendMessageW(combo_language_, CB_GETCURSEL, 0, 0);
-        if (idx >= 0 && idx <= 2 && callbacks_.on_select_language) {
-          callbacks_.on_select_language(static_cast<AppLanguage>(idx));
-        }
-        return 0;
-      }
-      if (id == kIdComboStyle && code == CBN_SELCHANGE) {
-        const LRESULT idx = SendMessageW(combo_style_, CB_GETCURSEL, 0, 0);
-        if (idx >= 0 && idx <= 3 && callbacks_.on_select_style) {
-          callbacks_.on_select_style(static_cast<InputStyle>(idx));
-        }
-        return 0;
+      if (id == kIdEditBufferSize &&
+          (code == EN_SETFOCUS || code == EN_KILLFOCUS)) {
+        InvalidateRect(hwnd_, nullptr, FALSE);
       }
       if (id == kIdEditBufferSize &&
           (code == EN_KILLFOCUS || code == EN_CHANGE)) {
@@ -1155,7 +1169,8 @@ LRESULT SettingsWindow::HandleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
     }
 
     case WM_CTLCOLOREDIT:
-    case WM_CTLCOLORLISTBOX: {
+    case WM_CTLCOLORLISTBOX:
+    case WM_CTLCOLORSTATIC: {
       HDC dc = reinterpret_cast<HDC>(wparam);
       SetTextColor(dc, palette_.win32_text_primary);
       SetBkColor(dc, palette_.win32_card_bg);
@@ -1168,8 +1183,6 @@ LRESULT SettingsWindow::HandleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
 
     case WM_NCDESTROY:
       hwnd_ = nullptr;
-      combo_language_ = nullptr;
-      combo_style_ = nullptr;
       edit_buffer_size_ = nullptr;
       updown_buffer_size_ = nullptr;
       hovered_target_ = HitTargetKind::kNone;
