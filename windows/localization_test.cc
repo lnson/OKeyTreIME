@@ -55,5 +55,14 @@ TEST(LocalizationTest, LanguageRawRoundTrip) {
             AppLanguage::kEnglish);
 }
 
+TEST(LocalizationTest, Utf8WideRoundTrip) {
+  EXPECT_EQ(Utf8ToWide(""), L"");
+  EXPECT_EQ(WideToUtf8(L""), "");
+  const std::string utf8 = "ÔKêyTre tiếng Việt ✨";
+  const std::wstring wide = Utf8ToWide(utf8);
+  EXPECT_EQ(wide, L"ÔKêyTre tiếng Việt ✨");
+  EXPECT_EQ(WideToUtf8(wide), utf8);
+}
+
 }  // namespace
 }  // namespace okeytre::win
