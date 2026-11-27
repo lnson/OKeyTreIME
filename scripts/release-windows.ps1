@@ -260,25 +260,42 @@ if ($Publish) {
     }
 
     $assetName = Split-Path -Leaf $ZipPath
+    $winHeading = "### Installation (Windows 10/11 x64)"
     $releaseNotes = @"
-### Installation (Windows 10/11 x64)
+$winHeading
 1. Download and extract ``$assetName``.
 2. Run **OKeyTre.exe** (if Windows SmartScreen appears on first launch, choose **More info -> Run anyway**).
 3. Use **Left Ctrl + Right Ctrl** to toggle Vietnamese On/Off and **Left Shift + Right Shift** to restore raw typed words.
 "@
+
+    function Merge-ReleaseNotes([string]$ExistingBody, [string]$Heading, [string]$NewSection) {
+        $normNew = $NewSection.Trim()
+        if ([string]::IsNullOrWhiteSpace($ExistingBody)) {
+            return $normNew
+        }
+        $normExisting = ($ExistingBody -replace "`r`n", "`n").Trim()
+        $pattern = '(?ms)^' + [regex]::Escape($Heading) + '\b.*?(?=^###\s|\z)'
+        if ([regex]::IsMatch($normExisting, $pattern)) {
+            return ([regex]::Replace($normExisting, $pattern, ($normNew -replace "`r`n", "`n"), 1)).Trim()
+        }
+        return ($normExisting + "`n`n" + ($normNew -replace "`r`n", "`n")).Trim()
+    }
 
     $gh = Find-Tool @("gh")
     if ($gh) {
         Write-Host "==> Publishing $assetName to GitHub Release $Tag ($GitHubRepo)..."
         $prevEap = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
-        & $gh release view $Tag --repo $GitHubRepo 2>&1 | Out-Null
+        $existingBody = (& $gh release view $Tag --repo $GitHubRepo --json body --jq ".body" 2>$null) -join "`n"
         $releaseExists = ($LASTEXITCODE -eq 0)
         $ErrorActionPreference = $prevEap
 
         if ($releaseExists) {
-            Write-Host "    Release $Tag already exists - uploading/updating asset..."
+            Write-Host "    Release $Tag already exists - uploading/updating asset and merging Windows notes..."
             & $gh release upload $Tag $ZipPath --repo $GitHubRepo --clobber
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $mergedNotes = Merge-ReleaseNotes $existingBody $winHeading $releaseNotes
+            & $gh release edit $Tag --repo $GitHubRepo --notes $mergedNotes
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         } else {
             $ghArgs = @("release", "create", $Tag, $ZipPath, "--repo", $GitHubRepo, "--target", $headSha, "--title", "$AppDisplayName $Tag", "--notes", $releaseNotes)
@@ -299,12 +316,15 @@ if ($Publish) {
         $release = $null
         try {
             $release = Invoke-RestMethod -Method Get -Uri "https://api.github.com/repos/$GitHubRepo/releases/tags/$Tag" -Headers $headers
-            Write-Host "    Release $Tag already exists - replacing existing asset if present..."
+            Write-Host "    Release $Tag already exists - replacing asset and merging Windows notes..."
             foreach ($existingAsset in $release.assets) {
                 if ($existingAsset.name -eq $assetName) {
                     Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/$GitHubRepo/releases/assets/$($existingAsset.id)" -Headers $headers | Out-Null
                 }
             }
+            $mergedNotes = Merge-ReleaseNotes ([string]$release.body) $winHeading $releaseNotes
+            $patchPayload = @{ body = $mergedNotes } | ConvertTo-Json
+            Invoke-RestMethod -Method Patch -Uri "https://api.github.com/repos/$GitHubRepo/releases/$($release.id)" -Headers $headers -Body $patchPayload -ContentType "application/json" | Out-Null
         } catch {
             $payload = @{
                 tag_name         = $Tag

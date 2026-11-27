@@ -316,11 +316,32 @@ if [[ "$PUBLISH_RELEASE" -eq 1 ]]; then
     exit 1
   fi
 
+  MAC_HEADING="### Installation (macOS 14.0+, Apple Silicon & Intel)"
+
+  merge_release_notes() {
+    python3 -c '
+import re, sys
+existing, heading, section = sys.argv[1], sys.argv[2], sys.argv[3].strip()
+existing = existing.replace("\r\n", "\n").strip()
+if not existing:
+    print(section)
+    sys.exit(0)
+pattern = re.compile(r"(?ms)^" + re.escape(heading) + r"\b.*?(?=^###\s|\Z)")
+if pattern.search(existing):
+    merged = pattern.sub(lambda _: section, existing, count=1).strip()
+else:
+    merged = (existing + "\n\n" + section).strip()
+print(merged)
+' "$1" "$MAC_HEADING" "$RELEASE_NOTES"
+  }
+
   echo "==> Publishing ${TAG} (${HEAD_SHA:0:7}) to GitHub (${GITHUB_REPO})..."
   if command -v gh >/dev/null 2>&1; then
-    if gh release view "$TAG" --repo "$GITHUB_REPO" >/dev/null 2>&1; then
-      echo "    Release ${TAG} already exists - uploading/updating asset..."
+    if EXISTING_BODY="$(gh release view "$TAG" --repo "$GITHUB_REPO" --json body --jq '.body' 2>/dev/null)"; then
+      echo "    Release ${TAG} already exists - uploading/updating DMG and merging macOS notes..."
       gh release upload "$TAG" "$DMG_PATH" --repo "$GITHUB_REPO" --clobber
+      MERGED_NOTES="$(merge_release_notes "$EXISTING_BODY")"
+      gh release edit "$TAG" --repo "$GITHUB_REPO" --notes "$MERGED_NOTES"
       echo "✅ Published to GitHub Releases: https://github.com/${GITHUB_REPO}/releases/tag/${TAG}"
     else
       GH_FLAGS=(--repo "$GITHUB_REPO" --target "$HEAD_SHA" --title "ÔKêyTre ${TAG}" --notes "$RELEASE_NOTES")
@@ -338,7 +359,9 @@ if [[ "$PUBLISH_RELEASE" -eq 1 ]]; then
       -H "Authorization: Bearer ${GITHUB_TOKEN}" \
       -H "X-GitHub-Api-Version: 2022-11-28" \
       "https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${TAG}" 2>/dev/null)"; then
-      echo "    Release ${TAG} already exists - replacing existing asset if present..."
+      echo "    Release ${TAG} already exists - replacing DMG and merging macOS notes..."
+      RELEASE_ID="$(python3 -c 'import json, sys; print(json.loads(sys.stdin.read())["id"])' <<<"$RESPONSE")"
+      EXISTING_BODY="$(python3 -c 'import json, sys; print(json.loads(sys.stdin.read()).get("body") or "")' <<<"$RESPONSE")"
       EXISTING_ASSET_ID="$(python3 -c '
 import json, sys
 name = sys.argv[1]
@@ -354,6 +377,14 @@ for asset in json.loads(sys.stdin.read()).get("assets", []):
           -H "X-GitHub-Api-Version: 2022-11-28" \
           "https://api.github.com/repos/${GITHUB_REPO}/releases/assets/${EXISTING_ASSET_ID}" >/dev/null
       fi
+      MERGED_NOTES="$(merge_release_notes "$EXISTING_BODY")"
+      PATCH_PAYLOAD="$(python3 -c 'import json, sys; print(json.dumps({"body": sys.argv[1]}))' "$MERGED_NOTES")"
+      curl -fsSL -X PATCH \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "https://api.github.com/repos/${GITHUB_REPO}/releases/${RELEASE_ID}" \
+        -d "$PATCH_PAYLOAD" >/dev/null
     else
       IS_PRERELEASE=$([[ "$PRERELEASE" -eq 1 ]] && echo "true" || echo "false")
       CREATE_PAYLOAD="$(python3 -c '
