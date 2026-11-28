@@ -5,11 +5,12 @@
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
-#include "simdutf.h"
 #include "windows/localization-tables.generated.h"
 
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include "uni_algo/conv.h"
 #endif
 
 namespace okeytre::win {
@@ -125,42 +126,47 @@ std::wstring Utf8ToWide(std::string_view utf8) {
   if (utf8.empty()) {
     return {};
   }
-  if constexpr (sizeof(wchar_t) == sizeof(char16_t)) {
-    std::wstring out(simdutf::utf16_length_from_utf8(utf8.data(), utf8.size()),
-                     L'\0');
-    const size_t written = simdutf::convert_utf8_to_utf16(
-        utf8.data(), utf8.size(), reinterpret_cast<char16_t*>(out.data()));
-    out.resize(written);
-    return out;
-  } else {
-    std::wstring out(simdutf::utf32_length_from_utf8(utf8.data(), utf8.size()),
-                     L'\0');
-    const size_t written = simdutf::convert_utf8_to_utf32(
-        utf8.data(), utf8.size(), reinterpret_cast<char32_t*>(out.data()));
-    out.resize(written);
-    return out;
+#ifdef _WIN32
+  const int needed = MultiByteToWideChar(
+      CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
+  if (needed <= 0) {
+    return {};
   }
+  std::wstring out(static_cast<size_t>(needed), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()),
+                      out.data(), needed);
+  return out;
+#else
+  if constexpr (sizeof(wchar_t) == sizeof(char16_t)) {
+    return una::utf8to16<char, wchar_t>(utf8);
+  } else {
+    return una::utf8to32<char, wchar_t>(utf8);
+  }
+#endif
 }
 
 std::string WideToUtf8(std::wstring_view wide) {
   if (wide.empty()) {
     return {};
   }
-  if constexpr (sizeof(wchar_t) == sizeof(char16_t)) {
-    const auto* src = reinterpret_cast<const char16_t*>(wide.data());
-    std::string out(simdutf::utf8_length_from_utf16(src, wide.size()), '\0');
-    const size_t written =
-        simdutf::convert_utf16_to_utf8(src, wide.size(), out.data());
-    out.resize(written);
-    return out;
-  } else {
-    const auto* src = reinterpret_cast<const char32_t*>(wide.data());
-    std::string out(simdutf::utf8_length_from_utf32(src, wide.size()), '\0');
-    const size_t written =
-        simdutf::convert_utf32_to_utf8(src, wide.size(), out.data());
-    out.resize(written);
-    return out;
+#ifdef _WIN32
+  const int needed = WideCharToMultiByte(
+      CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()), nullptr, 0,
+      nullptr, nullptr);
+  if (needed <= 0) {
+    return {};
   }
+  std::string out(static_cast<size_t>(needed), '\0');
+  WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()),
+                      out.data(), needed, nullptr, nullptr);
+  return out;
+#else
+  if constexpr (sizeof(wchar_t) == sizeof(char16_t)) {
+    return una::utf16to8<wchar_t, char>(wide);
+  } else {
+    return una::utf32to8<wchar_t, char>(wide);
+  }
+#endif
 }
 
 }  // namespace okeytre::win

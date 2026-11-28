@@ -72,8 +72,10 @@ cc_library(
     ],
     deps = [
         "@abseil-cpp//absl/strings",
-        "@simdutf",
-    ],
+    ] + select({
+        "@platforms//os:windows": [],
+        "//conditions:default": ["@uni_algo"],
+    }),
 )
 
 cc_test(
