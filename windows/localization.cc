@@ -13,6 +13,16 @@ namespace okeytre::win {
 
 namespace {
 
+constexpr std::string_view kLangSystem = "system";
+constexpr std::string_view kLangVi = "vi";
+constexpr std::string_view kLangEn = "en";
+
+bool MatchesLanguageTag(std::string_view tag, std::string_view code) {
+  if (!absl::StartsWithIgnoreCase(tag, code)) return false;
+  tag.remove_prefix(code.size());
+  return tag.empty() || tag[0] == '-' || tag[0] == '_';
+}
+
 std::vector<std::string> GetSystemPreferredLanguages() {
   ULONG num_languages = 0;
   ULONG buffer_size = 0;
@@ -35,18 +45,18 @@ std::vector<std::string> GetSystemPreferredLanguages() {
 std::string_view AppLanguageToRaw(AppLanguage language) noexcept {
   switch (language) {
     case AppLanguage::kSystem:
-      return "system";
+      return kLangSystem;
     case AppLanguage::kVietnamese:
-      return "vi";
+      return kLangVi;
     case AppLanguage::kEnglish:
-      return "en";
+      return kLangEn;
   }
-  return "system";
+  return kLangSystem;
 }
 
 AppLanguage AppLanguageFromRaw(std::string_view raw) noexcept {
-  if (raw == "vi") return AppLanguage::kVietnamese;
-  if (raw == "en") return AppLanguage::kEnglish;
+  if (raw == kLangVi) return AppLanguage::kVietnamese;
+  if (raw == kLangEn) return AppLanguage::kEnglish;
   return AppLanguage::kSystem;
 }
 
@@ -54,30 +64,22 @@ std::string_view ResolveLanguageCode(
     AppLanguage language, const std::vector<std::string>& preferred_languages) {
   switch (language) {
     case AppLanguage::kVietnamese:
-      return "vi";
+      return kLangVi;
     case AppLanguage::kEnglish:
-      return "en";
+      return kLangEn;
     case AppLanguage::kSystem:
       for (const std::string& identifier : preferred_languages) {
-        if (absl::EqualsIgnoreCase(identifier, "en") ||
-            absl::StartsWithIgnoreCase(identifier, "en-") ||
-            absl::StartsWithIgnoreCase(identifier, "en_")) {
-          return "en";
-        }
-        if (absl::EqualsIgnoreCase(identifier, "vi") ||
-            absl::StartsWithIgnoreCase(identifier, "vi-") ||
-            absl::StartsWithIgnoreCase(identifier, "vi_")) {
-          return "vi";
-        }
+        if (MatchesLanguageTag(identifier, kLangEn)) return kLangEn;
+        if (MatchesLanguageTag(identifier, kLangVi)) return kLangVi;
       }
-      return "vi";
+      return kLangVi;
   }
-  return "vi";
+  return kLangVi;
 }
 
 std::string_view ResolveSystemLanguageCode(AppLanguage language) {
-  if (language == AppLanguage::kVietnamese) return "vi";
-  if (language == AppLanguage::kEnglish) return "en";
+  if (language == AppLanguage::kVietnamese) return kLangVi;
+  if (language == AppLanguage::kEnglish) return kLangEn;
   return ResolveLanguageCode(language, GetSystemPreferredLanguages());
 }
 
@@ -86,8 +88,8 @@ std::wstring_view Localized(AppLanguage language, L10nKey key) {
   if (idx >= static_cast<size_t>(L10nKey::kCount)) return L"";
 
   const std::string_view code = ResolveSystemLanguageCode(language);
-  const auto& table = (code == "en") ? generated::kEnglishStrings
-                                     : generated::kVietnameseStrings;
+  const auto& table = code == kLangEn ? generated::kEnglishStrings
+                                      : generated::kVietnameseStrings;
   return table[idx];
 }
 
