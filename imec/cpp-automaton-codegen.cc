@@ -438,23 +438,22 @@ void EmitFallbackMatchers(const CompiledAutomaton& compiled, Sink& sink) {
     sink.WriteLn("      const uint16_t* slice,");
     sink.WriteLn("      int32_t slice_len,");
     sink.WriteLn("      std::vector<int>& out_tags) {");
-    sink.WriteLn("    static const okeytre::RuleMatcher kMatcher = {");
-    sink.WriteLn("        {");
+    sink.WriteLn("    static constexpr okeytre::PikeVMInst kInsts[] = {");
     for (const PikeVMInst& inst : rule.matcher.instructions) {
       switch (inst.op) {
         case PikeVMInst::Op::kMatch:
-          sink.WriteLn("            okeytre::PikeVMInst::MakeMatch(),");
+          sink.WriteLn("        okeytre::PikeVMInst::MakeMatch(),");
           break;
         case PikeVMInst::Op::kJump:
-          sink.WriteLn("            okeytre::PikeVMInst::MakeJump($0),",
+          sink.WriteLn("        okeytre::PikeVMInst::MakeJump($0),",
                        inst.arg1);
           break;
         case PikeVMInst::Op::kSplit:
-          sink.WriteLn("            okeytre::PikeVMInst::MakeSplit($0, $1),",
+          sink.WriteLn("        okeytre::PikeVMInst::MakeSplit($0, $1),",
                        inst.arg1, inst.arg2);
           break;
         case PikeVMInst::Op::kSaveTag:
-          sink.WriteLn("            okeytre::PikeVMInst::MakeSaveTag($0),",
+          sink.WriteLn("        okeytre::PikeVMInst::MakeSaveTag($0),",
                        inst.arg1);
           break;
         case PikeVMInst::Op::kCharClass: {
@@ -462,12 +461,12 @@ void EmitFallbackMatchers(const CompiledAutomaton& compiled, Sink& sink) {
           uint64_t hi = inst.char_class.HighWord();
           if (hi == 0) {
             sink.WriteLn(
-                "            "
+                "        "
                 "okeytre::PikeVMInst::MakeCharClass(okeytre::ECBitSet($0)),",
                 Hex64(lo));
           } else {
             sink.WriteLn(
-                "            "
+                "        "
                 "okeytre::PikeVMInst::MakeCharClass(okeytre::"
                 "ECBitSet($0, $1)),",
                 Hex64(lo), Hex64(hi));
@@ -476,14 +475,12 @@ void EmitFallbackMatchers(const CompiledAutomaton& compiled, Sink& sink) {
         }
       }
     }
-    sink.WriteLn("        },");
-    sink.WriteLn("        $0", rule.matcher.num_tags);
     sink.WriteLn("    };");
-    sink.WriteLn("    return kMatcher.MatchSliceWithClassifier(");
-    sink.WriteLn("        slice, static_cast<int>(slice_len),");
+    sink.WriteLn("    return okeytre::MatchPikeVmSlice(");
     sink.WriteLn(
-        "        [](uint16_t c) { return static_cast<int>(Classify(c)); }, "
-        "out_tags);");
+        "        kInsts, sizeof(kInsts) / sizeof(kInsts[0]), $0, slice,",
+        rule.matcher.num_tags);
+    sink.WriteLn("        static_cast<int>(slice_len), &Classify, out_tags);");
     sink.WriteLn("  }");
     sink.WriteLn();
   }
@@ -923,7 +920,6 @@ void EmitFixedPlanRuleBody(const CompiledRule& rule, const FixedSlicePlan& plan,
 void EmitPikeVMRuleBody(size_t rule_id, const CompiledRule& rule,
                         const std::vector<CharacterMap>& maps,
                         std::string_view indent, Sink& sink) {
-  sink.WriteLn("$0std::vector<int> tags;", indent);
   sink.WriteLn(
       "$0if (!MatchPikeVm_$1(matched_slice, slice_len, tags)) return -1;",
       indent, rule_id);
@@ -1036,6 +1032,17 @@ void EmitApplyRuleFunction(const CompiledAutomaton& compiled, Sink& sink) {
     sink.WriteLn("    return -1;");
     sink.WriteLn("  }");
     return;
+  }
+
+  bool has_pike_vm_rule = false;
+  for (const CompiledRule& rule : compiled.rules) {
+    if (!rule.has_fixed_plan) {
+      has_pike_vm_rule = true;
+      break;
+    }
+  }
+  if (has_pike_vm_rule) {
+    sink.WriteLn("    std::vector<int> tags;");
   }
 
   sink.WriteLn("    switch (rule_id) {");
