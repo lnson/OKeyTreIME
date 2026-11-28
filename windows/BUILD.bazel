@@ -132,9 +132,13 @@ cc_library(
     name = "update_parser",
     srcs = ["update-parser.cc"],
     hdrs = ["update-parser.h"],
+    linkopts = ["winhttp.lib"],
     deps = [
         ":app_version",
+        ":localization",
+        "@abseil-cpp//absl/cleanup",
         "@abseil-cpp//absl/strings",
+        "@yyjson",
     ],
 )
 
