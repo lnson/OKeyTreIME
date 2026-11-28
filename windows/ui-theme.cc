@@ -208,17 +208,34 @@ HFONT CreateUiFont(int point_size, int weight, UINT dpi) {
 Gdiplus::Bitmap* GetAppLogoBitmap() {
   static std::unique_ptr<Gdiplus::Bitmap> logo = []() {
     HMODULE mod = GetModuleHandleW(nullptr);
-    HRSRC res = FindResourceW(mod, MAKEINTRESOURCEW(IDR_APP_LOGO_PNG),
-                              RT_RCDATA);
-    if (res == nullptr) {
+    HRSRC group_res =
+        FindResourceW(mod, MAKEINTRESOURCEW(IDI_APP_ICON), RT_GROUP_ICON);
+    if (group_res == nullptr) {
       return std::unique_ptr<Gdiplus::Bitmap>();
     }
-    const DWORD size = SizeofResource(mod, res);
-    HGLOBAL loaded = LoadResource(mod, res);
-    if (loaded == nullptr || size == 0) {
+    HGLOBAL group_loaded = LoadResource(mod, group_res);
+    if (group_loaded == nullptr) {
       return std::unique_ptr<Gdiplus::Bitmap>();
     }
-    const void* data = LockResource(loaded);
+    auto* group_data = static_cast<PBYTE>(LockResource(group_loaded));
+    if (group_data == nullptr) {
+      return std::unique_ptr<Gdiplus::Bitmap>();
+    }
+    const int icon_id = LookupIconIdFromDirectoryEx(group_data, TRUE, 256, 256,
+                                                    LR_DEFAULTCOLOR);
+    if (icon_id <= 0) {
+      return std::unique_ptr<Gdiplus::Bitmap>();
+    }
+    HRSRC icon_res = FindResourceW(mod, MAKEINTRESOURCEW(icon_id), RT_ICON);
+    if (icon_res == nullptr) {
+      return std::unique_ptr<Gdiplus::Bitmap>();
+    }
+    const DWORD size = SizeofResource(mod, icon_res);
+    HGLOBAL icon_loaded = LoadResource(mod, icon_res);
+    if (icon_loaded == nullptr || size == 0) {
+      return std::unique_ptr<Gdiplus::Bitmap>();
+    }
+    const void* data = LockResource(icon_loaded);
     if (data == nullptr) {
       return std::unique_ptr<Gdiplus::Bitmap>();
     }
@@ -228,7 +245,7 @@ Gdiplus::Bitmap* GetAppLogoBitmap() {
     }
     std::unique_ptr<Gdiplus::Bitmap> bmp(Gdiplus::Bitmap::FromStream(stream));
     stream->Release();
-    if (!bmp || bmp->GetLastStatus() != Gdiplus::Ok) {
+    if (bmp == nullptr || bmp->GetLastStatus() != Gdiplus::Ok) {
       return std::unique_ptr<Gdiplus::Bitmap>();
     }
     return bmp;

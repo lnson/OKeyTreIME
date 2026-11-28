@@ -17,7 +17,6 @@
 #define VFT2_UNKNOWN_VAL 0x00000000L
 
 IDI_APP_ICON ICON "okeytre.ico"
-IDR_APP_LOGO_PNG RCDATA "okeytre-logo.png"
 IDI_TRAY_VI_ICON ICON "tray-vi.ico"
 IDI_TRAY_OFF_ICON ICON "tray-off.ico"
 CREATEPROCESS_MANIFEST_ID RT_MANIFEST_ID "okeytre.manifest"

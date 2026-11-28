@@ -182,7 +182,6 @@ genrule(
     name = "okeytre_resources",
     srcs = [
         "resources/okeytre.ico",
-        "resources/okeytre-logo.png",
         "resources/okeytre.manifest",
         "resources/okeytre.rc",
         "resources/resource.h",
