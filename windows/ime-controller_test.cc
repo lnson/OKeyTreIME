@@ -30,7 +30,7 @@ std::u16string TypeString(ImeController& controller, std::u16string_view keys) {
 
 TEST(ImeControllerTest, TelexTypingAndToggleOffOn) {
   SettingsStore store(std::make_unique<InMemorySettingsBackend>());
-  ImeController controller(store);
+  ImeController controller(store, nullptr);
 
   EXPECT_EQ(TypeString(controller, u"vieetj"), u"vi\u1ec7t");
 
@@ -45,9 +45,10 @@ TEST(ImeControllerTest, TelexTypingAndToggleOffOn) {
 
 TEST(ImeControllerTest, AutoRestoreAndManualRestore) {
   SettingsStore store(std::make_unique<InMemorySettingsBackend>());
-  ImeController controller(store);
+  ImeController controller(store, nullptr);
 
-  // Auto-restore non-Vietnamese word on space and punctuation (including Shift+? ).
+  // Auto-restore non-Vietnamese word on space and punctuation (including
+  // Shift+? ).
   EXPECT_EQ(TypeString(controller, u"user "), u"user ");
   controller.ResetBuffer();
   EXPECT_EQ(TypeString(controller, u"necessary "), u"necessary ");
@@ -113,7 +114,7 @@ TEST(ImeControllerTest, ExtractsSurroundingWordAtCaret) {
 TEST(ImeControllerTest,
      SuspendsTransformsAndReversionWhenSystemKeyboardIncompatible) {
   SettingsStore store(std::make_unique<InMemorySettingsBackend>());
-  ImeController controller(store);
+  ImeController controller(store, nullptr);
 
   EXPECT_TRUE(controller.is_vietnamese_enabled());
   EXPECT_TRUE(controller.is_effectively_active());
@@ -142,9 +143,9 @@ TEST(ImeControllerTest, TreatsRichTextSentinelsAsWordBoundaries) {
   // ZWNBSP (U+FEFF), or Object Replacement Characters (U+FFFC) adjacent to
   // the caret. They must never attach to the extracted word.
   const std::u16string text = u"\u200Btieng\uFFFC";
-  const SurroundingWord word = ExtractSurroundingWord(
-      reinterpret_cast<const uint16_t*>(text.data()),
-      static_cast<int32_t>(text.size()), 0, 6);
+  const SurroundingWord word =
+      ExtractSurroundingWord(reinterpret_cast<const uint16_t*>(text.data()),
+                             static_cast<int32_t>(text.size()), 0, 6);
   ASSERT_EQ(word.word_utf16.size(), 5u);
   EXPECT_EQ(word.caret_offset, 5);
 

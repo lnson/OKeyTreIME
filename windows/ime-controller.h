@@ -45,8 +45,7 @@ class ImeController {
   using CaretReaderFn = std::function<std::optional<SurroundingWord>()>;
   using StateChangedFn = std::function<void()>;
 
-  explicit ImeController(SettingsStore& settings,
-                         CaretReaderFn caret_reader = nullptr);
+  ImeController(SettingsStore& settings, CaretReaderFn caret_reader);
   ~ImeController();
 
   ImeController(const ImeController&) = delete;
