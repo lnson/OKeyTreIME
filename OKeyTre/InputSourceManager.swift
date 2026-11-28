@@ -69,43 +69,33 @@ final class InputSourceManager: ObservableObject {
         _ = applySource(source)
     }
 
+    private static func stringProperty(_ key: CFString, of source: TISInputSource) -> String? {
+        guard let ptr = TISGetInputSourceProperty(source, key) else { return nil }
+        return Unmanaged<CFString>.fromOpaque(ptr).takeUnretainedValue() as String
+    }
+
     @discardableResult
     private func applySource(_ source: TISInputSource) -> Bool {
-        var id = ""
-        if let idPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) {
-            id = Unmanaged<CFString>.fromOpaque(idPtr).takeUnretainedValue() as String
-        }
-
-        var sourceType: String?
-        if let typePtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceType) {
-            sourceType = Unmanaged<CFString>.fromOpaque(typePtr).takeUnretainedValue() as String
-        }
-
-        var name = AppLanguage.current.localized("input_source.unknown")
-        if let namePtr = TISGetInputSourceProperty(source, kTISPropertyLocalizedName) {
-            name = Unmanaged<CFString>.fromOpaque(namePtr).takeUnretainedValue() as String
-        }
-
+        let id = Self.stringProperty(kTISPropertyInputSourceID, of: source) ?? ""
+        let sourceType = Self.stringProperty(kTISPropertyInputSourceType, of: source)
+        let name = Self.stringProperty(kTISPropertyLocalizedName, of: source)
+            ?? AppLanguage.current.localized("input_source.unknown")
         let english = Self.isCompatibleEnglishKeyboard(sourceID: id, sourceType: sourceType)
 
+        let applyState = {
+            self.lastCheckedSource = source
+            if self.currentSourceName != name {
+                self.currentSourceName = name
+            }
+            if self.isEnglish != english {
+                self.isEnglish = english
+            }
+        }
+
         if Thread.isMainThread {
-            lastCheckedSource = source
-            if currentSourceName != name {
-                currentSourceName = name
-            }
-            if isEnglish != english {
-                isEnglish = english
-            }
+            applyState()
         } else {
-            DispatchQueue.main.async {
-                self.lastCheckedSource = source
-                if self.currentSourceName != name {
-                    self.currentSourceName = name
-                }
-                if self.isEnglish != english {
-                    self.isEnglish = english
-                }
-            }
+            DispatchQueue.main.async(execute: applyState)
         }
         return english
     }
@@ -170,15 +160,11 @@ final class InputSourceManager: ObservableObject {
             return false
         }
         for source in list {
-            if let idPtr = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) {
-                let id = Unmanaged<CFString>.fromOpaque(idPtr).takeUnretainedValue() as String
-                if id == "com.apple.keylayout.US" || id == "com.apple.keylayout.ABC" {
-                    let status = TISSelectInputSource(source)
-                    if status == noErr {
-                        updateCurrentSource()
-                        return true
-                    }
-                }
+            if let id = Self.stringProperty(kTISPropertyInputSourceID, of: source),
+               id == "com.apple.keylayout.US" || id == "com.apple.keylayout.ABC",
+               TISSelectInputSource(source) == noErr {
+                updateCurrentSource()
+                return true
             }
         }
         return false

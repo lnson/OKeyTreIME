@@ -99,12 +99,7 @@ final class PermissionManager: ObservableObject {
     private let isAutomatedEnvironment: Bool
 
     private init() {
-        let env = ProcessInfo.processInfo.environment
-        self.isAutomatedEnvironment = env["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
-            || env["XCTestConfigurationFilePath"] != nil
-            || env["XCTestBundlePath"] != nil
-            || env["XCTestSessionIdentifier"] != nil
-
+        self.isAutomatedEnvironment = ProcessInfo.isAutomatedEnvironment
         guard !isAutomatedEnvironment else { return }
 
         refreshWorkspaceSnapshot()

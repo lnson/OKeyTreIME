@@ -76,10 +76,17 @@ enum AppLanguage: String, CaseIterable, Identifiable {
     }
 
     static var current: AppLanguage {
-        guard let raw = UserDefaults.standard.string(forKey: defaultsKey),
-              let language = AppLanguage(rawValue: raw) else {
-            return .system
-        }
-        return language
+        UserDefaults.standard.string(forKey: defaultsKey)
+            .flatMap(AppLanguage.init(rawValue:)) ?? .system
     }
+}
+
+extension ProcessInfo {
+    nonisolated static let isAutomatedEnvironment: Bool = {
+        let env = processInfo.environment
+        return env["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
+            || env["XCTestConfigurationFilePath"] != nil
+            || env["XCTestBundlePath"] != nil
+            || env["XCTestSessionIdentifier"] != nil
+    }()
 }

@@ -10,7 +10,7 @@ enum CaretTextReader {
         let wordUTF16: [UniChar]
         let caretOffset: Int
     }
-    
+
     /// Per-element messaging timeout (50ms) so slow web renderers never stall the `CGEventTap`.
     private static let messagingTimeoutSeconds: Float = 0.05
 
@@ -23,7 +23,46 @@ enum CaretTextReader {
 
     /// Tracks PIDs for which we have already enabled `AXManualAccessibility` / `AXEnhancedUserInterface`.
     private static var enhancedPids = Set<pid_t>()
-    
+
+    private static func attribute(_ attr: String, of element: AXUIElement) -> CFTypeRef? {
+        var ref: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attr as CFString, &ref) == .success else {
+            return nil
+        }
+        return ref
+    }
+
+    private static func elementAttribute(_ attr: String, of element: AXUIElement) -> AXUIElement? {
+        guard let ref = attribute(attr, of: element),
+              CFGetTypeID(ref) == AXUIElementGetTypeID() else {
+            return nil
+        }
+        return (ref as! AXUIElement)
+    }
+
+    private static func parameterizedAttribute(
+        _ attr: String,
+        parameter: CFTypeRef,
+        of element: AXUIElement
+    ) -> CFTypeRef? {
+        var ref: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(
+            element,
+            attr as CFString,
+            parameter,
+            &ref
+        ) == .success else {
+            return nil
+        }
+        return ref
+    }
+
+    private static func cfRange(from value: CFTypeRef?) -> CFRange? {
+        guard let value, CFGetTypeID(value) == AXValueGetTypeID() else { return nil }
+        var range = CFRange()
+        return AXValueGetValue(value as! AXValue, .cfRange, &range) ? range : nil
+    }
+
     /// Enables `AXManualAccessibility` (for Electron apps like VS Code) and `AXEnhancedUserInterface`
     /// (for Chromium browsers and Apple iWork apps like Pages/Keynote/Numbers) once per process.
     static func enableEnhancedUserInterface(for pid: pid_t) {
@@ -41,7 +80,7 @@ enum CaretTextReader {
             enhancedPids.insert(pid)
         }
     }
-    
+
     static func handleAppTerminated(pid: pid_t) {
         enhancedPids.remove(pid)
     }
@@ -49,99 +88,65 @@ enum CaretTextReader {
     static func resetEnhancedPids() {
         enhancedPids.removeAll()
     }
-    
-    private static func supportsTextSelection(_ element: AXUIElement) -> Bool {
-        var rangeRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
-           let val = rangeRef, CFGetTypeID(val) == AXValueGetTypeID() {
-            return true
-        }
-        return false
-    }
 
-    private static let isAutomatedEnvironment: Bool = {
-        let env = ProcessInfo.processInfo.environment
-        return env["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
-            || env["XCTestConfigurationFilePath"] != nil
-            || env["XCTestBundlePath"] != nil
-            || env["XCTestSessionIdentifier"] != nil
-    }()
+    private static func supportsTextSelection(_ element: AXUIElement) -> Bool {
+        guard let val = attribute(kAXSelectedTextRangeAttribute as String, of: element) else {
+            return false
+        }
+        return CFGetTypeID(val) == AXValueGetTypeID()
+    }
 
     /// Resolves the currently focused UI element, including fallbacks for Apple Pages/iWork and Chromium-based applications.
     static func getFocusedElement() -> AXUIElement? {
-        guard !isAutomatedEnvironment else { return nil }
-        var focusedRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &focusedRef) == .success,
-           let focusedVal = focusedRef {
-            let focused = focusedVal as! AXUIElement
+        guard !ProcessInfo.isAutomatedEnvironment else { return nil }
+        if let focused = elementAttribute(kAXFocusedUIElementAttribute as String, of: systemWide) {
             var pid: pid_t = 0
-            if AXUIElementGetPid(focused, &pid) == .success, pid > 0, !enhancedPids.contains(pid) {
+            if AXUIElementGetPid(focused, &pid) == .success, pid > 0, !enhancedPids.contains(pid),
+               !supportsTextSelection(focused) {
                 // Apps like Apple Pages return the raw canvas view until AXEnhancedUserInterface is enabled.
-                if !supportsTextSelection(focused) {
-                    enableEnhancedUserInterface(for: pid)
-                    let appElement = AXUIElementCreateApplication(pid)
-                    var refreshedRef: CFTypeRef?
-                    if AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &refreshedRef) == .success,
-                       let refreshed = refreshedRef {
-                        return (refreshed as! AXUIElement)
-                    }
-                    if AXUIElementCopyAttributeValue(systemWide, kAXFocusedUIElementAttribute as CFString, &refreshedRef) == .success,
-                       let refreshed = refreshedRef {
-                        return (refreshed as! AXUIElement)
-                    }
-                }
+                enableEnhancedUserInterface(for: pid)
+                let appElement = AXUIElementCreateApplication(pid)
+                return elementAttribute(kAXFocusedUIElementAttribute as String, of: appElement)
+                    ?? elementAttribute(kAXFocusedUIElementAttribute as String, of: systemWide)
+                    ?? focused
             }
             return focused
         }
-        
+
         // Fallback: Query systemWide focused application, then query its focused element
-        var focusedAppRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedAppRef) == .success,
-           let appVal = focusedAppRef {
-            let focusedApp = appVal as! AXUIElement
+        if let focusedApp = elementAttribute(kAXFocusedApplicationAttribute as String, of: systemWide) {
             var pid: pid_t = 0
             if AXUIElementGetPid(focusedApp, &pid) == .success, pid > 0 {
                 enableEnhancedUserInterface(for: pid)
             }
-            
-            var appFocusedRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(focusedApp, kAXFocusedUIElementAttribute as CFString, &appFocusedRef) == .success,
-               let appFocused = appFocusedRef {
-                return (appFocused as! AXUIElement)
-            }
+            return elementAttribute(kAXFocusedUIElementAttribute as String, of: focusedApp)
         }
         return nil
     }
-    
+
     /// Returns the length of the currently selected text in the focused element, or 0 if no selection.
     static func getSelectedRangeLength(for element: AXUIElement? = nil) -> Int {
         guard let targetElement = element ?? getFocusedElement() else {
             return 0
         }
-        
+
         // 1. Primary check: kAXSelectedTextRangeAttribute
-        var rangeRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(targetElement, kAXSelectedTextRangeAttribute as CFString, &rangeRef) == .success,
-           let rangeVal = rangeRef, CFGetTypeID(rangeVal) == AXValueGetTypeID() {
-            var selectedRange = CFRange()
-            if AXValueGetValue(rangeVal as! AXValue, .cfRange, &selectedRange),
-               isValidCaretLocation(selectedRange.location),
-               selectedRange.length > 0,
-               selectedRange.length < (CFIndex.max - 1024) {
-                return selectedRange.length
-            }
+        if let selectedRange = cfRange(from: attribute(kAXSelectedTextRangeAttribute as String, of: targetElement)),
+           isValidCaretLocation(selectedRange.location),
+           selectedRange.length > 0,
+           selectedRange.length < (CFIndex.max - 1024) {
+            return selectedRange.length
         }
-        
+
         // 2. Secondary check: kAXSelectedTextAttribute (e.g. Chrome Omnibox inline autocomplete)
-        var selectedTextRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(targetElement, kAXSelectedTextAttribute as CFString, &selectedTextRef) == .success,
-           let str = selectedTextRef as? String, !str.isEmpty {
+        if let str = attribute(kAXSelectedTextAttribute as String, of: targetElement) as? String,
+           !str.isEmpty {
             return str.utf16.count
         }
-        
+
         return 0
     }
-    
+
     private static let editableRoles: Set<String> = [
         kAXTextFieldRole as String,
         kAXTextAreaRole as String,
@@ -173,24 +178,12 @@ enum CaretTextReader {
     }
 
     private static func domClassList(for element: AXUIElement) -> [String]? {
-        var classListRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element,
-            "AXDOMClassList" as CFString,
-            &classListRef
-        ) == .success else {
-            return nil
-        }
-        return classListRef as? [String]
+        attribute("AXDOMClassList", of: element) as? [String]
     }
 
     private static func hasEmptyEditorDOMClass(_ element: AXUIElement) -> Bool {
         var classListRef: CFTypeRef?
-        let err = AXUIElementCopyAttributeValue(
-            element,
-            "AXDOMClassList" as CFString,
-            &classListRef
-        )
+        let err = AXUIElementCopyAttributeValue(element, "AXDOMClassList" as CFString, &classListRef)
         if err == .attributeUnsupported {
             return false
         }
@@ -200,15 +193,8 @@ enum CaretTextReader {
             return true
         }
         // Also check the immediate parent in case focus sits on an unclassed `<p>` inside `.ql-editor.ql-blank`.
-        var parentRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(
-            element,
-            kAXParentAttribute as CFString,
-            &parentRef
-        ) == .success,
-           let parentVal = parentRef,
-           CFGetTypeID(parentVal) == AXUIElementGetTypeID(),
-           let parentClasses = domClassList(for: parentVal as! AXUIElement),
+        if let parent = elementAttribute(kAXParentAttribute as String, of: element),
+           let parentClasses = domClassList(for: parent),
            isEmptyEditorClassList(parentClasses) {
             return true
         }
@@ -243,28 +229,21 @@ enum CaretTextReader {
     }
 
     private static func isEditableTextElement(_ element: AXUIElement) -> Bool {
-        var roleRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleRef) == .success,
-           let role = roleRef as? String,
+        if let role = attribute(kAXRoleAttribute as String, of: element) as? String,
            editableRoles.contains(role) {
             return true
         }
 
-        var editableRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(element, "AXEditable" as CFString, &editableRef) == .success,
-           let editable = editableRef as? Bool,
-           editable {
+        if attribute("AXEditable", of: element) as? Bool == true {
             return true
         }
 
-        var isSettable: DarwinBoolean = false
-        if AXUIElementIsAttributeSettable(element, kAXValueAttribute as CFString, &isSettable) == .success,
-           isSettable.boolValue {
-            return true
-        }
-        if AXUIElementIsAttributeSettable(element, kAXSelectedTextRangeAttribute as CFString, &isSettable) == .success,
-           isSettable.boolValue {
-            return true
+        for attr in [kAXValueAttribute, kAXSelectedTextRangeAttribute] {
+            var isSettable: DarwinBoolean = false
+            if AXUIElementIsAttributeSettable(element, attr as CFString, &isSettable) == .success,
+               isSettable.boolValue {
+                return true
+            }
         }
         return false
     }
@@ -279,34 +258,15 @@ enum CaretTextReader {
         if CFGetTypeID(markerRange) == AXTextMarkerRangeGetTypeID() {
             return AXTextMarkerRangeCopyStartMarker(markerRange as! AXTextMarkerRange)
         }
-        if let element {
-            var startMarkerRef: CFTypeRef?
-            if AXUIElementCopyParameterizedAttributeValue(
-                element,
-                "AXStartTextMarkerForTextMarkerRange" as CFString,
-                markerRange,
-                &startMarkerRef
-            ) == .success, let startMarker = startMarkerRef {
-                return startMarker
-            }
-        }
-        return nil
+        guard let element else { return nil }
+        return parameterizedAttribute("AXStartTextMarkerForTextMarkerRange", parameter: markerRange, of: element)
     }
 
     private static func stringForTextMarkerRange(
         in element: AXUIElement,
         markerRange: CFTypeRef
     ) -> String? {
-        var strRef: CFTypeRef?
-        if AXUIElementCopyParameterizedAttributeValue(
-            element,
-            "AXStringForTextMarkerRange" as CFString,
-            markerRange,
-            &strRef
-        ) == .success, let str = strRef as? String {
-            return str
-        }
-        return nil
+        parameterizedAttribute("AXStringForTextMarkerRange", parameter: markerRange, of: element) as? String
     }
 
     /// Attempts to resolve surrounding text via WebKit / Chromium `AXTextMarker` APIs on `contenteditable`
@@ -314,29 +274,15 @@ enum CaretTextReader {
     /// (such as Quill's `.ql-blank` `<p><br></p>` sibling next to a CSS `::before` `"Ask Gemini"` node)
     /// so callers do not fall back to `AXValue` and accidentally ingest pseudo-element placeholder text.
     private static func surroundingTextViaTextMarkers(for element: AXUIElement) -> SurroundingText?? {
-        var selectedMarkerRangeRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            element,
-            "AXSelectedTextMarkerRange" as CFString,
-            &selectedMarkerRangeRef
-        ) == .success, let selectedMarkerRange = selectedMarkerRangeRef else {
-            return nil
-        }
-
-        guard let caretMarker = startTextMarker(for: selectedMarkerRange, in: element) else {
+        guard let selectedMarkerRange = attribute("AXSelectedTextMarkerRange", of: element),
+              let caretMarker = startTextMarker(for: selectedMarkerRange, in: element) else {
             return nil
         }
 
         // Inspect the specific DOM/AX node holding the caret. In rich-text editors like Quill
         // (`<div class="ql-editor ql-blank"><p><br></p></div>`), CSS `::before` placeholder text
         // lives on a separate sibling node while `caretMarker` points to the empty `<p>` / `<br>`.
-        var caretNodeRef: CFTypeRef?
-        if AXUIElementCopyParameterizedAttributeValue(
-            element,
-            "AXUIElementForTextMarker" as CFString,
-            caretMarker,
-            &caretNodeRef
-        ) == .success, let caretNodeVal = caretNodeRef,
+        if let caretNodeVal = parameterizedAttribute("AXUIElementForTextMarker", parameter: caretMarker, of: element),
            CFGetTypeID(caretNodeVal) == AXUIElementGetTypeID() {
             let caretNode = caretNodeVal as! AXUIElement
             if !CFEqual(caretNode, element) {
@@ -344,42 +290,20 @@ enum CaretTextReader {
                    isEmptyEditorClassList(caretClasses, includeLeafClasses: true) {
                     return .some(nil)
                 }
-                var nodeRangeRef: CFTypeRef?
-                if AXUIElementCopyParameterizedAttributeValue(
-                    element,
-                    "AXTextMarkerRangeForUIElement" as CFString,
-                    caretNode,
-                    &nodeRangeRef
-                ) == .success,
-                   let nodeRange = nodeRangeRef,
+                if let nodeRange = parameterizedAttribute("AXTextMarkerRangeForUIElement", parameter: caretNode, of: element),
                    let nodeText = stringForTextMarkerRange(in: element, markerRange: nodeRange) {
                     if isEmptyCaretContainerText(nodeText) {
                         return .some(nil)
                     }
-                } else {
-                    var nodeValueRef: CFTypeRef?
-                    if AXUIElementCopyAttributeValue(
-                        caretNode,
-                        kAXValueAttribute as CFString,
-                        &nodeValueRef
-                    ) == .success,
-                       let nodeValue = nodeValueRef as? String,
-                       isEmptyCaretContainerText(nodeValue) {
-                        return .some(nil)
-                    }
+                } else if let nodeValue = attribute(kAXValueAttribute as String, of: caretNode) as? String,
+                          isEmptyCaretContainerText(nodeValue) {
+                    return .some(nil)
                 }
             }
         }
 
         // Resolve the current line's text and exact caret offset within that line via markers.
-        var lineRangeRef: CFTypeRef?
-        guard AXUIElementCopyParameterizedAttributeValue(
-            element,
-            "AXLineTextMarkerRangeForTextMarker" as CFString,
-            caretMarker,
-            &lineRangeRef
-        ) == .success,
-              let lineRange = lineRangeRef,
+        guard let lineRange = parameterizedAttribute("AXLineTextMarkerRangeForTextMarker", parameter: caretMarker, of: element),
               let lineText = stringForTextMarkerRange(in: element, markerRange: lineRange) else {
             return nil
         }
@@ -397,14 +321,11 @@ enum CaretTextReader {
         }
 
         let orderedMarkers = [lineStartMarker, caretMarker] as CFArray
-        var prefixRangeRef: CFTypeRef?
-        guard AXUIElementCopyParameterizedAttributeValue(
-            element,
-            "AXTextMarkerRangeForUnorderedTextMarkers" as CFString,
-            orderedMarkers,
-            &prefixRangeRef
-        ) == .success,
-              let prefixRange = prefixRangeRef,
+        guard let prefixRange = parameterizedAttribute(
+            "AXTextMarkerRangeForUnorderedTextMarkers",
+            parameter: orderedMarkers,
+            of: element
+        ),
               let prefixText = stringForTextMarkerRange(in: element, markerRange: prefixRange) else {
             return nil
         }
@@ -439,16 +360,7 @@ enum CaretTextReader {
             return nil
         }
 
-        var placeholderRef: CFTypeRef?
-        let placeholderValue: String? = if AXUIElementCopyAttributeValue(
-            targetElement,
-            kAXPlaceholderValueAttribute as CFString,
-            &placeholderRef
-        ) == .success {
-            placeholderRef as? String
-        } else {
-            nil
-        }
+        let placeholderValue = attribute(kAXPlaceholderValueAttribute as String, of: targetElement) as? String
 
         // 0. For web/Electron `contenteditable` editors exposing `AXTextMarker` APIs, resolve
         // paragraph/line-scoped text directly so CSS `::before` placeholders never leak in.
@@ -463,110 +375,79 @@ enum CaretTextReader {
             }
             return resolved
         }
-        
+
         // Require a valid `kAXSelectedTextRangeAttribute` caret location; never guess `text.utf16.count`
         // when selection is missing or `NSNotFound` (e.g. after backspacing an empty `contenteditable`).
-        var rangeRef: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            targetElement,
-            kAXSelectedTextRangeAttribute as CFString,
-            &rangeRef
-        ) == .success,
-              let rangeVal = rangeRef,
-              CFGetTypeID(rangeVal) == AXValueGetTypeID() else {
-            return nil
-        }
-
-        var selectedRange = CFRange()
-        guard AXValueGetValue(rangeVal as! AXValue, .cfRange, &selectedRange),
+        guard let selectedRange = cfRange(from: attribute(kAXSelectedTextRangeAttribute as String, of: targetElement)),
               isValidCaretLocation(selectedRange.location) else {
             return nil
         }
         let location = selectedRange.location
-
         if location == 0 {
             return nil
         }
-        
+
         var text: String?
         var textOffset = 0
-        
+
         // 1. Fast path: Query a small clamped UTF-16 window directly via kAXStringForRangeParameterizedAttribute.
         // Works reliably in Apple Pages/Keynote/Numbers (even at end-of-storage where AXLineForIndex returns nil)
         // as well as native NSTextView, Xcode, Safari, and Chromium text areas.
         let windowRadius = 64
         let start = max(0, location - windowRadius)
         var maxEnd = location + windowRadius
-        
-        var countRef: CFTypeRef?
-        if AXUIElementCopyAttributeValue(targetElement, kAXNumberOfCharactersAttribute as CFString, &countRef) == .success,
-           let totalCount = countRef as? Int {
+
+        if let totalCount = attribute(kAXNumberOfCharactersAttribute as String, of: targetElement) as? Int {
             if totalCount <= 0 {
                 return nil
             }
             maxEnd = min(maxEnd, totalCount)
         }
-        
+
         let length = max(0, maxEnd - start)
         if length > 0 && start <= location {
             var windowRange = CFRange(location: start, length: length)
-            if let windowRangeVal = AXValueCreate(.cfRange, &windowRange) {
-                var stringRef: CFTypeRef?
-                if AXUIElementCopyParameterizedAttributeValue(
-                    targetElement,
-                    kAXStringForRangeParameterizedAttribute as CFString,
-                    windowRangeVal,
-                    &stringRef
-                ) == .success, let windowString = stringRef as? String {
-                    text = windowString
-                    textOffset = start
-                }
+            if let windowRangeVal = AXValueCreate(.cfRange, &windowRange),
+               let windowString = parameterizedAttribute(
+                   kAXStringForRangeParameterizedAttribute as String,
+                   parameter: windowRangeVal,
+                   of: targetElement
+               ) as? String {
+                text = windowString
+                textOffset = start
             }
         }
-        
+
         // 2. Line-level fallback: kAXLineForIndexParameterizedAttribute -> kAXRangeForLineParameterizedAttribute -> kAXStringForRangeParameterizedAttribute
-        if text == nil {
-            var lineIndexRef: CFTypeRef?
-            if AXUIElementCopyParameterizedAttributeValue(
-                targetElement,
-                kAXLineForIndexParameterizedAttribute as CFString,
-                location as CFNumber,
-                &lineIndexRef
-            ) == .success, let lineNumber = lineIndexRef as? Int {
-                var lineRangeRef: CFTypeRef?
-                if AXUIElementCopyParameterizedAttributeValue(
-                    targetElement,
-                    kAXRangeForLineParameterizedAttribute as CFString,
-                    lineNumber as CFNumber,
-                    &lineRangeRef
-                ) == .success, let lineRangeVal = lineRangeRef, CFGetTypeID(lineRangeVal) == AXValueGetTypeID() {
-                    var lineRange = CFRange()
-                    AXValueGetValue(lineRangeVal as! AXValue, .cfRange, &lineRange)
-                    var stringRef: CFTypeRef?
-                    if lineRange.length > 0,
-                       AXUIElementCopyParameterizedAttributeValue(
-                        targetElement,
-                        kAXStringForRangeParameterizedAttribute as CFString,
-                        lineRangeVal,
-                        &stringRef
-                    ) == .success, let lineString = stringRef as? String {
-                        text = lineString
-                        textOffset = lineRange.location
-                    }
-                }
-            }
+        if text == nil,
+           let lineNumber = parameterizedAttribute(
+               kAXLineForIndexParameterizedAttribute as String,
+               parameter: location as CFNumber,
+               of: targetElement
+           ) as? Int,
+           let lineRangeVal = parameterizedAttribute(
+               kAXRangeForLineParameterizedAttribute as String,
+               parameter: lineNumber as CFNumber,
+               of: targetElement
+           ),
+           let lineRange = cfRange(from: lineRangeVal),
+           lineRange.length > 0,
+           let lineString = parameterizedAttribute(
+               kAXStringForRangeParameterizedAttribute as String,
+               parameter: lineRangeVal,
+               of: targetElement
+           ) as? String {
+            text = lineString
+            textOffset = lineRange.location
         }
-        
+
         // 3. Fallback to full value (crucial for Chrome Omnibox & non-parameterized inputs)
-        if text == nil {
-            var fullValueRef: CFTypeRef?
-            if AXUIElementCopyAttributeValue(targetElement, kAXValueAttribute as CFString, &fullValueRef) == .success,
-               let fullString = fullValueRef as? String {
-                text = fullString
-                textOffset = 0
-            }
+        if text == nil,
+           let fullString = attribute(kAXValueAttribute as String, of: targetElement) as? String {
+            text = fullString
+            textOffset = 0
         }
-        
+
         guard let text, !text.isEmpty else { return nil }
         if textOffset == 0 && isPlaceholderMatch(value: text, placeholder: placeholderValue) {
             return nil
@@ -574,7 +455,7 @@ enum CaretTextReader {
 
         return surroundingText(in: text, textOffset: textOffset, caretLocation: location)
     }
-    
+
     /// Computes the word boundary and surrounding text around a given caret location in a string.
     static func surroundingText(in text: String, textOffset: Int = 0, caretLocation: Int) -> SurroundingText {
         let utf16 = text.utf16

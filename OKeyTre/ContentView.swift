@@ -4,43 +4,28 @@
 import AppKit
 import SwiftUI
 
-enum SettingsSection: String, CaseIterable, Identifiable {
-    case general
-    case correction
-    case advanced
+private enum SettingsSection: String, CaseIterable, Identifiable {
+    case general, correction, advanced
 
     var id: String { rawValue }
 
     func title(in language: AppLanguage) -> String {
-        switch self {
-        case .general:
-            return language.localized("settings.section.general")
-        case .correction:
-            return language.localized("settings.section.correction")
-        case .advanced:
-            return language.localized("settings.section.advanced")
-        }
+        language.localized("settings.section.\(rawValue)")
     }
 
     var systemImage: String {
         switch self {
-        case .general:
-            return "gearshape.fill"
-        case .correction:
-            return "wand.and.stars"
-        case .advanced:
-            return "gearshape.2.fill"
+        case .general: "gearshape.fill"
+        case .correction: "wand.and.stars"
+        case .advanced: "gearshape.2.fill"
         }
     }
 
     var tintColor: Color {
         switch self {
-        case .general:
-            return .teal
-        case .correction:
-            return .blue
-        case .advanced:
-            return .gray
+        case .general: .teal
+        case .correction: .blue
+        case .advanced: .gray
         }
     }
 }
@@ -76,14 +61,29 @@ struct ContentView: View {
         } detail: {
             switch selectedSection ?? .general {
             case .general:
-                GeneralSettingsPane()
+                GeneralSettingsPane(appLanguage: appLanguage)
             case .correction:
-                CorrectionSettingsPane()
+                CorrectionSettingsPane(appLanguage: appLanguage)
             case .advanced:
-                AdvancedSettingsPane()
+                AdvancedSettingsPane(appLanguage: appLanguage)
             }
         }
         .frame(minWidth: 640, idealWidth: 680, minHeight: 420, idealHeight: 460)
+    }
+}
+
+private struct SettingLabel: View {
+    let title: String
+    let description: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.body)
+            Text(description)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 
@@ -140,50 +140,39 @@ private struct SidebarFooter: View {
 }
 
 private struct GeneralSettingsPane: View {
-    @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
+    let appLanguage: AppLanguage
     @ObservedObject private var keyTapManager = KeyTapManager.shared
     @ObservedObject private var launchAtLoginManager = LaunchAtLoginManager.shared
     @ObservedObject private var updateManager = UpdateManager.shared
 
     var body: some View {
         Form {
-            Section {
+            Section(appLanguage.localized("settings.general.system.header")) {
                 Picker(selection: keyTapManager.styleBinding) {
                     ForEach(InputMethodStyle.allCases) { style in
                         Text(style.displayName(in: appLanguage)).tag(style)
                     }
                 } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("menu.input_style"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.general.input_style.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("menu.input_style"),
+                        description: appLanguage.localized("settings.general.input_style.description")
+                    )
                 }
 
                 Toggle(isOn: launchAtLoginManager.binding) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("menu.launch_at_login"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.general.launch_at_login.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("menu.launch_at_login"),
+                        description: appLanguage.localized("settings.general.launch_at_login.description")
+                    )
                 }
-            } header: {
-                Text(appLanguage.localized("settings.general.system.header"))
             }
 
-            Section {
+            Section(appLanguage.localized("settings.updates.header")) {
                 Toggle(isOn: updateManager.autoCheckBinding) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("settings.updates.auto_check.title"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.updates.auto_check.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("settings.updates.auto_check.title"),
+                        description: appLanguage.localized("settings.updates.auto_check.description")
+                    )
                 }
 
                 LabeledContent {
@@ -231,16 +220,11 @@ private struct GeneralSettingsPane: View {
                         }
                     }
                 } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("settings.updates.manual_download.title"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.updates.manual_download.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("settings.updates.manual_download.title"),
+                        description: appLanguage.localized("settings.updates.manual_download.description")
+                    )
                 }
-            } header: {
-                Text(appLanguage.localized("settings.updates.header"))
             }
         }
         .formStyle(.grouped)
@@ -252,7 +236,7 @@ private struct GeneralSettingsPane: View {
 }
 
 private struct CorrectionSettingsPane: View {
-    @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
+    let appLanguage: AppLanguage
     @ObservedObject private var keyTapManager = KeyTapManager.shared
     @AppStorage(InputMethodBuffer.modernToneDefaultsKey) private var modernTone = InputMethodBuffer.defaultModernTone
     @AppStorage(InputMethodBuffer.uoHornDefaultsKey) private var uoHorn = false
@@ -261,78 +245,57 @@ private struct CorrectionSettingsPane: View {
 
     var body: some View {
         Form {
-            Section {
+            Section(appLanguage.localized("settings.orthography.header")) {
                 Toggle(isOn: $modernTone) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("settings.orthography.modern_tone.title"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.orthography.modern_tone.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("settings.orthography.modern_tone.title"),
+                        description: appLanguage.localized("settings.orthography.modern_tone.description")
+                    )
                 }
                 .onChange(of: modernTone) { _, newValue in
-                    KeyTapManager.shared.modernTone = newValue
+                    keyTapManager.modernTone = newValue
                 }
-            } header: {
-                Text(appLanguage.localized("settings.orthography.header"))
             }
 
-            Section {
+            Section(appLanguage.localized("settings.english.header")) {
                 Toggle(isOn: keyTapManager.restoreInvalidWordsBinding) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("settings.english.restore_invalid.title"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.english.restore_invalid.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("settings.english.restore_invalid.title"),
+                        description: appLanguage.localized("settings.english.restore_invalid.description")
+                    )
                 }
-            } header: {
-                Text(appLanguage.localized("settings.english.header"))
             }
 
-            Section {
+            Section(appLanguage.localized("settings.correction.header")) {
                 Toggle(isOn: $uoHorn) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("settings.correction.uo_horn.title"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.correction.uo_horn.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("settings.correction.uo_horn.title"),
+                        description: appLanguage.localized("settings.correction.uo_horn.description")
+                    )
                 }
                 .onChange(of: uoHorn) { _, newValue in
-                    KeyTapManager.shared.uoHorn = newValue
+                    keyTapManager.uoHorn = newValue
                 }
 
                 Toggle(isOn: $ngToNgh) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("settings.correction.ng_to_ngh.title"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.correction.ng_to_ngh.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("settings.correction.ng_to_ngh.title"),
+                        description: appLanguage.localized("settings.correction.ng_to_ngh.description")
+                    )
                 }
                 .onChange(of: ngToNgh) { _, newValue in
-                    KeyTapManager.shared.ngToNgh = newValue
+                    keyTapManager.ngToNgh = newValue
                 }
 
                 Toggle(isOn: $nghToNg) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("settings.correction.ngh_to_ng.title"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.correction.ngh_to_ng.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("settings.correction.ngh_to_ng.title"),
+                        description: appLanguage.localized("settings.correction.ngh_to_ng.description")
+                    )
                 }
                 .onChange(of: nghToNg) { _, newValue in
-                    KeyTapManager.shared.nghToNg = newValue
+                    keyTapManager.nghToNg = newValue
                 }
-            } header: {
-                Text(appLanguage.localized("settings.correction.header"))
             }
         }
         .formStyle(.grouped)
@@ -341,7 +304,7 @@ private struct CorrectionSettingsPane: View {
 }
 
 private struct AdvancedSettingsPane: View {
-    @AppStorage(AppLanguage.defaultsKey) private var appLanguage: AppLanguage = .system
+    let appLanguage: AppLanguage
     @AppStorage(InputMethodBuffer.maxBufferSizeDefaultsKey)
     private var maxBufferSize: Int = InputMethodBuffer.defaultMaxBufferSize
 
@@ -355,7 +318,7 @@ private struct AdvancedSettingsPane: View {
 
     var body: some View {
         Form {
-            Section {
+            Section(appLanguage.localized("settings.advanced.header")) {
                 LabeledContent {
                     HStack(alignment: .center, spacing: 6) {
                         TextField(
@@ -382,13 +345,10 @@ private struct AdvancedSettingsPane: View {
                         d[VerticalAlignment.center]
                     }
                 } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appLanguage.localized("settings.advanced.buffer_size.title"))
-                            .font(.body)
-                        Text(appLanguage.localized("settings.advanced.buffer_size.description"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+                    SettingLabel(
+                        title: appLanguage.localized("settings.advanced.buffer_size.title"),
+                        description: appLanguage.localized("settings.advanced.buffer_size.description")
+                    )
                 }
                 .onChange(of: maxBufferSize) { _, newValue in
                     let clamped = min(
@@ -400,8 +360,6 @@ private struct AdvancedSettingsPane: View {
                     }
                     KeyTapManager.shared.maxBufferSize = clamped
                 }
-            } header: {
-                Text(appLanguage.localized("settings.advanced.header"))
             }
         }
         .formStyle(.grouped)

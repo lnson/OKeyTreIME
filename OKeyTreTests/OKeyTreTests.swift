@@ -632,7 +632,7 @@ struct OKeyTreTests {
         #expect(typeWord("nuwocs") == "nước")
 
         // Switch to VIQR mode and verify VIQR typing + autocorrection flags (uoHorn, ngToNgh, nghToNg)
-        ime.setStyle(.viqr)
+        ime.style = .viqr
         #expect(ime.style == .viqr)
         #expect(typeWord("tie^'ng") == "tiếng")
         #expect(typeWord("nuo+'c") == "nước")
@@ -651,7 +651,7 @@ struct OKeyTreTests {
         #expect(typeWord("tieengs") == "tieengs")
 
         // Switch to VNI mode and verify VNI typing + autocorrection flags (uoHorn, ngToNgh, nghToNg)
-        ime.setStyle(.vni)
+        ime.style = .vni
         #expect(ime.style == .vni)
         #expect(typeWord("tieng61") == "tiếng")
         #expect(typeWord("nuoc71") == "nước")
@@ -662,7 +662,7 @@ struct OKeyTreTests {
         #expect(typeWord("tieengs") == "tieengs")
 
         // Switch back to Telex mode and verify flags (uoHorn, ngToNgh, nghToNg) are preserved
-        ime.setStyle(.telex)
+        ime.style = .telex
         #expect(ime.style == .telex)
         #expect(typeWord("nuwocs") == "nước")
         #expect(typeWord("ngieengs") == "nghiếng")
@@ -752,7 +752,7 @@ struct OKeyTreTests {
 
         // 4. Works across VNI as well ("tieng61" -> "tiếng", dual-Shift -> "tieng61")
         screen.removeAll()
-        ime.setStyle(.vni)
+        ime.style = .vni
         typeText("tieng61")
         #expect(currentScreen() == "tiếng")
         pressDualShift()
@@ -760,7 +760,7 @@ struct OKeyTreTests {
 
         // 5. Typing space after a word, backspacing the space, and pressing dual-Shift still restores
         screen.removeAll()
-        ime.setStyle(.telex)
+        ime.style = .telex
         typeText("roof ")
         #expect(currentScreen() == "rồ ")
         typeText("\u{007F}")

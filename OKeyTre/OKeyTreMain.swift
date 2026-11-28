@@ -269,22 +269,30 @@ final class OKeyTreAppDelegate: NSObject, NSApplicationDelegate {
 final class DockIconCoordinator {
     static let shared = DockIconCoordinator()
 
+    private nonisolated struct TrackedWindow {
+        weak var window: NSWindow?
+        var observerTokens: [NSObjectProtocol] = []
+        var isOpen = false
+        var isOpening = false
+        var openGeneration: UInt64 = 0
+
+        @MainActor
+        var isActive: Bool {
+            isOpen || window?.isVisible == true || window?.isMiniaturized == true
+        }
+    }
+
     private let currentPolicyProvider: () -> NSApplication.ActivationPolicy
     private let setPolicyHandler: (NSApplication.ActivationPolicy) -> Void
     private let isAppHiddenProvider: () -> Bool
     private let activateAppHandler: () -> Void
     private let onAccessoryRestored: () -> Void
 
-    private weak var settingsWindow: NSWindow?
-    private weak var showcaseWindow: NSWindow?
-    nonisolated(unsafe) private var windowObserverTokens: [NSObjectProtocol] = []
-    nonisolated(unsafe) private var showcaseObserverTokens: [NSObjectProtocol] = []
-    private(set) var isSettingsWindowOpen = false
-    private(set) var isShowcaseWindowOpen = false
-    private var isOpeningSettings = false
-    private var isOpeningShowcase = false
-    private var openGeneration: UInt64 = 0
-    private var showcaseOpenGeneration: UInt64 = 0
+    nonisolated(unsafe) private var settings = TrackedWindow()
+    nonisolated(unsafe) private var showcase = TrackedWindow()
+
+    var isSettingsWindowOpen: Bool { settings.isOpen }
+    var isShowcaseWindowOpen: Bool { showcase.isOpen }
 
     init(
         currentPolicyProvider: @escaping () -> NSApplication.ActivationPolicy = {
@@ -314,10 +322,7 @@ final class DockIconCoordinator {
     }
 
     deinit {
-        for token in windowObserverTokens {
-            NotificationCenter.default.removeObserver(token)
-        }
-        for token in showcaseObserverTokens {
+        for token in settings.observerTokens + showcase.observerTokens {
             NotificationCenter.default.removeObserver(token)
         }
     }
@@ -332,10 +337,7 @@ final class DockIconCoordinator {
         if isOpening || isVisible || isMiniaturized {
             return true
         }
-        if isAppHidden && wasOpen {
-            return true
-        }
-        return false
+        return isAppHidden && wasOpen
     }
 
     func showSettingsWindow(openWindow: OpenWindowAction) {
@@ -345,162 +347,114 @@ final class DockIconCoordinator {
     }
 
     func showSettingsWindow(openAction: () -> Void) {
-        openGeneration &+= 1
-        let generation = openGeneration
-        isOpeningSettings = true
-        isSettingsWindowOpen = true
-        applyActivationPolicy(.regular)
-        openAction()
-        bringSettingsWindowToFront()
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.openGeneration == generation else { return }
-            self.isOpeningSettings = false
-            guard self.isSettingsWindowOpen else {
-                self.syncWithWindowState()
-                return
-            }
-            self.bringSettingsWindowToFront()
-            self.syncWithWindowState()
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-            guard let self,
-                  self.openGeneration == generation,
-                  self.isSettingsWindowOpen,
-                  self.settingsWindow?.isKeyWindow != true else {
-                return
-            }
-            self.bringSettingsWindowToFront()
-        }
-    }
-
-    func handleDockReopen() {
-        let settingsActive = isSettingsWindowOpen
-            || settingsWindow?.isVisible == true
-            || settingsWindow?.isMiniaturized == true
-        let showcaseActive = isShowcaseWindowOpen
-            || showcaseWindow?.isVisible == true
-            || showcaseWindow?.isMiniaturized == true
-        guard settingsActive || showcaseActive else {
-            return
-        }
-        if settingsActive {
-            bringSettingsWindowToFront()
-        }
-        if showcaseActive {
-            bringShowcaseWindowToFront()
-        }
+        showWindow(\.settings, retryKeyWindow: true, openAction: openAction)
     }
 
     func showShowcaseWindow(openAction: () -> Void) {
-        showcaseOpenGeneration &+= 1
-        let generation = showcaseOpenGeneration
-        isOpeningShowcase = true
-        isShowcaseWindowOpen = true
-        applyActivationPolicy(.regular)
-        openAction()
-        bringShowcaseWindowToFront()
-
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.showcaseOpenGeneration == generation else { return }
-            self.isOpeningShowcase = false
-            guard self.isShowcaseWindowOpen else {
-                self.syncWithWindowState()
-                return
-            }
-            self.bringShowcaseWindowToFront()
-            self.syncWithWindowState()
-        }
+        showWindow(\.showcase, retryKeyWindow: false, openAction: openAction)
     }
 
-    func registerShowcaseWindow(_ window: NSWindow) {
-        if showcaseWindow !== window {
-            removeShowcaseObservers()
-            showcaseWindow = window
-            window.isRestorable = false
-            attachShowcaseObservers(to: window)
+    func handleDockReopen() {
+        let settingsActive = settings.isActive
+        let showcaseActive = showcase.isActive
+        if settingsActive {
+            bringWindowToFront(\.settings)
         }
-        syncWithWindowState()
-    }
-
-    func noteShowcaseWindowWillClose() {
-        showcaseOpenGeneration &+= 1
-        isOpeningShowcase = false
-        isShowcaseWindowOpen = false
-        DispatchQueue.main.async { [weak self] in
-            self?.syncWithWindowState()
+        if showcaseActive {
+            bringWindowToFront(\.showcase)
         }
     }
 
     func registerSettingsWindow(_ window: NSWindow) {
-        if settingsWindow !== window {
-            removeWindowObservers()
-            settingsWindow = window
-            window.isRestorable = false
-            attachObservers(to: window)
-        }
-        syncWithWindowState()
-        DispatchQueue.main.async { [weak self] in
-            self?.syncWithWindowState()
-        }
+        registerWindow(window, for: \.settings, asyncSync: true)
     }
 
-    func noteSettingsWindowPresented() {
-        isSettingsWindowOpen = true
-        applyActivationPolicy(.regular)
-    }
-
-    func noteSettingsWindowWillClose() {
-        openGeneration &+= 1
-        isOpeningSettings = false
-        isSettingsWindowOpen = false
-        DispatchQueue.main.async { [weak self] in
-            self?.syncWithWindowState()
-        }
+    func registerShowcaseWindow(_ window: NSWindow) {
+        registerWindow(window, for: \.showcase, asyncSync: false)
     }
 
     func syncWithWindowState() {
         let appHidden = isAppHiddenProvider()
-        let isSettingsVisible = settingsWindow?.isVisible ?? false
-        let isSettingsMiniaturized = settingsWindow?.isMiniaturized ?? false
-        let settingsOpen = Self.resolvedSettingsOpenState(
-            isVisible: isSettingsVisible,
-            isMiniaturized: isSettingsMiniaturized,
+        settings.isOpen = Self.resolvedSettingsOpenState(
+            isVisible: settings.window?.isVisible ?? false,
+            isMiniaturized: settings.window?.isMiniaturized ?? false,
             isAppHidden: appHidden,
-            wasOpen: isSettingsWindowOpen,
-            isOpening: isOpeningSettings
+            wasOpen: settings.isOpen,
+            isOpening: settings.isOpening
         )
-        isSettingsWindowOpen = settingsOpen
-
-        let isShowcaseVisible = showcaseWindow?.isVisible ?? false
-        let isShowcaseMiniaturized = showcaseWindow?.isMiniaturized ?? false
-        let showcaseOpen = Self.resolvedSettingsOpenState(
-            isVisible: isShowcaseVisible,
-            isMiniaturized: isShowcaseMiniaturized,
+        showcase.isOpen = Self.resolvedSettingsOpenState(
+            isVisible: showcase.window?.isVisible ?? false,
+            isMiniaturized: showcase.window?.isMiniaturized ?? false,
             isAppHidden: appHidden,
-            wasOpen: isShowcaseWindowOpen,
-            isOpening: isOpeningShowcase
+            wasOpen: showcase.isOpen,
+            isOpening: showcase.isOpening
         )
-        isShowcaseWindowOpen = showcaseOpen
-
-        applyActivationPolicy((settingsOpen || showcaseOpen) ? .regular : .accessory)
+        applyActivationPolicy((settings.isOpen || showcase.isOpen) ? .regular : .accessory)
     }
 
-    private func bringShowcaseWindowToFront() {
-        if let window = showcaseWindow, window.isMiniaturized {
+    private func showWindow(
+        _ keyPath: ReferenceWritableKeyPath<DockIconCoordinator, TrackedWindow>,
+        retryKeyWindow: Bool,
+        openAction: () -> Void
+    ) {
+        self[keyPath: keyPath].openGeneration &+= 1
+        let generation = self[keyPath: keyPath].openGeneration
+        self[keyPath: keyPath].isOpening = true
+        self[keyPath: keyPath].isOpen = true
+        applyActivationPolicy(.regular)
+        openAction()
+        bringWindowToFront(keyPath)
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self[keyPath: keyPath].openGeneration == generation else { return }
+            self[keyPath: keyPath].isOpening = false
+            guard self[keyPath: keyPath].isOpen else {
+                self.syncWithWindowState()
+                return
+            }
+            self.bringWindowToFront(keyPath)
+            self.syncWithWindowState()
+        }
+
+        guard retryKeyWindow else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self,
+                  self[keyPath: keyPath].openGeneration == generation,
+                  self[keyPath: keyPath].isOpen,
+                  self[keyPath: keyPath].window?.isKeyWindow != true else {
+                return
+            }
+            self.bringWindowToFront(keyPath)
+        }
+    }
+
+    private func registerWindow(
+        _ window: NSWindow,
+        for keyPath: ReferenceWritableKeyPath<DockIconCoordinator, TrackedWindow>,
+        asyncSync: Bool
+    ) {
+        if self[keyPath: keyPath].window !== window {
+            removeObservers(for: keyPath)
+            self[keyPath: keyPath].window = window
+            window.isRestorable = false
+            attachObservers(to: window, for: keyPath)
+        }
+        syncWithWindowState()
+        if asyncSync {
+            DispatchQueue.main.async { [weak self] in
+                self?.syncWithWindowState()
+            }
+        }
+    }
+
+    private func bringWindowToFront(
+        _ keyPath: ReferenceWritableKeyPath<DockIconCoordinator, TrackedWindow>
+    ) {
+        if let window = self[keyPath: keyPath].window, window.isMiniaturized {
             window.deminiaturize(nil)
         }
         activateAppHandler()
-        showcaseWindow?.makeKeyAndOrderFront(nil)
-    }
-
-    private func bringSettingsWindowToFront() {
-        if let window = settingsWindow, window.isMiniaturized {
-            window.deminiaturize(nil)
-        }
-        activateAppHandler()
-        settingsWindow?.makeKeyAndOrderFront(nil)
+        self[keyPath: keyPath].window?.makeKeyAndOrderFront(nil)
     }
 
     private func applyActivationPolicy(_ policy: NSApplication.ActivationPolicy) {
@@ -511,7 +465,10 @@ final class DockIconCoordinator {
         }
     }
 
-    private func attachObservers(to window: NSWindow) {
+    private func attachObservers(
+        to window: NSWindow,
+        for keyPath: ReferenceWritableKeyPath<DockIconCoordinator, TrackedWindow>
+    ) {
         let center = NotificationCenter.default
         let presentedNames: [Notification.Name] = [
             NSWindow.didBecomeKeyNotification,
@@ -522,58 +479,11 @@ final class DockIconCoordinator {
         for name in presentedNames {
             let token = center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
-                    self?.noteSettingsWindowPresented()
-                }
-            }
-            windowObserverTokens.append(token)
-        }
-
-        let occlusionToken = center.addObserver(
-            forName: NSWindow.didChangeOcclusionStateNotification,
-            object: window,
-            queue: .main
-        ) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.syncWithWindowState()
-            }
-        }
-        windowObserverTokens.append(occlusionToken)
-
-        let closeToken = center.addObserver(
-            forName: NSWindow.willCloseNotification,
-            object: window,
-            queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated {
-                self?.noteSettingsWindowWillClose()
-            }
-        }
-        windowObserverTokens.append(closeToken)
-    }
-
-    private func removeWindowObservers() {
-        for token in windowObserverTokens {
-            NotificationCenter.default.removeObserver(token)
-        }
-        windowObserverTokens.removeAll()
-    }
-
-    private func attachShowcaseObservers(to window: NSWindow) {
-        let center = NotificationCenter.default
-        let presentedNames: [Notification.Name] = [
-            NSWindow.didBecomeKeyNotification,
-            NSWindow.didBecomeMainNotification,
-            NSWindow.didMiniaturizeNotification,
-            NSWindow.didDeminiaturizeNotification,
-        ]
-        for name in presentedNames {
-            let token = center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.isShowcaseWindowOpen = true
+                    self?[keyPath: keyPath].isOpen = true
                     self?.applyActivationPolicy(.regular)
                 }
             }
-            showcaseObserverTokens.append(token)
+            self[keyPath: keyPath].observerTokens.append(token)
         }
 
         let occlusionToken = center.addObserver(
@@ -585,7 +495,7 @@ final class DockIconCoordinator {
                 self?.syncWithWindowState()
             }
         }
-        showcaseObserverTokens.append(occlusionToken)
+        self[keyPath: keyPath].observerTokens.append(occlusionToken)
 
         let closeToken = center.addObserver(
             forName: NSWindow.willCloseNotification,
@@ -593,17 +503,25 @@ final class DockIconCoordinator {
             queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.noteShowcaseWindowWillClose()
+                guard let self else { return }
+                self[keyPath: keyPath].openGeneration &+= 1
+                self[keyPath: keyPath].isOpening = false
+                self[keyPath: keyPath].isOpen = false
+                DispatchQueue.main.async { [weak self] in
+                    self?.syncWithWindowState()
+                }
             }
         }
-        showcaseObserverTokens.append(closeToken)
+        self[keyPath: keyPath].observerTokens.append(closeToken)
     }
 
-    private func removeShowcaseObservers() {
-        for token in showcaseObserverTokens {
+    private func removeObservers(
+        for keyPath: ReferenceWritableKeyPath<DockIconCoordinator, TrackedWindow>
+    ) {
+        for token in self[keyPath: keyPath].observerTokens {
             NotificationCenter.default.removeObserver(token)
         }
-        showcaseObserverTokens.removeAll()
+        self[keyPath: keyPath].observerTokens.removeAll()
     }
 }
 
@@ -648,15 +566,11 @@ private final class SettingsWindowTrackingView: NSView {
             PermissionManager.runAccessibilityRegistrationHelperAndExit()
         }
 
-        let env = ProcessInfo.processInfo.environment
-        let isPreview = env["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
-        let isRunningTests = env["XCTestConfigurationFilePath"] != nil
-            || env["XCTestBundlePath"] != nil
-            || env["XCTestSessionIdentifier"] != nil
+        let isAutomated = ProcessInfo.isAutomatedEnvironment
 
-        if !isPreview && !isRunningTests {
+        if !isAutomated {
             Self.terminateExistingInstances()
-            Self.relaunchViaLaunchServicesIfNeeded(env: env)
+            Self.relaunchViaLaunchServicesIfNeeded(env: ProcessInfo.processInfo.environment)
         }
 
         UserDefaults.standard.register(defaults: [
@@ -668,7 +582,7 @@ private final class SettingsWindowTrackingView: NSView {
         NSApplication.shared.setActivationPolicy(.accessory)
         _ = KeyTapManager.shared
 
-        if !isPreview && !isRunningTests {
+        if !isAutomated {
             Self.terminateExistingInstances()
             let launchShowcaseMode = ShowcaseManager.shared.resolveLaunchPresentation()
             LaunchAtLoginManager.shared.enableByDefaultIfNeeded()

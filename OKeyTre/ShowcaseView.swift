@@ -239,69 +239,23 @@ struct ShowcaseView: View {
     @ViewBuilder
     private var setupStatusBanner: some View {
         if !permissionManager.isAccessibilityGranted {
-            HStack(spacing: 12) {
-                Image(systemName: "exclamationmark.shield.fill")
-                    .font(.title3)
-                    .foregroundStyle(.orange)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(appLanguage.localized("showcase.status.accessibility_title"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(appLanguage.localized("showcase.status.accessibility_desc"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 8)
-
-                Button(appLanguage.localized("action.open_settings_now")) {
-                    permissionManager.openAccessibilitySettings()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
-                .controlSize(.small)
+            warningBanner(
+                icon: "exclamationmark.shield.fill",
+                title: appLanguage.localized("showcase.status.accessibility_title"),
+                subtitle: appLanguage.localized("showcase.status.accessibility_desc"),
+                actionTitle: appLanguage.localized("action.open_settings_now")
+            ) {
+                permissionManager.openAccessibilitySettings()
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(Color.orange.opacity(0.10))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .strokeBorder(Color.orange.opacity(0.28), lineWidth: 1)
-            )
         } else if keyTapManager.isVietnameseEnabled && !inputSourceManager.isEnglish {
-            HStack(spacing: 12) {
-                Image(systemName: "keyboard.badge.exclamationmark")
-                    .font(.title3)
-                    .foregroundStyle(.orange)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(appLanguage.localized("menu.input_source_warning.title", inputSourceManager.currentSourceName))
-                        .font(.subheadline.weight(.semibold))
-                    Text(appLanguage.localized("menu.input_source_warning.subtitle"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 8)
-
-                Button(appLanguage.localized("action.switch_to_us")) {
-                    _ = inputSourceManager.switchToEnglishInputSource()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
-                .controlSize(.small)
+            warningBanner(
+                icon: "keyboard.badge.exclamationmark",
+                title: appLanguage.localized("menu.input_source_warning.title", inputSourceManager.currentSourceName),
+                subtitle: appLanguage.localized("menu.input_source_warning.subtitle"),
+                actionTitle: appLanguage.localized("action.switch_to_us")
+            ) {
+                _ = inputSourceManager.switchToEnglishInputSource()
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(Color.orange.opacity(0.10))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .strokeBorder(Color.orange.opacity(0.28), lineWidth: 1)
-            )
         } else {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill")
@@ -321,6 +275,44 @@ struct ShowcaseView: View {
                     .strokeBorder(Color.green.opacity(0.25), lineWidth: 1)
             )
         }
+    }
+
+    private func warningBanner(
+        icon: String,
+        title: String,
+        subtitle: String,
+        actionTitle: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.orange)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Button(actionTitle, action: action)
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .controlSize(.small)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(Color.orange.opacity(0.10))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.28), lineWidth: 1)
+        )
     }
 
     private var showcaseGrid: some View {
