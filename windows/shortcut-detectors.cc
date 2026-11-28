@@ -13,9 +13,7 @@ void DualShiftDetector::Reset() noexcept {
 
 bool DualShiftDetector::OnKeyEvent(uint32_t vk_code, bool is_key_down,
                                    const ModifierSnapshot& mods) noexcept {
-  if (vk_code != kVkLeftShift && vk_code != kVkRightShift) {
-    return false;
-  }
+  if (vk_code != kVkLeftShift && vk_code != kVkRightShift) return false;
 
   if (vk_code == kVkLeftShift) {
     is_left_shift_pressed_ = is_key_down;
@@ -28,13 +26,8 @@ bool DualShiftDetector::OnKeyEvent(uint32_t vk_code, bool is_key_down,
     return false;
   }
 
-  if (mods.control || mods.alt || mods.win) {
-    return false;
-  }
-
-  if (has_triggered_for_chord_) {
-    return false;
-  }
+  if (mods.control || mods.alt || mods.win) return false;
+  if (has_triggered_for_chord_) return false;
 
   has_triggered_for_chord_ = true;
   return true;
@@ -48,9 +41,7 @@ void DualControlDetector::Reset() noexcept {
 }
 
 void DualControlDetector::NoteNonModifierKeyDown() noexcept {
-  if (is_left_ctrl_pressed_ || is_right_ctrl_pressed_) {
-    is_disrupted_ = true;
-  }
+  if (is_left_ctrl_pressed_ || is_right_ctrl_pressed_) is_disrupted_ = true;
 }
 
 bool DualControlDetector::OnKeyEvent(uint32_t vk_code, bool is_key_down,
@@ -62,9 +53,7 @@ bool DualControlDetector::OnKeyEvent(uint32_t vk_code, bool is_key_down,
     return false;
   }
 
-  if (mods.shift || mods.alt || mods.win) {
-    is_disrupted_ = true;
-  }
+  if (mods.shift || mods.alt || mods.win) is_disrupted_ = true;
 
   if (vk_code == kVkLeftControl) {
     is_left_ctrl_pressed_ = is_key_down;
@@ -82,9 +71,7 @@ bool DualControlDetector::OnKeyEvent(uint32_t vk_code, bool is_key_down,
     return false;
   }
 
-  if (is_disrupted_ || has_triggered_for_chord_) {
-    return false;
-  }
+  if (is_disrupted_ || has_triggered_for_chord_) return false;
 
   has_triggered_for_chord_ = true;
   return true;

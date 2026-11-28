@@ -57,12 +57,10 @@ bool IsModifierVk(DWORD vk) noexcept {
   }
 }
 
-ModifierSnapshot CurrentModifierSnapshot(DWORD event_vk, bool is_down) noexcept {
+ModifierSnapshot CurrentModifierSnapshot(DWORD event_vk,
+                                         bool is_down) noexcept {
   auto pressed = [event_vk, is_down](int vk) {
-    if (static_cast<DWORD>(vk) == event_vk) {
-      return is_down;
-    }
-    return IsKeyDownAsync(vk);
+    return static_cast<DWORD>(vk) == event_vk ? is_down : IsKeyDownAsync(vk);
   };
   ModifierSnapshot snap;
   snap.shift = pressed(VK_LSHIFT) || pressed(VK_RSHIFT);
@@ -122,25 +120,15 @@ int TranslateKeyToUtf16(DWORD vk, DWORD scan_code, const ModifierSnapshot& mods,
     if (IsKeyDownAsync(VK_LSHIFT)) key_state[VK_LSHIFT] = 0x80;
     if (IsKeyDownAsync(VK_RSHIFT)) key_state[VK_RSHIFT] = 0x80;
   }
-  if (mods.control) {
-    key_state[VK_CONTROL] = 0x80;
-  }
-  if (mods.alt) {
-    key_state[VK_MENU] = 0x80;
-  }
-  if (IsKeyToggled(VK_CAPITAL)) {
-    key_state[VK_CAPITAL] = 0x01;
-  }
-  if (IsKeyToggled(VK_NUMLOCK)) {
-    key_state[VK_NUMLOCK] = 0x01;
-  }
+  if (mods.control) key_state[VK_CONTROL] = 0x80;
+  if (mods.alt) key_state[VK_MENU] = 0x80;
+  if (IsKeyToggled(VK_CAPITAL)) key_state[VK_CAPITAL] = 0x01;
+  if (IsKeyToggled(VK_NUMLOCK)) key_state[VK_NUMLOCK] = 0x01;
 
   HWND fg = GetForegroundWindow();
   DWORD fg_thread = fg != nullptr ? GetWindowThreadProcessId(fg, nullptr) : 0;
   HKL layout = GetKeyboardLayout(fg_thread);
-  if (layout == nullptr) {
-    layout = GetKeyboardLayout(0);
-  }
+  if (layout == nullptr) layout = GetKeyboardLayout(0);
 
   // Flag bit 2 (0x0004, Win10 1607+): do not modify keyboard dead-key state.
   constexpr UINT kDoNotChangeKeyboardState = 0x0004;
@@ -148,9 +136,8 @@ int TranslateKeyToUtf16(DWORD vk, DWORD scan_code, const ModifierSnapshot& mods,
   const int count = ToUnicodeEx(vk, scan_code, key_state, wbuf.data(),
                                 static_cast<int>(wbuf.size()),
                                 kDoNotChangeKeyboardState, layout);
-  if (count <= 0) {
-    return 0;
-  }
+  if (count <= 0) return 0;
+
   const int safe_count = count < out_capacity ? count : out_capacity;
   for (int i = 0; i < safe_count; ++i) {
     out_units[i] = static_cast<uint16_t>(wbuf[static_cast<size_t>(i)]);
@@ -169,14 +156,12 @@ KeyHookManager::KeyHookManager(ImeController& controller,
 KeyHookManager::~KeyHookManager() { Stop(); }
 
 bool KeyHookManager::Start() {
-  if (keyboard_hook_ != nullptr) {
-    return true;
-  }
+  if (keyboard_hook_ != nullptr) return true;
 
   active_instance_ = this;
   HINSTANCE hinst = GetModuleHandleW(nullptr);
-  keyboard_hook_ =
-      SetWindowsHookExW(WH_KEYBOARD_LL, &KeyHookManager::KeyboardProc, hinst, 0);
+  keyboard_hook_ = SetWindowsHookExW(WH_KEYBOARD_LL,
+                                     &KeyHookManager::KeyboardProc, hinst, 0);
   if (keyboard_hook_ == nullptr) {
     active_instance_ = nullptr;
     return false;
@@ -184,10 +169,10 @@ bool KeyHookManager::Start() {
 
   mouse_hook_ =
       SetWindowsHookExW(WH_MOUSE_LL, &KeyHookManager::MouseProc, hinst, 0);
-  foreground_hook_ = SetWinEventHook(
-      EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
-      &KeyHookManager::ForegroundEventProc, 0, 0,
-      WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
+  foreground_hook_ =
+      SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
+                      &KeyHookManager::ForegroundEventProc, 0, 0,
+                      WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
   return true;
 }
 
@@ -222,9 +207,7 @@ LRESULT CALLBACK KeyHookManager::KeyboardProc(int code, WPARAM wparam,
     const auto* info = reinterpret_cast<const KBDLLHOOKSTRUCT*>(lparam);
     if (info != nullptr) {
       const LRESULT res = active_instance_->HandleKeyboardEvent(wparam, info);
-      if (res != 0) {
-        return res;
-      }
+      if (res != 0) return res;
     }
   }
   return CallNextHookEx(nullptr, code, wparam, lparam);
@@ -264,22 +247,17 @@ void KeyHookManager::HandleForegroundChanged() {
   dual_shift_.Reset();
   dual_control_.Reset();
   controller_.ResetBuffer();
-  if (on_foreground_changed_) {
-    on_foreground_changed_();
-  }
+  if (on_foreground_changed_) on_foreground_changed_();
 }
 
 LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
                                             const KBDLLHOOKSTRUCT* info) {
   // Never re-process our own injected SendInput events.
-  if (info->dwExtraInfo == kMagicExtraInfo) {
-    return 0;
-  }
+  if (info->dwExtraInfo == kMagicExtraInfo) return 0;
 
   // Guard against unexpected hook re-entrancy.
-  if (in_keyboard_event_) {
-    return 0;
-  }
+  if (in_keyboard_event_) return 0;
+
   in_keyboard_event_ = true;
   const auto reset_guard =
       absl::MakeCleanup([this]() { in_keyboard_event_ = false; });
@@ -307,16 +285,13 @@ LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
 
   // 2. Handle Left Shift + Right Shift instant raw-word restoration.
   if (vk == VK_LSHIFT || vk == VK_RSHIFT) {
-    if (is_key_down) {
-      dual_control_.OnKeyEvent(vk, true, mods);
-    }
+    if (is_key_down) dual_control_.OnKeyEvent(vk, true, mods);
+
     const bool english_layout =
         InputSourceManager::IsForegroundKeyboardEnglish();
     if (english_layout != controller_.is_system_keyboard_compatible()) {
       controller_.SetSystemKeyboardCompatible(english_layout);
-      if (on_foreground_changed_) {
-        on_foreground_changed_();
-      }
+      if (on_foreground_changed_) on_foreground_changed_();
     }
     if (controller_.is_effectively_active() &&
         dual_shift_.OnKeyEvent(vk, is_key_down, mods)) {
@@ -332,15 +307,11 @@ LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
   }
 
   if (IsModifierVk(vk)) {
-    if (is_key_down) {
-      dual_control_.OnKeyEvent(vk, true, mods);
-    }
+    if (is_key_down) dual_control_.OnKeyEvent(vk, true, mods);
     return 0;
   }
 
-  if (!is_key_down) {
-    return 0;
-  }
+  if (!is_key_down) return 0;
 
   // Any non-modifier key down disrupts an active Ctrl chord.
   dual_control_.NoteNonModifierKeyDown();
@@ -348,9 +319,7 @@ LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
   const bool english_layout = InputSourceManager::IsForegroundKeyboardEnglish();
   if (english_layout != controller_.is_system_keyboard_compatible()) {
     controller_.SetSystemKeyboardCompatible(english_layout);
-    if (on_foreground_changed_) {
-      on_foreground_changed_();
-    }
+    if (on_foreground_changed_) on_foreground_changed_();
   }
 
   if (!controller_.is_effectively_active()) {
@@ -359,9 +328,7 @@ LRESULT KeyHookManager::HandleKeyboardEvent(WPARAM wparam,
     return 0;
   }
 
-  if (!mods.shift) {
-    dual_shift_.Reset();
-  }
+  if (!mods.shift) dual_shift_.Reset();
 
   // Ctrl / Alt / Win shortcuts reset the buffer and pass through untouched.
   if (mods.control || mods.alt || mods.win) {
@@ -411,10 +378,8 @@ void KeyHookManager::SendEditAction(const ImeEditAction& action) {
   // pressing Left Shift + Right Shift to restore), temporarily release it
   // around VK_BACK so target apps receive plain Backspace rather than
   // Shift+Backspace, then restore the held Shift state afterwards.
-  const bool lshift_held =
-      total_backspaces > 0 && IsKeyDownAsync(VK_LSHIFT);
-  const bool rshift_held =
-      total_backspaces > 0 && IsKeyDownAsync(VK_RSHIFT);
+  const bool lshift_held = total_backspaces > 0 && IsKeyDownAsync(VK_LSHIFT);
+  const bool rshift_held = total_backspaces > 0 && IsKeyDownAsync(VK_RSHIFT);
 
   std::vector<INPUT> inputs;
   inputs.reserve(static_cast<size_t>(total_backspaces) * 2 +

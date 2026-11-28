@@ -51,9 +51,9 @@ class RegistrySettingsBackend final : public SettingsBackend {
       return std::nullopt;
     }
     std::wstring wval(cb_data / sizeof(wchar_t), L'\0');
-    const LONG rc2 = RegQueryValueExW(hkey, wkey.c_str(), nullptr, &type,
-                                      reinterpret_cast<LPBYTE>(wval.data()),
-                                      &cb_data);
+    const LONG rc2 =
+        RegQueryValueExW(hkey, wkey.c_str(), nullptr, &type,
+                         reinterpret_cast<LPBYTE>(wval.data()), &cb_data);
     if (rc2 != ERROR_SUCCESS) {
       return std::nullopt;
     }
@@ -100,8 +100,9 @@ class RegistrySettingsBackend final : public SettingsBackend {
     DWORD type = 0;
     uint64_t qword = 0;
     DWORD cb_data = sizeof(qword);
-    const LONG rc = RegQueryValueExW(hkey, wkey.c_str(), nullptr, &type,
-                                     reinterpret_cast<LPBYTE>(&qword), &cb_data);
+    const LONG rc =
+        RegQueryValueExW(hkey, wkey.c_str(), nullptr, &type,
+                         reinterpret_cast<LPBYTE>(&qword), &cb_data);
     if (rc != ERROR_SUCCESS) {
       return std::nullopt;
     }
@@ -156,9 +157,8 @@ class RegistrySettingsBackend final : public SettingsBackend {
     }
     const auto close_key = absl::MakeCleanup([hkey]() { RegCloseKey(hkey); });
     const std::wstring wkey = Utf8ToWide(key);
-    const LONG rc =
-        RegQueryValueExW(hkey, wkey.c_str(), nullptr, nullptr, nullptr, nullptr);
-    return rc == ERROR_SUCCESS;
+    return RegQueryValueExW(hkey, wkey.c_str(), nullptr, nullptr, nullptr,
+                            nullptr) == ERROR_SUCCESS;
   }
 };
 

@@ -39,7 +39,11 @@ class CaretTextReader {
   int32_t GetSelectedRangeLength();
 
  private:
-  enum class WorkerRequestKind : uint8_t { kNone, kSurroundingText, kHasSelection };
+  enum class WorkerRequestKind : uint8_t {
+    kNone,
+    kSurroundingText,
+    kHasSelection,
+  };
 
   void EnsureWorkerStarted() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mu_);
   bool RunWorkerRequest(WorkerRequestKind kind, absl::Duration budget)

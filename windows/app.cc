@@ -5,6 +5,7 @@
 
 #include <commctrl.h>
 #include <objidl.h>
+
 #include <gdiplus.h>
 
 #include "okeytre-engine.h"
@@ -73,10 +74,8 @@ void App::TerminateOlderInstances() {
 
   // Brief wait for previous instance to release hooks and tray icon.
   for (int i = 0; i < 20; ++i) {
-    instance_mutex_ =
-        CreateMutexW(nullptr, TRUE, kSingleInstanceMutexName);
-    if (instance_mutex_ != nullptr &&
-        GetLastError() != ERROR_ALREADY_EXISTS) {
+    instance_mutex_ = CreateMutexW(nullptr, TRUE, kSingleInstanceMutexName);
+    if (instance_mutex_ != nullptr && GetLastError() != ERROR_ALREADY_EXISTS) {
       break;
     }
     if (instance_mutex_ != nullptr) {
@@ -130,8 +129,8 @@ void App::WireSubsystems() {
 
   launch_at_login_ = std::make_unique<LaunchAtLoginManager>(*settings_);
 
-  update_manager_ = std::make_unique<UpdateManager>(
-      *settings_, hidden_hwnd_, kMsgUpdateFinished);
+  update_manager_ = std::make_unique<UpdateManager>(*settings_, hidden_hwnd_,
+                                                    kMsgUpdateFinished);
   update_manager_->SetOnStateChanged([this]() {
     if (update_manager_->did_confirm_up_to_date()) {
       SetTimer(hidden_hwnd_, kTimerClearUpToDate, kUpToDateBannerDurationMs,
@@ -140,7 +139,8 @@ void App::WireSubsystems() {
     RefreshAllUI();
   });
 
-  key_hook_ = std::make_unique<KeyHookManager>(*ime_controller_, *caret_reader_);
+  key_hook_ =
+      std::make_unique<KeyHookManager>(*ime_controller_, *caret_reader_);
   key_hook_->SetOnToggleRequested([this]() {
     if (hidden_hwnd_ != nullptr) {
       PostMessageW(hidden_hwnd_, kMsgToggleVietnamese, 0, 0);
@@ -233,8 +233,7 @@ void App::WireSubsystems() {
   settings_cbs.on_set_max_buffer_size = [this](int32_t size) {
     ime_controller_->SetMaxBufferSize(size);
   };
-  settings_window_ =
-      std::make_unique<SettingsWindow>(std::move(settings_cbs));
+  settings_window_ = std::make_unique<SettingsWindow>(std::move(settings_cbs));
 
   ShowcaseCallbacks showcase_cbs;
   showcase_cbs.on_select_language = [this](AppLanguage lang) {
@@ -248,8 +247,7 @@ void App::WireSubsystems() {
   showcase_cbs.on_switch_to_us = [this]() {
     input_source_manager_->SwitchToEnglishKeyboard(settings_->GetAppLanguage());
   };
-  showcase_window_ =
-      std::make_unique<ShowcaseWindow>(std::move(showcase_cbs));
+  showcase_window_ = std::make_unique<ShowcaseWindow>(std::move(showcase_cbs));
 }
 
 TrayState App::BuildTrayState() const {
@@ -478,9 +476,8 @@ LRESULT App::HandleHiddenMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
       return 0;
 
     case WM_SETTINGCHANGE:
-      if (lparam != 0 &&
-          _wcsicmp(reinterpret_cast<const wchar_t*>(lparam),
-                   L"ImmersiveColorSet") == 0) {
+      if (lparam != 0 && _wcsicmp(reinterpret_cast<const wchar_t*>(lparam),
+                                  L"ImmersiveColorSet") == 0) {
         if (tray_icon_) tray_icon_->Update(BuildTrayState());
         if (settings_window_) settings_window_->RefreshTheme();
         if (showcase_window_) showcase_window_->RefreshTheme();

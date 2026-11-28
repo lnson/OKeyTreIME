@@ -102,25 +102,21 @@ HKL GetActiveKeyboardLayout() noexcept {
   const DWORD thread_id =
       fg != nullptr ? GetWindowThreadProcessId(fg, nullptr) : 0;
   HKL hkl = GetKeyboardLayout(thread_id);
-  if (hkl == nullptr) {
-    hkl = GetKeyboardLayout(0);
-  }
+  if (hkl == nullptr) hkl = GetKeyboardLayout(0);
+
   return hkl;
 }
 
 LANGID ResolveLayoutLangId(HKL hkl, const std::wstring** out_special_text) {
-  if (out_special_text != nullptr) {
-    *out_special_text = nullptr;
-  }
+  if (out_special_text != nullptr) *out_special_text = nullptr;
+
   const uintptr_t raw = reinterpret_cast<uintptr_t>(hkl);
   const LANGID input_lang = LOWORD(raw);
   const uint16_t device_id = HIWORD(raw);
-  if (device_id == 0) {
-    return input_lang;
-  }
-  if ((device_id & 0xF000u) != 0xF000u) {
-    return static_cast<LANGID>(device_id);
-  }
+  if (device_id == 0) return input_lang;
+
+  if ((device_id & 0xF000u) != 0xF000u) return static_cast<LANGID>(device_id);
+
   const absl::flat_hash_map<uint16_t, SpecialLayoutInfo>& special_map =
       GetSpecialLayoutMap();
   const auto it = special_map.find(static_cast<uint16_t>(device_id & 0x0FFFu));
@@ -134,13 +130,11 @@ LANGID ResolveLayoutLangId(HKL hkl, const std::wstring** out_special_text) {
 }
 
 bool IsEnglishKeyboardLayout(HKL hkl) noexcept {
-  if (hkl == nullptr) {
-    return true;
-  }
+  if (hkl == nullptr) return true;
+
   const LANGID input_lang = LOWORD(reinterpret_cast<uintptr_t>(hkl));
-  if (PRIMARYLANGID(input_lang) != LANG_ENGLISH) {
-    return false;
-  }
+  if (PRIMARYLANGID(input_lang) != LANG_ENGLISH) return false;
+
   const LANGID layout_lang = ResolveLayoutLangId(hkl, nullptr);
   return PRIMARYLANGID(layout_lang) == LANG_ENGLISH;
 }
@@ -189,17 +183,15 @@ bool InputSourceManager::Refresh(AppLanguage language) {
 
   is_english_ = next_english;
   current_source_name_ = next_name;
-  if (on_changed_) {
-    on_changed_();
-  }
+  if (on_changed_) on_changed_();
+
   return true;
 }
 
 bool InputSourceManager::SwitchToEnglishKeyboard(AppLanguage language) {
   HKL us_hkl = LoadKeyboardLayoutW(L"00000409", KLF_ACTIVATE);
-  if (us_hkl == nullptr) {
-    return false;
-  }
+  if (us_hkl == nullptr) return false;
+
   ActivateKeyboardLayout(us_hkl, KLF_SETFORPROCESS);
   if (HWND fg = GetForegroundWindow(); fg != nullptr) {
     PostMessageW(fg, WM_INPUTLANGCHANGEREQUEST, 0,
@@ -207,17 +199,14 @@ bool InputSourceManager::SwitchToEnglishKeyboard(AppLanguage language) {
   }
   is_english_ = true;
   current_source_name_ = GetKeyboardLayoutDisplayName(us_hkl, language);
-  if (on_changed_) {
-    on_changed_();
-  }
+  if (on_changed_) on_changed_();
+
   return true;
 }
 
 void InputSourceManager::CheckAndWarnOnStartup(AppLanguage language) {
   Refresh(language);
-  if (is_english_) {
-    return;
-  }
+  if (is_english_) return;
 
   const std::wstring_view title =
       Localized(language, L10nKey::kAlertNonEnglishKeyboardTitle);

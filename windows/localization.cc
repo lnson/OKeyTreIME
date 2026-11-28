@@ -51,8 +51,7 @@ AppLanguage AppLanguageFromRaw(std::string_view raw) noexcept {
 }
 
 std::string_view ResolveLanguageCode(
-    AppLanguage language,
-    const std::vector<std::string>& preferred_languages) {
+    AppLanguage language, const std::vector<std::string>& preferred_languages) {
   switch (language) {
     case AppLanguage::kVietnamese:
       return "vi";
@@ -84,9 +83,8 @@ std::string_view ResolveSystemLanguageCode(AppLanguage language) {
 
 std::wstring_view Localized(AppLanguage language, L10nKey key) {
   const size_t idx = static_cast<size_t>(key);
-  if (idx >= static_cast<size_t>(L10nKey::kCount)) {
-    return L"";
-  }
+  if (idx >= static_cast<size_t>(L10nKey::kCount)) return L"";
+
   const std::string_view code = ResolveSystemLanguageCode(language);
   const auto& table = (code == "en") ? generated::kEnglishStrings
                                      : generated::kVietnameseStrings;
@@ -97,10 +95,7 @@ std::wstring LocalizedFormat(AppLanguage language, L10nKey key,
                              std::wstring_view arg) {
   std::wstring result(Localized(language, key));
   const size_t pos = result.find(L"%@");
-  if (pos != std::wstring::npos) {
-    result.replace(pos, 2, arg);
-  }
-  return result;
+  return pos == std::wstring::npos ? result : result.replace(pos, 2, arg);
 }
 
 std::wstring_view LanguageDisplayName(AppLanguage option,
@@ -117,23 +112,21 @@ std::wstring_view LanguageDisplayName(AppLanguage option,
 }
 
 std::wstring Utf8ToWide(std::string_view utf8) {
-  if (utf8.empty()) {
-    return {};
-  }
+  if (utf8.empty()) return {};
+
   std::wstring out;
   out.resize_and_overwrite(utf8.size(), [utf8](wchar_t* buf, size_t n) {
-    const int written = MultiByteToWideChar(
-        CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), buf,
-        static_cast<int>(n));
+    const int written = MultiByteToWideChar(CP_UTF8, 0, utf8.data(),
+                                            static_cast<int>(utf8.size()), buf,
+                                            static_cast<int>(n));
     return written > 0 ? static_cast<size_t>(written) : 0;
   });
   return out;
 }
 
 std::string WideToUtf8(std::wstring_view wide) {
-  if (wide.empty()) {
-    return {};
-  }
+  if (wide.empty()) return {};
+
   std::string out;
   out.resize_and_overwrite(wide.size() * 3, [wide](char* buf, size_t n) {
     const int written = WideCharToMultiByte(

@@ -65,9 +65,7 @@ bool TrayIcon::Create(const TrayState& initial_state) {
   const std::wstring tip = BuildTooltip(state_);
   wcsncpy_s(nid.szTip, tip.c_str(), _TRUNCATE);
 
-  if (!Shell_NotifyIconW(NIM_ADD, &nid)) {
-    return false;
-  }
+  if (!Shell_NotifyIconW(NIM_ADD, &nid)) return false;
 
   nid.uVersion = NOTIFYICON_VERSION_4;
   Shell_NotifyIconW(NIM_SETVERSION, &nid);
@@ -121,32 +119,26 @@ void TrayIcon::ApplyIconAndTooltip() {
 
   Shell_NotifyIconW(NIM_MODIFY, &nid);
 
-  if (current_icon_ != nullptr) {
-    DestroyIcon(current_icon_);
-  }
+  if (current_icon_ != nullptr) DestroyIcon(current_icon_);
   current_icon_ = next_icon;
 }
 
 std::wstring TrayIcon::BuildTooltip(const TrayState& state) {
-  std::wstring base = LocalizedFormat(
-      state.language, L10nKey::kMenuTooltipMode,
-      InputStyleDisplayName(state.style, state.language));
+  std::wstring base =
+      LocalizedFormat(state.language, L10nKey::kMenuTooltipMode,
+                      InputStyleDisplayName(state.style, state.language));
   if (state.style != InputStyle::kOff && !state.is_english_keyboard) {
     base += L" · ";
-    base += LocalizedFormat(state.language,
-                            L10nKey::kMenuInputSourceWarningTitle,
-                            state.keyboard_name);
+    base +=
+        LocalizedFormat(state.language, L10nKey::kMenuInputSourceWarningTitle,
+                        state.keyboard_name);
   }
   return base;
 }
 
 TrayIconKind TrayIcon::ResolveIconKind(const TrayState& state) {
-  if (state.style == InputStyle::kOff) {
-    return TrayIconKind::kOff;
-  }
-  if (!state.is_english_keyboard) {
-    return TrayIconKind::kWarning;
-  }
+  if (state.style == InputStyle::kOff) return TrayIconKind::kOff;
+  if (!state.is_english_keyboard) return TrayIconKind::kWarning;
   return TrayIconKind::kVietnameseActive;
 }
 
@@ -172,17 +164,15 @@ void TrayIcon::HandleTrayMessage(WPARAM /*wparam*/, LPARAM lparam) {
 
 void TrayIcon::ShowContextMenu() {
   HMENU menu = CreatePopupMenu();
-  if (menu == nullptr) {
-    return;
-  }
+  if (menu == nullptr) return;
 
   const AppLanguage lang = state_.language;
 
   // 1. Optional Update Available banner section
   if (state_.visible_update.has_value()) {
-    const std::wstring title = LocalizedFormat(
-        lang, L10nKey::kMenuUpdateAvailableTitle,
-        Utf8ToWide(state_.visible_update->display_version()));
+    const std::wstring title =
+        LocalizedFormat(lang, L10nKey::kMenuUpdateAvailableTitle,
+                        Utf8ToWide(state_.visible_update->display_version()));
     AppendMenuW(menu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, title.c_str());
     AppendMenuW(menu, MF_STRING, kCmdDownloadUpdate,
                 Localized(lang, L10nKey::kActionDownloadUpdate).data());
@@ -236,8 +226,7 @@ void TrayIcon::ShowContextMenu() {
   AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
 
   // 4. Quick Toggles & Language Submenu
-  AppendMenuW(menu,
-              MF_STRING | (state_.restore_invalid_words ? MF_CHECKED : 0),
+  AppendMenuW(menu, MF_STRING | (state_.restore_invalid_words ? MF_CHECKED : 0),
               kCmdToggleRestoreInvalid,
               Localized(lang, L10nKey::kMenuRestoreInvalidWords).data());
 
@@ -286,9 +275,9 @@ void TrayIcon::ShowContextMenu() {
 
   // Required by Win32 shell guidelines so clicking outside dismisses the menu.
   SetForegroundWindow(owner_hwnd_);
-  const UINT cmd = static_cast<UINT>(TrackPopupMenuEx(
-      menu, TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y,
-      owner_hwnd_, nullptr));
+  const UINT cmd = static_cast<UINT>(
+      TrackPopupMenuEx(menu, TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY,
+                       pt.x, pt.y, owner_hwnd_, nullptr));
   PostMessageW(owner_hwnd_, WM_NULL, 0, 0);
   DestroyMenu(menu);
 
@@ -303,16 +292,20 @@ void TrayIcon::ShowContextMenu() {
       if (callbacks_.on_switch_to_us) callbacks_.on_switch_to_us();
       break;
     case kCmdStyleOff:
-      if (callbacks_.on_select_style) callbacks_.on_select_style(InputStyle::kOff);
+      if (callbacks_.on_select_style)
+        callbacks_.on_select_style(InputStyle::kOff);
       break;
     case kCmdStyleTelex:
-      if (callbacks_.on_select_style) callbacks_.on_select_style(InputStyle::kTelex);
+      if (callbacks_.on_select_style)
+        callbacks_.on_select_style(InputStyle::kTelex);
       break;
     case kCmdStyleVni:
-      if (callbacks_.on_select_style) callbacks_.on_select_style(InputStyle::kVNI);
+      if (callbacks_.on_select_style)
+        callbacks_.on_select_style(InputStyle::kVNI);
       break;
     case kCmdStyleViqr:
-      if (callbacks_.on_select_style) callbacks_.on_select_style(InputStyle::kVIQR);
+      if (callbacks_.on_select_style)
+        callbacks_.on_select_style(InputStyle::kVIQR);
       break;
     case kCmdToggleRestoreInvalid:
       if (callbacks_.on_toggle_restore_invalid) {

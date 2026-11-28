@@ -3,7 +3,9 @@
 
 #include "windows/caret-text-reader.h"
 
+// clang-format off
 #include <windows.h>
+// clang-format on
 
 #include <oleauto.h>
 #include <uiautomation.h>

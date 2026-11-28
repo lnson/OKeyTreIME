@@ -232,9 +232,8 @@ void SettingsWindow::CreateChildControls() {
   updown_buffer_size_ = CreateWindowExW(
       0, UPDOWN_CLASSW, L"",
       WS_CHILD | UDS_ALIGNRIGHT | UDS_ARROWKEYS | UDS_HOTTRACK, 0, 0, 18, 22,
-      hwnd_,
-      reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdUpDownBufferSize)), hinst,
-      nullptr);
+      hwnd_, reinterpret_cast<HMENU>(static_cast<INT_PTR>(kIdUpDownBufferSize)),
+      hinst, nullptr);
 
   SendMessageW(updown_buffer_size_, UDM_SETBUDDY,
                reinterpret_cast<WPARAM>(edit_buffer_size_), 0);
@@ -266,8 +265,8 @@ void SettingsWindow::LayoutChildControls() {
   const int width = rc.right - rc.left;
   const int sidebar_w = ScaleDpi(kSidebarWidthDip, dpi_);
   const int content_x = sidebar_w + ScaleDpi(24, dpi_);
-  const int content_w = std::max(ScaleDpi(320, dpi_),
-                                 width - sidebar_w - ScaleDpi(48, dpi_));
+  const int content_w =
+      std::max(ScaleDpi(320, dpi_), width - sidebar_w - ScaleDpi(48, dpi_));
 
   // Advanced pane Buffer Size edit + updown inside the rounded input box.
   if (edit_buffer_size_ != nullptr && updown_buffer_size_ != nullptr) {
@@ -282,9 +281,8 @@ void SettingsWindow::LayoutChildControls() {
       const int updown_w = ScaleDpi(18, dpi_);
       const int edit_h = ScaleDpi(18, dpi_);
       const int pad_x = ScaleDpi(6, dpi_);
-      MoveWindow(edit_buffer_size_, box_x + pad_x,
-                 box_y + (box_h - edit_h) / 2, box_w - updown_w - pad_x - 2,
-                 edit_h, TRUE);
+      MoveWindow(edit_buffer_size_, box_x + pad_x, box_y + (box_h - edit_h) / 2,
+                 box_w - updown_w - pad_x - 2, edit_h, TRUE);
       MoveWindow(updown_buffer_size_, box_x + box_w - updown_w - 2, box_y + 2,
                  updown_w, box_h - 4, TRUE);
     }
@@ -328,8 +326,7 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
                                   int height) {
   const float sidebar_w = static_cast<float>(ScaleDpi(kSidebarWidthDip, dpi_));
   Gdiplus::SolidBrush sb_brush(palette_.sidebar_bg);
-  g.FillRectangle(&sb_brush, 0.0f, 0.0f, sidebar_w,
-                  static_cast<float>(height));
+  g.FillRectangle(&sb_brush, 0.0f, 0.0f, sidebar_w, static_cast<float>(height));
 
   // Hairline vertical divider between sidebar and detail pane.
   Gdiplus::Pen div_pen(palette_.card_border, 1.0f);
@@ -379,10 +376,9 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
                               badge_sz);
     DrawNavBadge(g, badge_rect, item.badge_color, item.section, dpi_);
 
-    Gdiplus::RectF text_rect(badge_rect.GetRight() + ScaleDpiF(10.0f, dpi_),
-                             row_rect.Y,
-                             row_rect.Width - badge_sz - ScaleDpiF(26.0f, dpi_),
-                             row_h);
+    Gdiplus::RectF text_rect(
+        badge_rect.GetRight() + ScaleDpiF(10.0f, dpi_), row_rect.Y,
+        row_rect.Width - badge_sz - ScaleDpiF(26.0f, dpi_), row_h);
     const std::wstring_view label = Localized(model_.language, item.key);
     DrawTextLeft(g, label, selected ? nav_font_sel : nav_font,
                  palette_.text_primary, text_rect);
@@ -398,24 +394,23 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
   dropdown_language_rect_ = Gdiplus::RectF(
       (sidebar_w - dd_w) * 0.5f + ScaleDpiF(10.0f, dpi_),
       static_cast<float>(height) - ScaleDpiF(156.0f, dpi_), dd_w, dd_h);
-  DrawFluentDropdown(
-      g, dropdown_language_rect_,
-      LanguageDisplayName(model_.language, model_.language),
-      hovered_target_ == HitTargetKind::kDropdownLanguage, palette_, dpi_);
+  DrawFluentDropdown(g, dropdown_language_rect_,
+                     LanguageDisplayName(model_.language, model_.language),
+                     hovered_target_ == HitTargetKind::kDropdownLanguage,
+                     palette_, dpi_);
   hit_regions_.push_back(
       {HitTargetKind::kDropdownLanguage, dropdown_language_rect_});
 
   const float globe_sz = ScaleDpiF(15.0f, dpi_);
-  const float globe_x = dropdown_language_rect_.X - globe_sz -
-                        ScaleDpiF(7.0f, dpi_);
-  const float globe_y =
-      dropdown_language_rect_.Y + (dd_h - globe_sz) * 0.5f;
+  const float globe_x =
+      dropdown_language_rect_.X - globe_sz - ScaleDpiF(7.0f, dpi_);
+  const float globe_y = dropdown_language_rect_.Y + (dd_h - globe_sz) * 0.5f;
   Gdiplus::Pen globe_pen(palette_.text_secondary, ScaleDpiF(1.2f, dpi_));
   g.DrawEllipse(&globe_pen, globe_x, globe_y, globe_sz, globe_sz);
   g.DrawEllipse(&globe_pen, globe_x + globe_sz * 0.26f, globe_y,
                 globe_sz * 0.48f, globe_sz);
-  g.DrawLine(&globe_pen, globe_x, globe_y + globe_sz * 0.5f,
-             globe_x + globe_sz, globe_y + globe_sz * 0.5f);
+  g.DrawLine(&globe_pen, globe_x, globe_y + globe_sz * 0.5f, globe_x + globe_sz,
+             globe_y + globe_sz * 0.5f);
 
   const float logo_sz = ScaleDpiF(64.0f, dpi_);
   Gdiplus::RectF logo_rect((sidebar_w - logo_sz) * 0.5f,
@@ -439,9 +434,9 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
   g.DrawString(app_name.data(), static_cast<INT>(app_name.size()), &app_font,
                name_rect, &center_fmt, &primary_brush);
 
-  const std::wstring ver_str = LocalizedFormat(
-      model_.language, L10nKey::kSettingsSidebarVersion,
-      model_.current_version);
+  const std::wstring ver_str =
+      LocalizedFormat(model_.language, L10nKey::kSettingsSidebarVersion,
+                      model_.current_version);
   Gdiplus::SolidBrush secondary_brush(palette_.text_secondary);
   Gdiplus::RectF ver_rect(0.0f, name_rect.GetBottom() + ScaleDpiF(1.0f, dpi_),
                           sidebar_w, ScaleDpiF(16.0f, dpi_));
@@ -458,9 +453,9 @@ void SettingsWindow::PaintDetailPane(Gdiplus::Graphics& g, int width,
                   static_cast<float>(height));
 
   const float x = sidebar_w + ScaleDpiF(24.0f, dpi_);
-  const float w = std::max(ScaleDpiF(320.0f, dpi_),
-                           static_cast<float>(width) - sidebar_w -
-                               ScaleDpiF(48.0f, dpi_));
+  const float w =
+      std::max(ScaleDpiF(320.0f, dpi_),
+               static_cast<float>(width) - sidebar_w - ScaleDpiF(48.0f, dpi_));
 
   const wchar_t* font_name = PreferredUiFontFamily();
   Gdiplus::Font title_font(font_name, ScaleDpiF(20.0f, dpi_),
@@ -511,10 +506,10 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
   Gdiplus::Pen div_pen(palette_.divider, 1.0f);
 
   // --- Section 1: System ---
-  DrawTextLeft(g, Localized(model_.language, L10nKey::kSettingsGeneralSystemHeader),
-               hdr_font, palette_.text_secondary,
-               Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
-                              ScaleDpiF(20.0f, dpi_)));
+  DrawTextLeft(
+      g, Localized(model_.language, L10nKey::kSettingsGeneralSystemHeader),
+      hdr_font, palette_.text_secondary,
+      Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w, ScaleDpiF(20.0f, dpi_)));
   y += ScaleDpiF(24.0f, dpi_);
 
   const float row1_h = ScaleDpiF(70.0f, dpi_);
@@ -529,25 +524,23 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
                row_title_font, palette_.text_primary,
                Gdiplus::RectF(x + pad, y + ScaleDpiF(11.0f, dpi_), text_w1,
                               ScaleDpiF(20.0f, dpi_)));
-  DrawTextLeft(
-      g,
-      Localized(model_.language,
-                L10nKey::kSettingsGeneralInputStyleDescription),
-      desc_font, palette_.text_secondary,
-      Gdiplus::RectF(x + pad, y + ScaleDpiF(32.0f, dpi_), text_w1,
-                     ScaleDpiF(34.0f, dpi_)),
-      /*wrap=*/true);
+  DrawTextLeft(g,
+               Localized(model_.language,
+                         L10nKey::kSettingsGeneralInputStyleDescription),
+               desc_font, palette_.text_secondary,
+               Gdiplus::RectF(x + pad, y + ScaleDpiF(32.0f, dpi_), text_w1,
+                              ScaleDpiF(34.0f, dpi_)),
+               /*wrap=*/true);
   const float style_dd_w = ScaleDpiF(118.0f, dpi_);
   const float style_dd_h = ScaleDpiF(28.0f, dpi_);
-  dropdown_style_rect_ = Gdiplus::RectF(x + w - pad - style_dd_w,
-                                        y + (row1_h - style_dd_h) * 0.5f,
-                                        style_dd_w, style_dd_h);
-  DrawFluentDropdown(
-      g, dropdown_style_rect_,
-      InputStyleDisplayName(model_.style, model_.language),
-      hovered_target_ == HitTargetKind::kDropdownStyle, palette_, dpi_);
-  hit_regions_.push_back(
-      {HitTargetKind::kDropdownStyle, dropdown_style_rect_});
+  dropdown_style_rect_ =
+      Gdiplus::RectF(x + w - pad - style_dd_w, y + (row1_h - style_dd_h) * 0.5f,
+                     style_dd_w, style_dd_h);
+  DrawFluentDropdown(g, dropdown_style_rect_,
+                     InputStyleDisplayName(model_.style, model_.language),
+                     hovered_target_ == HitTargetKind::kDropdownStyle, palette_,
+                     dpi_);
+  hit_regions_.push_back({HitTargetKind::kDropdownStyle, dropdown_style_rect_});
 
   const float div1_y = y + row1_h;
   g.DrawLine(&div_pen, x + pad, div1_y, x + w - pad, div1_y);
@@ -558,14 +551,13 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
                row_title_font, palette_.text_primary,
                Gdiplus::RectF(x + pad, div1_y + ScaleDpiF(11.0f, dpi_), text_w2,
                               ScaleDpiF(20.0f, dpi_)));
-  DrawTextLeft(
-      g,
-      Localized(model_.language,
-                L10nKey::kSettingsGeneralLaunchAtLoginDescription),
-      desc_font, palette_.text_secondary,
-      Gdiplus::RectF(x + pad, div1_y + ScaleDpiF(32.0f, dpi_), text_w2,
-                     ScaleDpiF(28.0f, dpi_)),
-      /*wrap=*/true);
+  DrawTextLeft(g,
+               Localized(model_.language,
+                         L10nKey::kSettingsGeneralLaunchAtLoginDescription),
+               desc_font, palette_.text_secondary,
+               Gdiplus::RectF(x + pad, div1_y + ScaleDpiF(32.0f, dpi_), text_w2,
+                              ScaleDpiF(28.0f, dpi_)),
+               /*wrap=*/true);
   Gdiplus::RectF login_toggle(x + w - pad - toggle_w,
                               div1_y + (row2_h - toggle_h) * 0.5f, toggle_w,
                               toggle_h);
@@ -576,10 +568,10 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
 
   // --- Section 2: Updates ---
   y = sys_card.GetBottom() + ScaleDpiF(20.0f, dpi_);
-  DrawTextLeft(g, Localized(model_.language, L10nKey::kSettingsUpdatesHeader),
-               hdr_font, palette_.text_secondary,
-               Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
-                              ScaleDpiF(20.0f, dpi_)));
+  DrawTextLeft(
+      g, Localized(model_.language, L10nKey::kSettingsUpdatesHeader), hdr_font,
+      palette_.text_secondary,
+      Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w, ScaleDpiF(20.0f, dpi_)));
   y += ScaleDpiF(24.0f, dpi_);
 
   const float u_row1_h = ScaleDpiF(66.0f, dpi_);
@@ -641,41 +633,41 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
     right_edge = dl_btn.X - ScaleDpiF(8.0f, dpi_);
   }
 
-  const float status_w = std::max(ScaleDpiF(100.0f, dpi_), right_edge - x - pad);
+  const float status_w =
+      std::max(ScaleDpiF(100.0f, dpi_), right_edge - x - pad);
   const bool has_sub =
       model_.is_checking_updates || model_.did_confirm_up_to_date;
-  const float main_y =
-      has_sub ? (u_div1_y + ScaleDpiF(10.0f, dpi_)) : (u_div1_y + ScaleDpiF(18.0f, dpi_));
+  const float main_y = has_sub ? (u_div1_y + ScaleDpiF(10.0f, dpi_))
+                               : (u_div1_y + ScaleDpiF(18.0f, dpi_));
 
   if (model_.available_release.has_value()) {
     const std::wstring avail = LocalizedFormat(
         model_.language, L10nKey::kSettingsUpdatesAvailableStatus,
         Utf8ToWide(model_.available_release->display_version()));
-    DrawTextLeft(g, avail, row_title_bold, palette_.text_primary,
-                 Gdiplus::RectF(x + pad, main_y, status_w,
-                                ScaleDpiF(20.0f, dpi_)));
+    DrawTextLeft(
+        g, avail, row_title_bold, palette_.text_primary,
+        Gdiplus::RectF(x + pad, main_y, status_w, ScaleDpiF(20.0f, dpi_)));
   } else {
     const std::wstring cur = LocalizedFormat(
         model_.language, L10nKey::kSettingsUpdatesCurrentVersion,
         model_.current_version);
-    DrawTextLeft(g, cur, row_title_font, palette_.text_primary,
-                 Gdiplus::RectF(x + pad, main_y, status_w,
-                                ScaleDpiF(20.0f, dpi_)));
+    DrawTextLeft(
+        g, cur, row_title_font, palette_.text_primary,
+        Gdiplus::RectF(x + pad, main_y, status_w, ScaleDpiF(20.0f, dpi_)));
   }
 
   if (model_.is_checking_updates) {
     DrawTextLeft(
-        g,
-        Localized(model_.language, L10nKey::kSettingsSidebarCheckingUpdates),
+        g, Localized(model_.language, L10nKey::kSettingsSidebarCheckingUpdates),
         desc_font, palette_.text_secondary,
         Gdiplus::RectF(x + pad, u_div1_y + ScaleDpiF(32.0f, dpi_), status_w,
                        ScaleDpiF(18.0f, dpi_)));
   } else if (model_.did_confirm_up_to_date) {
-    DrawTextLeft(
-        g, Localized(model_.language, L10nKey::kSettingsSidebarUpToDate),
-        desc_font, palette_.accent_green,
-        Gdiplus::RectF(x + pad, u_div1_y + ScaleDpiF(32.0f, dpi_), status_w,
-                       ScaleDpiF(18.0f, dpi_)));
+    DrawTextLeft(g,
+                 Localized(model_.language, L10nKey::kSettingsSidebarUpToDate),
+                 desc_font, palette_.accent_green,
+                 Gdiplus::RectF(x + pad, u_div1_y + ScaleDpiF(32.0f, dpi_),
+                                status_w, ScaleDpiF(18.0f, dpi_)));
   }
 
   const float u_div2_y = u_div1_y + u_row2_h;
@@ -690,18 +682,18 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
       row_title_font, palette_.text_primary,
       Gdiplus::RectF(x + pad, u_div2_y + ScaleDpiF(10.0f, dpi_), text_w3,
                      ScaleDpiF(20.0f, dpi_)));
-  DrawTextLeft(
-      g,
-      Localized(model_.language,
-                L10nKey::kSettingsUpdatesManualDownloadDescription),
-      desc_font, palette_.text_secondary,
-      Gdiplus::RectF(x + pad, u_div2_y + ScaleDpiF(31.0f, dpi_), text_w3,
-                     ScaleDpiF(32.0f, dpi_)),
-      /*wrap=*/true);
+  DrawTextLeft(g,
+               Localized(model_.language,
+                         L10nKey::kSettingsUpdatesManualDownloadDescription),
+               desc_font, palette_.text_secondary,
+               Gdiplus::RectF(x + pad, u_div2_y + ScaleDpiF(31.0f, dpi_),
+                              text_w3, ScaleDpiF(32.0f, dpi_)),
+               /*wrap=*/true);
 
-  Gdiplus::RectF link_rect(x + w - pad - link_w,
-                           u_div2_y + (u_row3_h - ScaleDpiF(24.0f, dpi_)) * 0.5f,
-                           link_w, ScaleDpiF(24.0f, dpi_));
+  Gdiplus::RectF link_rect(
+      x + w - pad - link_w,
+      u_div2_y + (u_row3_h - ScaleDpiF(24.0f, dpi_)) * 0.5f, link_w,
+      ScaleDpiF(24.0f, dpi_));
   const std::wstring link_text =
       std::wstring(Localized(model_.language,
                              L10nKey::kSettingsUpdatesManualDownloadLink)) +
@@ -773,10 +765,10 @@ void SettingsWindow::PaintCorrectionPane(Gdiplus::Graphics& g, float x, float y,
 
   // Section 2: Non-Vietnamese Words
   y = tone_card.GetBottom() + ScaleDpiF(14.0f, dpi_);
-  DrawTextLeft(g, Localized(model_.language, L10nKey::kSettingsEnglishHeader),
-               hdr_font, palette_.text_secondary,
-               Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
-                              ScaleDpiF(20.0f, dpi_)));
+  DrawTextLeft(
+      g, Localized(model_.language, L10nKey::kSettingsEnglishHeader), hdr_font,
+      palette_.text_secondary,
+      Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w, ScaleDpiF(20.0f, dpi_)));
   y += ScaleDpiF(22.0f, dpi_);
 
   const float h_eng = ScaleDpiF(74.0f, dpi_);
@@ -831,10 +823,10 @@ void SettingsWindow::PaintAdvancedPane(Gdiplus::Graphics& g, float x, float y,
   const float card_r = ScaleDpiF(8.0f, dpi_);
   const float pad = ScaleDpiF(16.0f, dpi_);
 
-  DrawTextLeft(g, Localized(model_.language, L10nKey::kSettingsAdvancedHeader),
-               hdr_font, palette_.text_secondary,
-               Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w,
-                              ScaleDpiF(20.0f, dpi_)));
+  DrawTextLeft(
+      g, Localized(model_.language, L10nKey::kSettingsAdvancedHeader), hdr_font,
+      palette_.text_secondary,
+      Gdiplus::RectF(x + ScaleDpiF(4.0f, dpi_), y, w, ScaleDpiF(20.0f, dpi_)));
   y += ScaleDpiF(24.0f, dpi_);
 
   const float card_h = ScaleDpiF(86.0f, dpi_);
@@ -844,19 +836,17 @@ void SettingsWindow::PaintAdvancedPane(Gdiplus::Graphics& g, float x, float y,
 
   const float text_w = w - pad * 2.0f - ScaleDpiF(96.0f, dpi_);
   DrawTextLeft(
-      g,
-      Localized(model_.language, L10nKey::kSettingsAdvancedBufferSizeTitle),
+      g, Localized(model_.language, L10nKey::kSettingsAdvancedBufferSizeTitle),
       row_title_font, palette_.text_primary,
       Gdiplus::RectF(x + pad, y + ScaleDpiF(12.0f, dpi_), text_w,
                      ScaleDpiF(20.0f, dpi_)));
-  DrawTextLeft(
-      g,
-      Localized(model_.language,
-                L10nKey::kSettingsAdvancedBufferSizeDescription),
-      desc_font, palette_.text_secondary,
-      Gdiplus::RectF(x + pad, y + ScaleDpiF(34.0f, dpi_), text_w,
-                     ScaleDpiF(46.0f, dpi_)),
-      /*wrap=*/true);
+  DrawTextLeft(g,
+               Localized(model_.language,
+                         L10nKey::kSettingsAdvancedBufferSizeDescription),
+               desc_font, palette_.text_secondary,
+               Gdiplus::RectF(x + pad, y + ScaleDpiF(34.0f, dpi_), text_w,
+                              ScaleDpiF(46.0f, dpi_)),
+               /*wrap=*/true);
 
   const float box_w = ScaleDpiF(78.0f, dpi_);
   const float box_h = ScaleDpiF(28.0f, dpi_);
@@ -865,9 +855,10 @@ void SettingsWindow::PaintAdvancedPane(Gdiplus::Graphics& g, float x, float y,
   const bool buf_focused =
       (edit_buffer_size_ != nullptr && GetFocus() == edit_buffer_size_);
   FillRoundedRect(g, buf_box, ScaleDpiF(6.0f, dpi_), palette_.card_bg);
-  StrokeRoundedRect(g, buf_box, ScaleDpiF(6.0f, dpi_),
-                    buf_focused ? palette_.accent_teal : palette_.control_border,
-                    buf_focused ? 1.4f : 1.0f);
+  StrokeRoundedRect(
+      g, buf_box, ScaleDpiF(6.0f, dpi_),
+      buf_focused ? palette_.accent_teal : palette_.control_border,
+      buf_focused ? 1.4f : 1.0f);
 }
 
 SettingsWindow::HitTargetKind SettingsWindow::HitTest(int x, int y) const {
@@ -1128,8 +1119,7 @@ LRESULT SettingsWindow::HandleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
                                              model_.max_allowed_buffer_size);
           if (code == EN_KILLFOCUS && clamped != val) {
             updating_controls_ = true;
-            SetWindowTextW(edit_buffer_size_,
-                           std::to_wstring(clamped).c_str());
+            SetWindowTextW(edit_buffer_size_, std::to_wstring(clamped).c_str());
             updating_controls_ = false;
           }
           if (clamped != model_.max_buffer_size &&
@@ -1149,9 +1139,9 @@ LRESULT SettingsWindow::HandleMessage(UINT msg, WPARAM wparam, LPARAM lparam) {
         const auto* ud = reinterpret_cast<const NMUPDOWN*>(lparam);
         // Step by 8 matching macOS Stepper(..., step: 8).
         const int32_t step = ud->iDelta > 0 ? 8 : -8;
-        const int32_t next = std::clamp(model_.max_buffer_size + step,
-                                        model_.min_buffer_size,
-                                        model_.max_allowed_buffer_size);
+        const int32_t next =
+            std::clamp(model_.max_buffer_size + step, model_.min_buffer_size,
+                       model_.max_allowed_buffer_size);
         if (callbacks_.on_set_max_buffer_size) {
           callbacks_.on_set_max_buffer_size(next);
         }
