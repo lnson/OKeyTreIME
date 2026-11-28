@@ -3,13 +3,11 @@
 
 #include "windows/settings-store.h"
 
+#include <windows.h>
+
 #include <utility>
 
 #include "absl/cleanup/cleanup.h"
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 namespace okeytre::win {
 
@@ -33,7 +31,6 @@ constexpr std::string_view kKeySkippedVersion = "skippedUpdateVersion";
 constexpr std::string_view kKeyLastSeenShowcase = "lastSeenShowcaseVersion";
 constexpr std::string_view kKeyLegacyHasSeenShowcase = "hasSeenFeatureShowcase";
 
-#ifdef _WIN32
 constexpr wchar_t kRegistrySubKey[] = L"Software\\OKeyTre";
 
 class RegistrySettingsBackend final : public SettingsBackend {
@@ -164,7 +161,6 @@ class RegistrySettingsBackend final : public SettingsBackend {
     return rc == ERROR_SUCCESS;
   }
 };
-#endif
 
 }  // namespace
 
@@ -250,11 +246,7 @@ bool InMemorySettingsBackend::HasKey(std::string_view key) const {
 }
 
 std::unique_ptr<SettingsBackend> CreateRegistrySettingsBackend() {
-#ifdef _WIN32
   return std::make_unique<RegistrySettingsBackend>();
-#else
-  return std::make_unique<InMemorySettingsBackend>();
-#endif
 }
 
 SettingsStore::SettingsStore(std::unique_ptr<SettingsBackend> backend)

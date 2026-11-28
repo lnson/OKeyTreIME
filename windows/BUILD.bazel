@@ -5,15 +5,17 @@ load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 
 package(default_visibility = ["//visibility:public"])
 
+WIN_ONLY = ["@platforms//os:windows"]
+
 # ---------------------------------------------------------------------------
-# 1. Portable Core Windows UI Logic & Unit Tests
-#    (Compiles and passes tests on Windows, macOS, and Linux.)
+# 1. Windows Core Logic & Unit Tests
 # ---------------------------------------------------------------------------
 
 cc_library(
     name = "app_version",
     srcs = ["app-version.cc"],
     hdrs = ["app-version.h"],
+    target_compatible_with = WIN_ONLY,
     deps = ["@abseil-cpp//absl/strings"],
 )
 
@@ -21,6 +23,7 @@ cc_test(
     name = "app_version_test",
     size = "small",
     srcs = ["app-version_test.cc"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":app_version",
         "@googletest//:gtest_main",
@@ -30,6 +33,7 @@ cc_test(
 cc_binary(
     name = "localization_codegen",
     srcs = ["localization-codegen.cc"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         "@abseil-cpp//absl/container:flat_hash_map",
         "@abseil-cpp//absl/container:flat_hash_set",
@@ -57,6 +61,7 @@ genrule(
         "$(location localization-keys.generated.h) " +
         "$(location localization-tables.generated.h)"
     ),
+    target_compatible_with = WIN_ONLY,
     tools = [":localization_codegen"],
 )
 
@@ -70,18 +75,15 @@ cc_library(
         "localization.h",
         "localization-keys.generated.h",
     ],
-    deps = [
-        "@abseil-cpp//absl/strings",
-    ] + select({
-        "@platforms//os:windows": [],
-        "//conditions:default": ["@uni_algo"],
-    }),
+    target_compatible_with = WIN_ONLY,
+    deps = ["@abseil-cpp//absl/strings"],
 )
 
 cc_test(
     name = "localization_test",
     size = "small",
     srcs = ["localization_test.cc"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":localization",
         "@googletest//:gtest_main",
@@ -92,12 +94,14 @@ cc_library(
     name = "shortcut_detectors",
     srcs = ["shortcut-detectors.cc"],
     hdrs = ["shortcut-detectors.h"],
+    target_compatible_with = WIN_ONLY,
 )
 
 cc_test(
     name = "shortcut_detectors_test",
     size = "small",
     srcs = ["shortcut-detectors_test.cc"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":shortcut_detectors",
         "@googletest//:gtest_main",
@@ -108,10 +112,8 @@ cc_library(
     name = "settings_store",
     srcs = ["settings-store.cc"],
     hdrs = ["settings-store.h"],
-    linkopts = select({
-        "@platforms//os:windows": ["advapi32.lib"],
-        "//conditions:default": [],
-    }),
+    linkopts = ["advapi32.lib"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":app_version",
         ":localization",
@@ -124,6 +126,7 @@ cc_test(
     name = "settings_store_test",
     size = "small",
     srcs = ["settings-store_test.cc"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":settings_store",
         "@googletest//:gtest_main",
@@ -135,6 +138,7 @@ cc_library(
     srcs = ["update-parser.cc"],
     hdrs = ["update-parser.h"],
     linkopts = ["winhttp.lib"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":app_version",
         ":localization",
@@ -148,6 +152,7 @@ cc_test(
     name = "update_parser_test",
     size = "small",
     srcs = ["update-parser_test.cc"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":update_parser",
         "@googletest//:gtest_main",
@@ -158,6 +163,7 @@ cc_library(
     name = "ime_controller",
     srcs = ["ime-controller.cc"],
     hdrs = ["ime-controller.h"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":settings_store",
         "//OKeyTre/ime/core:OKeyTreEngineLib",
@@ -168,6 +174,7 @@ cc_test(
     name = "ime_controller_test",
     size = "small",
     srcs = ["ime-controller_test.cc"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":ime_controller",
         "@googletest//:gtest_main",
@@ -198,7 +205,7 @@ genrule(
         "& $$rc /nologo /c65001 /i windows/resources /fo '$@' '$(location resources/okeytre.rc)'; " +
         "exit $$LASTEXITCODE\""
     ),
-    target_compatible_with = ["@platforms//os:windows"],
+    target_compatible_with = WIN_ONLY,
 )
 
 WINDOWS_COPTS = [
@@ -237,7 +244,7 @@ cc_library(
         "update-manager.h",
     ],
     copts = WINDOWS_COPTS,
-    target_compatible_with = ["@platforms//os:windows"],
+    target_compatible_with = WIN_ONLY,
     deps = [
         ":app_version",
         ":ime_controller",
@@ -279,6 +286,6 @@ cc_binary(
         "uxtheme.lib",
         "winhttp.lib",
     ],
-    target_compatible_with = ["@platforms//os:windows"],
+    target_compatible_with = WIN_ONLY,
     deps = [":okeytre_win_ui"],
 )

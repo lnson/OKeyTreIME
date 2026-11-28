@@ -3,22 +3,17 @@
 
 #include "windows/localization.h"
 
+#include <windows.h>
+
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
 #include "windows/localization-tables.generated.h"
-
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include "uni_algo/conv.h"
-#endif
 
 namespace okeytre::win {
 
 namespace {
 
 std::vector<std::string> GetSystemPreferredLanguages() {
-#ifdef _WIN32
   ULONG num_languages = 0;
   ULONG buffer_size = 0;
   if (GetUserPreferredUILanguages(MUI_LANGUAGE_NAME, &num_languages, nullptr,
@@ -32,7 +27,6 @@ std::vector<std::string> GetSystemPreferredLanguages() {
           absl::SkipEmpty());
     }
   }
-#endif
   return {};
 }
 
@@ -126,7 +120,6 @@ std::wstring Utf8ToWide(std::string_view utf8) {
   if (utf8.empty()) {
     return {};
   }
-#ifdef _WIN32
   const int needed = MultiByteToWideChar(
       CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
   if (needed <= 0) {
@@ -136,20 +129,12 @@ std::wstring Utf8ToWide(std::string_view utf8) {
   MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()),
                       out.data(), needed);
   return out;
-#else
-  if constexpr (sizeof(wchar_t) == sizeof(char16_t)) {
-    return una::utf8to16<char, wchar_t>(utf8);
-  } else {
-    return una::utf8to32<char, wchar_t>(utf8);
-  }
-#endif
 }
 
 std::string WideToUtf8(std::wstring_view wide) {
   if (wide.empty()) {
     return {};
   }
-#ifdef _WIN32
   const int needed = WideCharToMultiByte(
       CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()), nullptr, 0,
       nullptr, nullptr);
@@ -160,13 +145,6 @@ std::string WideToUtf8(std::wstring_view wide) {
   WideCharToMultiByte(CP_UTF8, 0, wide.data(), static_cast<int>(wide.size()),
                       out.data(), needed, nullptr, nullptr);
   return out;
-#else
-  if constexpr (sizeof(wchar_t) == sizeof(char16_t)) {
-    return una::utf16to8<wchar_t, char>(wide);
-  } else {
-    return una::utf32to8<wchar_t, char>(wide);
-  }
-#endif
 }
 
 }  // namespace okeytre::win
