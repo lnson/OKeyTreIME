@@ -46,6 +46,33 @@ TEST(UnicodeUtilsTest, VietnameseAndLatinCaseConversions) {
   EXPECT_FALSE(IsUpper(0x1EC7));
   EXPECT_EQ(ToLower(0x1EC6), 0x1EC7);
   EXPECT_EQ(ToUpper(0x1EC7), 0x1EC6);
+
+  // All Vietnamese Extended Additional pairs (U+1EA0..U+1EF9)
+  for (uint16_t u = 0x1EA0; u <= 0x1EF8; u += 2) {
+    const uint16_t l = static_cast<uint16_t>(u + 1);
+    EXPECT_TRUE(IsUpper(u));
+    EXPECT_FALSE(IsUpper(l));
+    EXPECT_EQ(ToLower(u), l);
+    EXPECT_EQ(ToUpper(l), u);
+  }
+}
+
+TEST(UnicodeUtilsTest, WordBoundaries) {
+  EXPECT_TRUE(IsWordBoundary(' '));
+  EXPECT_TRUE(IsWordBoundary('\t'));
+  EXPECT_TRUE(IsWordBoundary('\n'));
+  EXPECT_TRUE(IsWordBoundary('.'));
+  EXPECT_TRUE(IsWordBoundary(','));
+  EXPECT_TRUE(IsWordBoundary(0x00A0));  // NBSP
+  EXPECT_TRUE(IsWordBoundary(0x2014));  // —
+  EXPECT_TRUE(IsWordBoundary(0x201C));  // “
+  EXPECT_TRUE(IsWordBoundary(0x3000));  // Ideographic space
+  EXPECT_FALSE(IsWordBoundary('a'));
+  EXPECT_FALSE(IsWordBoundary(0x0111));  // đ
+  EXPECT_FALSE(IsWordBoundary('+'));
+  EXPECT_FALSE(IsWordBoundary('^'));
+  EXPECT_FALSE(IsWordBoundary('~'));
+  EXPECT_FALSE(IsWordBoundary('`'));
 }
 
 }  // namespace

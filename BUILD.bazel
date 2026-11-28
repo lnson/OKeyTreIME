@@ -20,7 +20,6 @@ filegroup(
         "//OKeyTre/ime/core:vietnamese-inv-automaton.generated.h",
         "//OKeyTre/ime/core:viqr-automaton.generated.h",
         "//OKeyTre/ime/core:vni-automaton.generated.h",
-        "@uni_algo",
     ],
 )
 
