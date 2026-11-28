@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
-#include <string>
 
 #include "windows/resources/resource.h"
 
@@ -40,8 +39,10 @@ bool QueryPersonalizeLightFlag(const wchar_t* value_name,
   return val != 0;
 }
 
-std::wstring PreferredFontFamily() {
-  static const std::wstring kFamily = []() -> std::wstring {
+}  // namespace
+
+const wchar_t* PreferredUiFontFamily() {
+  static const wchar_t* const kFamily = []() -> const wchar_t* {
     Gdiplus::FontFamily var_family(L"Segoe UI Variable Text");
     if (var_family.IsAvailable()) {
       return L"Segoe UI Variable Text";
@@ -50,8 +51,6 @@ std::wstring PreferredFontFamily() {
   }();
   return kFamily;
 }
-
-}  // namespace
 
 bool IsAppDarkMode() {
   return !QueryPersonalizeLightFlag(L"AppsUseLightTheme", true);
@@ -148,6 +147,46 @@ void ApplyWindowThemeAttributes(HWND hwnd, bool dark_mode) {
                         sizeof(kDwmwcpRound));
 }
 
+void ApplyControlTheme(HWND hwnd, bool dark_mode) {
+  if (hwnd == nullptr) {
+    return;
+  }
+  SetWindowTheme(hwnd, dark_mode ? L"DarkMode_CFD" : L"Explorer", nullptr);
+}
+
+void RefreshNativeMenuTheme(bool dark_mode) {
+  HMODULE uxtheme = GetModuleHandleW(L"uxtheme.dll");
+  if (uxtheme == nullptr) {
+    uxtheme = LoadLibraryExW(L"uxtheme.dll", nullptr,
+                             LOAD_LIBRARY_SEARCH_SYSTEM32);
+  }
+  if (uxtheme == nullptr) {
+    return;
+  }
+
+  enum class PreferredAppMode : int {
+    kDefault = 0,
+    kAllowDark = 1,
+    kForceDark = 2,
+    kForceLight = 3,
+    kMax = 4,
+  };
+  using SetPreferredAppModeFn = PreferredAppMode(WINAPI*)(PreferredAppMode);
+  using FlushMenuThemesFn = void(WINAPI*)();
+
+  auto set_preferred_app_mode = reinterpret_cast<SetPreferredAppModeFn>(
+      GetProcAddress(uxtheme, MAKEINTRESOURCEA(135)));
+  auto flush_menu_themes = reinterpret_cast<FlushMenuThemesFn>(
+      GetProcAddress(uxtheme, MAKEINTRESOURCEA(136)));
+  if (set_preferred_app_mode != nullptr) {
+    set_preferred_app_mode(dark_mode ? PreferredAppMode::kForceDark
+                                     : PreferredAppMode::kForceLight);
+  }
+  if (flush_menu_themes != nullptr) {
+    flush_menu_themes();
+  }
+}
+
 int ScaleDpi(int value, UINT dpi) noexcept {
   return MulDiv(value, static_cast<int>(dpi), 96);
 }
@@ -161,25 +200,42 @@ HFONT CreateUiFont(int point_size, int weight, UINT dpi) {
   lf.lfHeight = -MulDiv(point_size, static_cast<int>(dpi), 72);
   lf.lfWeight = weight;
   lf.lfQuality = CLEARTYPE_QUALITY;
-  const std::wstring family = PreferredFontFamily();
-  wcsncpy_s(lf.lfFaceName, family.c_str(), _TRUNCATE);
+  const wchar_t* family = PreferredUiFontFamily();
+  wcsncpy_s(lf.lfFaceName, family, _TRUNCATE);
   return CreateFontIndirectW(&lf);
 }
 
 Gdiplus::Bitmap* GetAppLogoBitmap() {
   static std::unique_ptr<Gdiplus::Bitmap> logo = []() {
     HMODULE mod = GetModuleHandleW(nullptr);
-    HRSRC res = FindResourceW(mod, MAKEINTRESOURCEW(IDR_APP_LOGO_PNG),
-                              RT_RCDATA);
-    if (res == nullptr) {
+    HRSRC group_res =
+        FindResourceW(mod, MAKEINTRESOURCEW(IDI_APP_ICON), RT_GROUP_ICON);
+    if (group_res == nullptr) {
       return std::unique_ptr<Gdiplus::Bitmap>();
     }
-    const DWORD size = SizeofResource(mod, res);
-    HGLOBAL loaded = LoadResource(mod, res);
-    if (loaded == nullptr || size == 0) {
+    HGLOBAL group_loaded = LoadResource(mod, group_res);
+    if (group_loaded == nullptr) {
       return std::unique_ptr<Gdiplus::Bitmap>();
     }
-    const void* data = LockResource(loaded);
+    auto* group_data = static_cast<PBYTE>(LockResource(group_loaded));
+    if (group_data == nullptr) {
+      return std::unique_ptr<Gdiplus::Bitmap>();
+    }
+    const int icon_id = LookupIconIdFromDirectoryEx(group_data, TRUE, 256, 256,
+                                                    LR_DEFAULTCOLOR);
+    if (icon_id <= 0) {
+      return std::unique_ptr<Gdiplus::Bitmap>();
+    }
+    HRSRC icon_res = FindResourceW(mod, MAKEINTRESOURCEW(icon_id), RT_ICON);
+    if (icon_res == nullptr) {
+      return std::unique_ptr<Gdiplus::Bitmap>();
+    }
+    const DWORD size = SizeofResource(mod, icon_res);
+    HGLOBAL icon_loaded = LoadResource(mod, icon_res);
+    if (icon_loaded == nullptr || size == 0) {
+      return std::unique_ptr<Gdiplus::Bitmap>();
+    }
+    const void* data = LockResource(icon_loaded);
     if (data == nullptr) {
       return std::unique_ptr<Gdiplus::Bitmap>();
     }
@@ -189,7 +245,7 @@ Gdiplus::Bitmap* GetAppLogoBitmap() {
     }
     std::unique_ptr<Gdiplus::Bitmap> bmp(Gdiplus::Bitmap::FromStream(stream));
     stream->Release();
-    if (!bmp || bmp->GetLastStatus() != Gdiplus::Ok) {
+    if (bmp == nullptr || bmp->GetLastStatus() != Gdiplus::Ok) {
       return std::unique_ptr<Gdiplus::Bitmap>();
     }
     return bmp;
@@ -278,8 +334,8 @@ void DrawFluentButton(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
     StrokeRoundedRect(g, rect, radius, border, 1.0f);
   }
 
-  const std::wstring family = PreferredFontFamily();
-  Gdiplus::Font font(family.c_str(), ScaleDpiF(12.5f, dpi),
+  const wchar_t* family = PreferredUiFontFamily();
+  Gdiplus::Font font(family, ScaleDpiF(12.5f, dpi),
                      is_primary ? Gdiplus::FontStyleBold
                                 : Gdiplus::FontStyleRegular,
                      Gdiplus::UnitPixel);
@@ -291,6 +347,45 @@ void DrawFluentButton(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
   fmt.SetFormatFlags(Gdiplus::StringFormatFlagsNoWrap);
   g.DrawString(text.data(), static_cast<INT>(text.size()), &font, rect, &fmt,
                &brush);
+}
+
+void DrawFluentDropdown(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
+                        std::wstring_view text, bool is_hovered,
+                        const ThemePalette& palette, UINT dpi) {
+  const float radius = ScaleDpiF(6.0f, dpi);
+  const Gdiplus::Color fill =
+      is_hovered ? palette.hover_bg : palette.control_bg;
+  FillRoundedRect(g, rect, radius, fill);
+  StrokeRoundedRect(g, rect, radius, palette.control_border, 1.0f);
+
+  const float pad_l = ScaleDpiF(10.0f, dpi);
+  const float chev_area = ScaleDpiF(22.0f, dpi);
+  const wchar_t* family = PreferredUiFontFamily();
+  Gdiplus::Font font(family, ScaleDpiF(12.0f, dpi),
+                     Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
+  Gdiplus::SolidBrush text_brush(palette.text_primary);
+  Gdiplus::StringFormat fmt;
+  fmt.SetAlignment(Gdiplus::StringAlignmentNear);
+  fmt.SetLineAlignment(Gdiplus::StringAlignmentCenter);
+  fmt.SetFormatFlags(Gdiplus::StringFormatFlagsNoWrap);
+  fmt.SetTrimming(Gdiplus::StringTrimmingEllipsisCharacter);
+  Gdiplus::RectF text_rect(rect.X + pad_l, rect.Y,
+                           std::max(0.0f, rect.Width - pad_l - chev_area),
+                           rect.Height);
+  g.DrawString(text.data(), static_cast<INT>(text.size()), &font, text_rect,
+               &fmt, &text_brush);
+
+  // Subtle downward chevron.
+  const float cx = rect.GetRight() - ScaleDpiF(12.0f, dpi);
+  const float cy = rect.Y + rect.Height * 0.5f;
+  const float hw = ScaleDpiF(3.5f, dpi);
+  const float hh = ScaleDpiF(2.0f, dpi);
+  Gdiplus::Pen pen(palette.text_secondary, ScaleDpiF(1.3f, dpi));
+  pen.SetStartCap(Gdiplus::LineCapRound);
+  pen.SetEndCap(Gdiplus::LineCapRound);
+  pen.SetLineJoin(Gdiplus::LineJoinRound);
+  g.DrawLine(&pen, cx - hw, cy - hh, cx, cy + hh);
+  g.DrawLine(&pen, cx, cy + hh, cx + hw, cy - hh);
 }
 
 void DrawAppLogo(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,

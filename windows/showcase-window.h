@@ -6,6 +6,7 @@
 
 #include <windows.h>
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -17,12 +18,12 @@
 namespace okeytre::win {
 
 struct ShowcaseViewModel {
+  std::wstring keyboard_name;
+  std::wstring milestone_version;
   ShowcaseMode mode = ShowcaseMode::kFirstInstall;
   AppLanguage language = AppLanguage::kSystem;
   InputStyle style = InputStyle::kTelex;
   bool is_english_keyboard = true;
-  std::wstring keyboard_name = L"English (United States)";
-  std::wstring milestone_version = L"0.3";
 };
 
 struct ShowcaseCallbacks {
@@ -49,13 +50,15 @@ class ShowcaseWindow {
   bool IsVisible() const;
 
  private:
-  enum class HitTargetKind {
+  enum class HitTargetKind : uint8_t {
     kNone,
+    kDropdownLanguage,
     kButtonSwitchToUs,
     kSegmentTelex,
     kSegmentVni,
     kSegmentViqr,
     kButtonGetStarted,
+    kPracticeBox,
   };
 
   struct HitRegion {
@@ -80,22 +83,23 @@ class ShowcaseWindow {
 
   HitTargetKind HitTest(int x, int y) const;
   void HandleClick(HitTargetKind target);
+  void ShowLanguageMenu();
   std::wstring ResolveWindowTitle() const;
 
   ShowcaseCallbacks callbacks_;
   ShowcaseViewModel model_;
-  ThemePalette palette_;
-  UINT dpi_ = 96;
+  std::vector<HitRegion> hit_regions_;
 
   HWND hwnd_ = nullptr;
-  HWND combo_language_ = nullptr;
   HWND edit_practice_ = nullptr;
 
   HFONT ui_font_ = nullptr;
   HFONT practice_font_ = nullptr;
   HBRUSH brush_card_ = nullptr;
 
-  std::vector<HitRegion> hit_regions_;
+  ThemePalette palette_;
+  Gdiplus::RectF dropdown_language_rect_;
+  UINT dpi_ = 96;
   HitTargetKind hovered_target_ = HitTargetKind::kNone;
   bool updating_controls_ = false;
   bool tracking_mouse_ = false;

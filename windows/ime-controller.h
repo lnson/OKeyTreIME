@@ -21,8 +21,8 @@ struct SurroundingWord {
 };
 
 struct ImeEditAction {
-  int32_t backspace_count = 0;
   std::u16string text;
+  int32_t backspace_count = 0;
 
   bool operator==(const ImeEditAction& other) const = default;
 };
@@ -45,8 +45,7 @@ class ImeController {
   using CaretReaderFn = std::function<std::optional<SurroundingWord>()>;
   using StateChangedFn = std::function<void()>;
 
-  explicit ImeController(SettingsStore& settings,
-                         CaretReaderFn caret_reader = nullptr);
+  ImeController(SettingsStore& settings, CaretReaderFn caret_reader);
   ~ImeController();
 
   ImeController(const ImeController&) = delete;

@@ -9,10 +9,11 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
-#include <mutex>
 #include <optional>
 #include <string>
 
+#include "absl/base/thread_annotations.h"
+#include "absl/synchronization/mutex.h"
 #include "windows/app-version.h"
 #include "windows/settings-store.h"
 #include "windows/update-parser.h"
@@ -76,9 +77,9 @@ class UpdateManager {
 
  private:
   struct PendingResult {
+    std::optional<UpdateRelease> release;
     bool succeeded = false;
     bool user_initiated = false;
-    std::optional<UpdateRelease> release;
   };
 
   void StartCheckThread(bool user_initiated);
@@ -86,18 +87,18 @@ class UpdateManager {
 
   SettingsStore& settings_;
   HWND notify_hwnd_ = nullptr;
-  UINT notify_msg_ = 0;
   AppVersion current_version_;
-  bool is_auto_check_enabled_ = true;
-  bool is_checking_ = false;
-  bool did_confirm_up_to_date_ = false;
   std::optional<std::string> skipped_version_;
   std::optional<UpdateRelease> available_release_;
   StateChangedFn on_state_changed_;
+  absl::Mutex result_mutex_;
+  std::optional<PendingResult> pending_result_ ABSL_GUARDED_BY(result_mutex_);
 
+  UINT notify_msg_ = 0;
   std::atomic<bool> shutting_down_{false};
-  std::mutex result_mutex_;
-  std::optional<PendingResult> pending_result_;
+  bool is_auto_check_enabled_ = true;
+  bool is_checking_ = false;
+  bool did_confirm_up_to_date_ = false;
 };
 
 }  // namespace okeytre::win

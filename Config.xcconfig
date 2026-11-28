@@ -1,7 +1,6 @@
 PRODUCT_BUNDLE_IDENTIFIER = com.okeytre.OKeyTre
 EXCLUDED_SOURCE_FILE_NAMES = *_test.cc BUILD.bazel BUILD
-HEADER_SEARCH_PATHS = $(inherited) $(SRCROOT)/OKeyTre/ime/core $(SRCROOT)/bazel-bin/OKeyTre/ime/core $(SRCROOT)/bazel-execroot/external/+http_archive+uni_algo/include
-OTHER_LDFLAGS = $(inherited) $(SRCROOT)/bazel-bin/external/+http_archive+uni_algo/libuni_algo.a
+HEADER_SEARCH_PATHS = $(inherited) $(SRCROOT)/OKeyTre/ime/core $(SRCROOT)/bazel-bin/OKeyTre/ime/core
 
 // Optional local configuration override. Create `Local.xcconfig` (ignored by git)
 // in the repository root to set your local Apple Developer Team ID, e.g.:

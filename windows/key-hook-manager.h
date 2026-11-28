@@ -68,10 +68,10 @@ class KeyHookManager {
   HHOOK mouse_hook_ = nullptr;
   HWINEVENTHOOK foreground_hook_ = nullptr;
 
-  DualShiftDetector dual_shift_;
-  DualControlDetector dual_control_;
   AsyncCallbackFn on_toggle_requested_;
   AsyncCallbackFn on_foreground_changed_;
+  DualShiftDetector dual_shift_;
+  DualControlDetector dual_control_;
   bool in_keyboard_event_ = false;
 };
 

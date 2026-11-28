@@ -3,15 +3,13 @@
 
 #include "windows/settings-store.h"
 
-#include <memory>
-
 #include "gtest/gtest.h"
 
 namespace okeytre::win {
 namespace {
 
 TEST(SettingsStoreTest, DefaultsMatchMacOS) {
-  SettingsStore store(std::make_unique<InMemorySettingsBackend>());
+  SettingsStore store = SettingsStore::CreateInMemory();
 
   EXPECT_EQ(store.GetInputStyle(), InputStyle::kTelex);
   EXPECT_EQ(store.GetLastActiveInputStyle(), InputStyle::kTelex);
@@ -27,7 +25,7 @@ TEST(SettingsStoreTest, DefaultsMatchMacOS) {
 }
 
 TEST(SettingsStoreTest, ShowcasePresentationLifecycle) {
-  SettingsStore store(std::make_unique<InMemorySettingsBackend>());
+  SettingsStore store = SettingsStore::CreateInMemory();
 
   // Fresh install shows first-install showcase.
   EXPECT_EQ(store.ResolveLaunchShowcaseMode("0.3"),
@@ -43,7 +41,7 @@ TEST(SettingsStoreTest, ShowcasePresentationLifecycle) {
 }
 
 TEST(SettingsStoreTest, PriorInstallWithoutShowcaseKeyShowsFeatureUpdate) {
-  SettingsStore store(std::make_unique<InMemorySettingsBackend>());
+  SettingsStore store = SettingsStore::CreateInMemory();
   store.SetInputStyle(InputStyle::kVNI);
 
   EXPECT_EQ(store.ResolveLaunchShowcaseMode("0.3"),

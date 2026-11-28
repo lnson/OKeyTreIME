@@ -1,0 +1,53 @@
+# Copyright (C) 2026 lnson
+# SPDX-License-Identifier: GPL-3.0-only
+
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
+package(default_visibility = ["//visibility:public"])
+
+# 1. Apple `.strings` Parser & C++ Localization Table Codegen Library
+cc_library(
+    name = "l10n_compiler",
+    srcs = ["l10n-compiler.cc"],
+    hdrs = ["l10n-compiler.h"],
+    includes = ["."],
+    deps = [
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/container:flat_hash_set",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:status_macros",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+    ],
+)
+
+cc_test(
+    name = "l10n_compiler_test",
+    size = "small",
+    srcs = ["l10n-compiler_test.cc"],
+    deps = [
+        ":l10n_compiler",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+        "@googletest//:gtest_main",
+    ],
+)
+
+# 2. Ahead-of-Time `.strings` -> `.generated.h` C++ compiler CLI (`l10nc`)
+cc_binary(
+    name = "l10nc",
+    srcs = ["l10nc-main.cc"],
+    deps = [
+        ":l10n_compiler",
+        "@abseil-cpp//absl/flags:flag",
+        "@abseil-cpp//absl/flags:parse",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:status_macros",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:cord",
+    ],
+)

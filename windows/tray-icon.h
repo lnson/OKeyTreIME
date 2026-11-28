@@ -18,13 +18,13 @@
 namespace okeytre::win {
 
 struct TrayState {
+  std::wstring keyboard_name;
+  std::optional<UpdateRelease> visible_update;
   InputStyle style = InputStyle::kTelex;
   AppLanguage language = AppLanguage::kSystem;
   bool restore_invalid_words = true;
   bool launch_at_login = false;
   bool is_english_keyboard = true;
-  std::wstring keyboard_name = L"English (United States)";
-  std::optional<UpdateRelease> visible_update;
 };
 
 struct TrayCallbacks {
@@ -66,11 +66,11 @@ class TrayIcon {
   static std::wstring BuildTooltip(const TrayState& state);
   static TrayIconKind ResolveIconKind(const TrayState& state);
 
-  HWND owner_hwnd_ = nullptr;
-  UINT callback_msg_ = 0;
   TrayCallbacks callbacks_;
   TrayState state_;
+  HWND owner_hwnd_ = nullptr;
   HICON current_icon_ = nullptr;
+  UINT callback_msg_ = 0;
   bool installed_ = false;
 };
 

@@ -12,10 +12,16 @@ TEST(UpdateParserTest, ValidatesGitHubUrls) {
   EXPECT_TRUE(IsValidatedGitHubUrl(
       "https://github.com/lnson/OKeyTreIME/releases/tag/v0.4"));
   EXPECT_TRUE(IsValidatedGitHubUrl(
+      "https://GITHUB.COM/lnson/OKeyTreIME/releases/tag/v0.4"));
+  EXPECT_TRUE(IsValidatedGitHubUrl(
       "https://objects.githubusercontent.com/release/OKeyTre.exe"));
+  EXPECT_TRUE(IsValidatedGitHubUrl("https://github.com?tab=releases"));
   EXPECT_FALSE(IsValidatedGitHubUrl("http://github.com/lnson/OKeyTreIME"));
   EXPECT_FALSE(IsValidatedGitHubUrl("https://evil.example.com/github.com"));
+  EXPECT_FALSE(IsValidatedGitHubUrl("https://evil.example.com\\github.com"));
+  EXPECT_FALSE(IsValidatedGitHubUrl("https://evil.example.com\\.github.com"));
   EXPECT_FALSE(IsValidatedGitHubUrl("https://user@github.com/lnson/repo"));
+  EXPECT_FALSE(IsValidatedGitHubUrl("https://github.com:8443/lnson/repo"));
 }
 
 TEST(UpdateParserTest, ParsesNewerReleaseWithWindowsAsset) {

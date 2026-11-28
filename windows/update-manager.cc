@@ -46,10 +46,9 @@ struct HttpResponse {
 HttpResponse FetchLatestReleaseJson(const std::wstring& user_agent) {
   HttpResponse resp;
 
-  WinHttpHandle session(WinHttpOpen(user_agent.c_str(),
-                                    WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-                                    WINHTTP_NO_PROXY_NAME,
-                                    WINHTTP_NO_PROXY_BYPASS, 0));
+  WinHttpHandle session(
+      WinHttpOpen(user_agent.c_str(), WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                  WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0));
   if (!session) {
     return resp;
   }
@@ -85,8 +84,7 @@ HttpResponse FetchLatestReleaseJson(const std::wstring& user_agent) {
   DWORD status_code = 0;
   DWORD status_size = sizeof(status_code);
   if (!WinHttpQueryHeaders(
-          request.Get(),
-          WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+          request.Get(), WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
           WINHTTP_HEADER_NAME_BY_INDEX, &status_code, &status_size,
           WINHTTP_NO_HEADER_INDEX)) {
     return resp;
@@ -110,9 +108,7 @@ HttpResponse FetchLatestReleaseJson(const std::wstring& user_agent) {
       break;
     }
     resp.body.resize(old_size + read);
-    if (read == 0) {
-      break;
-    }
+    if (read == 0) break;
     if (resp.body.size() > 2 * 1024 * 1024) {
       resp.ok = false;
       break;
@@ -128,10 +124,10 @@ UpdateManager::UpdateManager(SettingsStore& settings, HWND notify_hwnd,
                              UINT notify_msg)
     : settings_(settings),
       notify_hwnd_(notify_hwnd),
-      notify_msg_(notify_msg),
       current_version_(AppVersion::Parse(kCurrentAppVersionString).value()),
-      is_auto_check_enabled_(settings.GetAutoCheckUpdates()),
-      skipped_version_(settings.GetSkippedUpdateVersion()) {}
+      skipped_version_(settings.GetSkippedUpdateVersion()),
+      notify_msg_(notify_msg),
+      is_auto_check_enabled_(settings.GetAutoCheckUpdates()) {}
 
 UpdateManager::~UpdateManager() { shutting_down_.store(true); }
 
@@ -141,23 +137,15 @@ int64_t UpdateManager::NowUnixSeconds() {
 }
 
 void UpdateManager::SetAutoCheckEnabled(bool enabled) {
-  if (is_auto_check_enabled_ == enabled) {
-    return;
-  }
+  if (is_auto_check_enabled_ == enabled) return;
   is_auto_check_enabled_ = enabled;
   settings_.SetAutoCheckUpdates(enabled);
-  if (on_state_changed_) {
-    on_state_changed_();
-  }
-  if (enabled) {
-    CheckIfDueInBackground();
-  }
+  if (on_state_changed_) on_state_changed_();
+  if (enabled) CheckIfDueInBackground();
 }
 
 std::optional<UpdateRelease> UpdateManager::visible_available_release() const {
-  if (!available_release_.has_value()) {
-    return std::nullopt;
-  }
+  if (!available_release_.has_value()) return std::nullopt;
   if (skipped_version_.has_value()) {
     if (const auto skipped = AppVersion::Parse(*skipped_version_);
         skipped.has_value() && available_release_->version <= *skipped) {
@@ -168,30 +156,22 @@ std::optional<UpdateRelease> UpdateManager::visible_available_release() const {
 }
 
 void UpdateManager::CheckIfDueInBackground() {
-  if (!is_auto_check_enabled_ || is_checking_) {
-    return;
-  }
+  if (!is_auto_check_enabled_ || is_checking_) return;
   const int64_t last_check = settings_.GetLastUpdateCheckTimestamp();
   const int64_t now = NowUnixSeconds();
-  if (last_check > 0 && (now - last_check) < kCheckIntervalSeconds) {
-    return;
-  }
+  if (last_check > 0 && (now - last_check) < kCheckIntervalSeconds) return;
   StartCheckThread(/*user_initiated=*/false);
 }
 
 void UpdateManager::CheckForUpdatesNow() {
-  if (is_checking_) {
-    return;
-  }
+  if (is_checking_) return;
   did_confirm_up_to_date_ = false;
   StartCheckThread(/*user_initiated=*/true);
 }
 
 void UpdateManager::StartCheckThread(bool user_initiated) {
   is_checking_ = true;
-  if (on_state_changed_) {
-    on_state_changed_();
-  }
+  if (on_state_changed_) on_state_changed_();
 
   const AppVersion current = current_version_;
   const std::wstring ua = L"OKeyTre/" + Utf8ToWide(current.description());
@@ -211,12 +191,10 @@ void UpdateManager::StartCheckThread(bool user_initiated) {
       }
     }
 
-    if (shutting_down_.load()) {
-      return;
-    }
+    if (shutting_down_.load()) return;
 
     {
-      std::lock_guard<std::mutex> lock(result_mutex_);
+      absl::MutexLock lock(result_mutex_);
       pending_result_ = std::move(result);
     }
 
@@ -229,7 +207,7 @@ void UpdateManager::StartCheckThread(bool user_initiated) {
 void UpdateManager::HandleAsyncCheckFinished() {
   std::optional<PendingResult> result;
   {
-    std::lock_guard<std::mutex> lock(result_mutex_);
+    absl::MutexLock lock(result_mutex_);
     result = std::move(pending_result_);
     pending_result_.reset();
   }
@@ -248,9 +226,7 @@ void UpdateManager::HandleAsyncCheckFinished() {
     }
   }
 
-  if (on_state_changed_) {
-    on_state_changed_();
-  }
+  if (on_state_changed_) on_state_changed_();
 }
 
 void UpdateManager::ClearUpToDateBanner() {
@@ -258,17 +234,13 @@ void UpdateManager::ClearUpToDateBanner() {
     return;
   }
   did_confirm_up_to_date_ = false;
-  if (on_state_changed_) {
-    on_state_changed_();
-  }
+  if (on_state_changed_) on_state_changed_();
 }
 
 void UpdateManager::SkipRelease(const UpdateRelease& release) {
   skipped_version_ = release.display_version();
   settings_.SetSkippedUpdateVersion(*skipped_version_);
-  if (on_state_changed_) {
-    on_state_changed_();
-  }
+  if (on_state_changed_) on_state_changed_();
 }
 
 void UpdateManager::OpenReleasePage(

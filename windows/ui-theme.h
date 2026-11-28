@@ -8,13 +8,12 @@
 #include <objidl.h>
 #include <gdiplus.h>
 
+#include <cstdint>
 #include <string_view>
 
 namespace okeytre::win {
 
 struct ThemePalette {
-  bool dark = false;
-
   Gdiplus::Color window_bg;
   Gdiplus::Color sidebar_bg;
   Gdiplus::Color card_bg;
@@ -46,9 +45,11 @@ struct ThemePalette {
   COLORREF win32_card_bg = RGB(255, 255, 255);
   COLORREF win32_text_primary = RGB(27, 27, 27);
   COLORREF win32_text_secondary = RGB(95, 95, 95);
+
+  bool dark = false;
 };
 
-enum class TrayIconKind {
+enum class TrayIconKind : uint8_t {
   kVietnameseActive = 0,
   kOff = 1,
   kWarning = 2,
@@ -63,8 +64,19 @@ ThemePalette GetThemePalette(bool dark_mode);
 // Applies Windows 11 dark titlebar and rounded corners when supported.
 void ApplyWindowThemeAttributes(HWND hwnd, bool dark_mode);
 
+// Applies light/dark UxTheme styling to native Win32 child controls.
+void ApplyControlTheme(HWND hwnd, bool dark_mode);
+
+// Configures Win32 native popup menus (`TrackPopupMenuEx`) to render in
+// light or dark mode on Windows 10 1903+ and Windows 11.
+void RefreshNativeMenuTheme(bool dark_mode);
+
 int ScaleDpi(int value, UINT dpi) noexcept;
 float ScaleDpiF(float value, UINT dpi) noexcept;
+
+// Returns the preferred Windows UI font family ("Segoe UI Variable Text" on
+// Windows 11, falling back to "Segoe UI" on earlier versions).
+const wchar_t* PreferredUiFontFamily();
 
 // Creates a Segoe UI Variable (or Segoe UI fallback) HFONT for native Win32
 // child controls at the given DPI.
@@ -88,6 +100,10 @@ void DrawToggleSwitch(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
 void DrawFluentButton(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
                       std::wstring_view text, bool is_primary, bool is_hovered,
                       bool is_disabled, const ThemePalette& palette, UINT dpi);
+
+void DrawFluentDropdown(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
+                        std::wstring_view text, bool is_hovered,
+                        const ThemePalette& palette, UINT dpi);
 
 void DrawAppLogo(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
                  float corner_radius);

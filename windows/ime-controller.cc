@@ -17,9 +17,8 @@ SurroundingWord ExtractSurroundingWord(const uint16_t* text, int32_t text_len,
                                        int32_t text_offset,
                                        int32_t caret_location) {
   SurroundingWord result;
-  if (text == nullptr || text_len <= 0) {
-    return result;
-  }
+  if (text == nullptr || text_len <= 0) return result;
+
   const int32_t clamped_caret =
       std::clamp(caret_location - text_offset, 0, text_len);
 
@@ -165,7 +164,9 @@ void ImeController::SetMaxBufferSize(int32_t size) {
   NotifyStateChanged();
 }
 
-void ImeController::ResetBuffer() noexcept { okeytre_buffer_reset(raw_buffer_); }
+void ImeController::ResetBuffer() noexcept {
+  okeytre_buffer_reset(raw_buffer_);
+}
 
 void ImeController::SeedCaretIfNeeded() {
   if (!caret_reader_) {
@@ -247,10 +248,9 @@ std::optional<ImeEditAction> ImeController::HandleInput(const uint16_t* input,
   ImeEditAction action;
   action.backspace_count = backspace_count;
   if (out_len > 0) {
-    action.text.assign(
-        reinterpret_cast<const char16_t*>(out_buf.data()),
-        static_cast<size_t>(
-            std::min(out_len, static_cast<int32_t>(out_buf.size()))));
+    action.text.assign(reinterpret_cast<const char16_t*>(out_buf.data()),
+                       static_cast<size_t>(std::min(
+                           out_len, static_cast<int32_t>(out_buf.size()))));
   }
   return action;
 }
@@ -275,10 +275,9 @@ std::optional<ImeEditAction> ImeController::RestoreCurrentWord() {
   ImeEditAction action;
   action.backspace_count = backspace_count;
   if (out_len > 0) {
-    action.text.assign(
-        reinterpret_cast<const char16_t*>(out_buf.data()),
-        static_cast<size_t>(
-            std::min(out_len, static_cast<int32_t>(out_buf.size()))));
+    action.text.assign(reinterpret_cast<const char16_t*>(out_buf.data()),
+                       static_cast<size_t>(std::min(
+                           out_len, static_cast<int32_t>(out_buf.size()))));
   }
   return action;
 }

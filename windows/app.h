@@ -26,7 +26,7 @@ namespace okeytre::win {
 // manager, Settings window, and Feature Showcase window.
 class App {
  public:
-  App();
+  App() = default;
   ~App();
 
   App(const App&) = delete;
@@ -53,10 +53,6 @@ class App {
 
   HWND hidden_hwnd_ = nullptr;
   HANDLE instance_mutex_ = nullptr;
-  UINT msg_taskbar_created_ = 0;
-  UINT msg_terminate_existing_ = 0;
-
-  ShowcaseMode active_showcase_mode_ = ShowcaseMode::kFirstInstall;
 
   std::unique_ptr<SettingsStore> settings_;
   std::unique_ptr<CaretTextReader> caret_reader_;
@@ -68,6 +64,10 @@ class App {
   std::unique_ptr<TrayIcon> tray_icon_;
   std::unique_ptr<SettingsWindow> settings_window_;
   std::unique_ptr<ShowcaseWindow> showcase_window_;
+
+  UINT msg_taskbar_created_ = 0;
+  UINT msg_terminate_existing_ = 0;
+  ShowcaseMode active_showcase_mode_ = ShowcaseMode::kFirstInstall;
 };
 
 }  // namespace okeytre::win

@@ -11,7 +11,9 @@
 
 #include <cwchar>
 #include <iterator>
-#include <unordered_map>
+
+#include "absl/base/no_destructor.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace okeytre::win {
 
@@ -26,10 +28,11 @@ struct SpecialLayoutInfo {
 // `(HIWORD(hkl) & 0xF000) == 0xF000`) to its underlying KLID language and name.
 // This detects IME/keyboard variants such as Windows built-in Vietnamese Telex
 // (`0001042a`) or VNI (`0002042a`) even when installed under `en-US` (`0409`).
-const std::unordered_map<uint16_t, SpecialLayoutInfo>& GetSpecialLayoutMap() {
-  static const std::unordered_map<uint16_t, SpecialLayoutInfo>* const kMap =
-      []() {
-        auto* table = new std::unordered_map<uint16_t, SpecialLayoutInfo>();
+const absl::flat_hash_map<uint16_t, SpecialLayoutInfo>& GetSpecialLayoutMap() {
+  static const absl::NoDestructor<
+      absl::flat_hash_map<uint16_t, SpecialLayoutInfo>>
+      kMap([]() {
+        absl::flat_hash_map<uint16_t, SpecialLayoutInfo> table;
         HKEY layouts_key = nullptr;
         if (RegOpenKeyExW(
                 HKEY_LOCAL_MACHINE,
@@ -82,15 +85,15 @@ const std::unordered_map<uint16_t, SpecialLayoutInfo>& GetSpecialLayoutMap() {
                   (text_type == REG_SZ || text_type == REG_EXPAND_SZ)) {
                 info.layout_text.assign(text_buf);
               }
-              table->try_emplace(static_cast<uint16_t>(special_id & 0x0FFFu),
-                                 std::move(info));
+              table.try_emplace(static_cast<uint16_t>(special_id & 0x0FFFu),
+                                std::move(info));
             }
           }
           RegCloseKey(subkey);
         }
         RegCloseKey(layouts_key);
         return table;
-      }();
+      }());
   return *kMap;
 }
 
@@ -99,26 +102,22 @@ HKL GetActiveKeyboardLayout() noexcept {
   const DWORD thread_id =
       fg != nullptr ? GetWindowThreadProcessId(fg, nullptr) : 0;
   HKL hkl = GetKeyboardLayout(thread_id);
-  if (hkl == nullptr) {
-    hkl = GetKeyboardLayout(0);
-  }
+  if (hkl == nullptr) hkl = GetKeyboardLayout(0);
+
   return hkl;
 }
 
 LANGID ResolveLayoutLangId(HKL hkl, const std::wstring** out_special_text) {
-  if (out_special_text != nullptr) {
-    *out_special_text = nullptr;
-  }
+  if (out_special_text != nullptr) *out_special_text = nullptr;
+
   const uintptr_t raw = reinterpret_cast<uintptr_t>(hkl);
   const LANGID input_lang = LOWORD(raw);
   const uint16_t device_id = HIWORD(raw);
-  if (device_id == 0) {
-    return input_lang;
-  }
-  if ((device_id & 0xF000u) != 0xF000u) {
-    return static_cast<LANGID>(device_id);
-  }
-  const std::unordered_map<uint16_t, SpecialLayoutInfo>& special_map =
+  if (device_id == 0) return input_lang;
+
+  if ((device_id & 0xF000u) != 0xF000u) return static_cast<LANGID>(device_id);
+
+  const absl::flat_hash_map<uint16_t, SpecialLayoutInfo>& special_map =
       GetSpecialLayoutMap();
   const auto it = special_map.find(static_cast<uint16_t>(device_id & 0x0FFFu));
   if (it != special_map.end()) {
@@ -131,20 +130,18 @@ LANGID ResolveLayoutLangId(HKL hkl, const std::wstring** out_special_text) {
 }
 
 bool IsEnglishKeyboardLayout(HKL hkl) noexcept {
-  if (hkl == nullptr) {
-    return true;
-  }
+  if (hkl == nullptr) return true;
+
   const LANGID input_lang = LOWORD(reinterpret_cast<uintptr_t>(hkl));
-  if (PRIMARYLANGID(input_lang) != LANG_ENGLISH) {
-    return false;
-  }
+  if (PRIMARYLANGID(input_lang) != LANG_ENGLISH) return false;
+
   const LANGID layout_lang = ResolveLayoutLangId(hkl, nullptr);
   return PRIMARYLANGID(layout_lang) == LANG_ENGLISH;
 }
 
 std::wstring GetKeyboardLayoutDisplayName(HKL hkl, AppLanguage language) {
   if (hkl == nullptr) {
-    return Localized(language, "input_source.unknown");
+    return std::wstring(Localized(language, L10nKey::kInputSourceUnknown));
   }
   const std::wstring* special_text = nullptr;
   const LANGID input_lang = LOWORD(reinterpret_cast<uintptr_t>(hkl));
@@ -164,7 +161,7 @@ std::wstring GetKeyboardLayoutDisplayName(HKL hkl, AppLanguage language) {
       return std::wstring(display_name);
     }
   }
-  return Localized(language, "input_source.unknown");
+  return std::wstring(Localized(language, L10nKey::kInputSourceUnknown));
 }
 
 }  // namespace
@@ -186,17 +183,15 @@ bool InputSourceManager::Refresh(AppLanguage language) {
 
   is_english_ = next_english;
   current_source_name_ = next_name;
-  if (on_changed_) {
-    on_changed_();
-  }
+  if (on_changed_) on_changed_();
+
   return true;
 }
 
 bool InputSourceManager::SwitchToEnglishKeyboard(AppLanguage language) {
   HKL us_hkl = LoadKeyboardLayoutW(L"00000409", KLF_ACTIVATE);
-  if (us_hkl == nullptr) {
-    return false;
-  }
+  if (us_hkl == nullptr) return false;
+
   ActivateKeyboardLayout(us_hkl, KLF_SETFORPROCESS);
   if (HWND fg = GetForegroundWindow(); fg != nullptr) {
     PostMessageW(fg, WM_INPUTLANGCHANGEREQUEST, 0,
@@ -204,36 +199,34 @@ bool InputSourceManager::SwitchToEnglishKeyboard(AppLanguage language) {
   }
   is_english_ = true;
   current_source_name_ = GetKeyboardLayoutDisplayName(us_hkl, language);
-  if (on_changed_) {
-    on_changed_();
-  }
+  if (on_changed_) on_changed_();
+
   return true;
 }
 
 void InputSourceManager::CheckAndWarnOnStartup(AppLanguage language) {
   Refresh(language);
-  if (is_english_) {
-    return;
-  }
+  if (is_english_) return;
 
-  const std::wstring title =
-      Localized(language, "alert.non_english_keyboard.title");
+  const std::wstring_view title =
+      Localized(language, L10nKey::kAlertNonEnglishKeyboardTitle);
   const std::wstring message = LocalizedFormat(
-      language, "alert.non_english_keyboard.message", current_source_name_);
-  const std::wstring btn_switch = Localized(language, "action.switch_to_us");
-  const std::wstring btn_settings = Localized(
-      language, "alert.non_english_keyboard.open_keyboard_settings");
-  const std::wstring btn_ignore =
-      Localized(language, "alert.non_english_keyboard.ignore");
+      language, L10nKey::kAlertNonEnglishKeyboardMessage, current_source_name_);
+  const std::wstring_view btn_switch =
+      Localized(language, L10nKey::kActionSwitchToUs);
+  const std::wstring_view btn_settings = Localized(
+      language, L10nKey::kAlertNonEnglishKeyboardOpenKeyboardSettings);
+  const std::wstring_view btn_ignore =
+      Localized(language, L10nKey::kAlertNonEnglishKeyboardIgnore);
 
   constexpr int kBtnSwitchId = 1001;
   constexpr int kBtnSettingsId = 1002;
   constexpr int kBtnIgnoreId = 1003;
 
   const TASKDIALOG_BUTTON buttons[] = {
-      {kBtnSwitchId, btn_switch.c_str()},
-      {kBtnSettingsId, btn_settings.c_str()},
-      {kBtnIgnoreId, btn_ignore.c_str()},
+      {kBtnSwitchId, btn_switch.data()},
+      {kBtnSettingsId, btn_settings.data()},
+      {kBtnIgnoreId, btn_ignore.data()},
   };
 
   TASKDIALOGCONFIG cfg{};
@@ -241,7 +234,7 @@ void InputSourceManager::CheckAndWarnOnStartup(AppLanguage language) {
   cfg.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_POSITION_RELATIVE_TO_WINDOW;
   cfg.pszWindowTitle = L"ÔKêyTre";
   cfg.pszMainIcon = TD_WARNING_ICON;
-  cfg.pszMainInstruction = title.c_str();
+  cfg.pszMainInstruction = title.data();
   cfg.pszContent = message.c_str();
   cfg.cButtons = static_cast<UINT>(std::size(buttons));
   cfg.pButtons = buttons;

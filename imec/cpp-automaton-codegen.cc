@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -438,23 +439,22 @@ void EmitFallbackMatchers(const CompiledAutomaton& compiled, Sink& sink) {
     sink.WriteLn("      const uint16_t* slice,");
     sink.WriteLn("      int32_t slice_len,");
     sink.WriteLn("      std::vector<int>& out_tags) {");
-    sink.WriteLn("    static const okeytre::RuleMatcher kMatcher = {");
-    sink.WriteLn("        {");
+    sink.WriteLn("    static constexpr okeytre::PikeVMInst kInsts[] = {");
     for (const PikeVMInst& inst : rule.matcher.instructions) {
       switch (inst.op) {
         case PikeVMInst::Op::kMatch:
-          sink.WriteLn("            okeytre::PikeVMInst::MakeMatch(),");
+          sink.WriteLn("        okeytre::PikeVMInst::MakeMatch(),");
           break;
         case PikeVMInst::Op::kJump:
-          sink.WriteLn("            okeytre::PikeVMInst::MakeJump($0),",
+          sink.WriteLn("        okeytre::PikeVMInst::MakeJump($0),",
                        inst.arg1);
           break;
         case PikeVMInst::Op::kSplit:
-          sink.WriteLn("            okeytre::PikeVMInst::MakeSplit($0, $1),",
+          sink.WriteLn("        okeytre::PikeVMInst::MakeSplit($0, $1),",
                        inst.arg1, inst.arg2);
           break;
         case PikeVMInst::Op::kSaveTag:
-          sink.WriteLn("            okeytre::PikeVMInst::MakeSaveTag($0),",
+          sink.WriteLn("        okeytre::PikeVMInst::MakeSaveTag($0),",
                        inst.arg1);
           break;
         case PikeVMInst::Op::kCharClass: {
@@ -462,12 +462,12 @@ void EmitFallbackMatchers(const CompiledAutomaton& compiled, Sink& sink) {
           uint64_t hi = inst.char_class.HighWord();
           if (hi == 0) {
             sink.WriteLn(
-                "            "
+                "        "
                 "okeytre::PikeVMInst::MakeCharClass(okeytre::ECBitSet($0)),",
                 Hex64(lo));
           } else {
             sink.WriteLn(
-                "            "
+                "        "
                 "okeytre::PikeVMInst::MakeCharClass(okeytre::"
                 "ECBitSet($0, $1)),",
                 Hex64(lo), Hex64(hi));
@@ -476,14 +476,12 @@ void EmitFallbackMatchers(const CompiledAutomaton& compiled, Sink& sink) {
         }
       }
     }
-    sink.WriteLn("        },");
-    sink.WriteLn("        $0", rule.matcher.num_tags);
     sink.WriteLn("    };");
-    sink.WriteLn("    return kMatcher.MatchSliceWithClassifier(");
-    sink.WriteLn("        slice, static_cast<int>(slice_len),");
+    sink.WriteLn("    return okeytre::MatchPikeVmSlice(");
     sink.WriteLn(
-        "        [](uint16_t c) { return static_cast<int>(Classify(c)); }, "
-        "out_tags);");
+        "        kInsts, sizeof(kInsts) / sizeof(kInsts[0]), $0, slice,",
+        rule.matcher.num_tags);
+    sink.WriteLn("        static_cast<int>(slice_len), &Classify, out_tags);");
     sink.WriteLn("  }");
     sink.WriteLn();
   }
@@ -569,7 +567,188 @@ void EmitStateTransitionSwitch(const KeyAutomaton& dfa, int state_count,
   sink.WriteLn("$0}", indent);
 }
 
-void EmitDFAFunction(size_t index, const KeyAutomaton& dfa, Sink& sink) {
+struct SharedIntTablePool {
+  struct Entry {
+    int elem_bytes;
+    std::vector<int32_t> values;
+  };
+
+  std::string Intern(int elem_bytes, std::vector<int32_t> values) {
+    auto key = std::make_pair(elem_bytes, values);
+    auto it = index_by_key.find(key);
+    if (it != index_by_key.end()) {
+      return absl::StrCat("kDfaTable_", it->second);
+    }
+    size_t id = entries.size();
+    index_by_key.emplace(std::move(key), id);
+    entries.push_back(Entry{elem_bytes, std::move(values)});
+    return absl::StrCat("kDfaTable_", id);
+  }
+
+  void EmitAll(Sink& sink) const {
+    constexpr size_t kChunkSize = 24;
+    for (size_t id = 0; id < entries.size(); ++id) {
+      const Entry& entry = entries[id];
+      std::string_view elem_type =
+          entry.elem_bytes == 1 ? "uint8_t" : "uint16_t";
+      sink.WriteLn("  static constexpr $0 kDfaTable_$1[] = {", elem_type, id);
+      size_t offset = 0;
+      while (offset < entry.values.size()) {
+        size_t end = std::min(offset + kChunkSize, entry.values.size());
+        std::string row = "      ";
+        for (size_t i = offset; i < end; ++i) {
+          if (i > offset) absl::StrAppend(&row, ", ");
+          absl::StrAppend(&row, entry.values[i]);
+        }
+        if (end < entry.values.size()) absl::StrAppend(&row, ",");
+        sink.WriteLn(row);
+        offset = end;
+      }
+      sink.WriteLn("  };");
+    }
+    if (!entries.empty()) {
+      sink.WriteLn();
+    }
+  }
+
+  std::vector<Entry> entries;
+  absl::btree_map<std::pair<int, std::vector<int32_t>>, size_t> index_by_key;
+};
+
+struct CompressedDfaRef {
+  std::string trans_name;
+  std::string row_map_name;
+  std::string col_map_name;
+  int num_cols = 0;
+};
+
+bool DfaHasAccepts(const KeyAutomaton& dfa) {
+  for (const std::vector<KeyAutomaton::AcceptEntry>& u :
+       dfa.unanchored_accept) {
+    if (!u.empty()) return true;
+  }
+  for (const std::vector<KeyAutomaton::AcceptEntry>& a : dfa.anchored_accept) {
+    if (!a.empty()) return true;
+  }
+  return false;
+}
+
+CompressedDfaRef CompressDfaTable(const KeyAutomaton& dfa,
+                                  SharedIntTablePool& pool) {
+  const int state_count = dfa.StateCount();
+  const int num_classes = dfa.num_classes;
+  const int trans_elem = state_count <= 255 ? 1 : 2;
+
+  // 1. Canonical column deduplication (lexicographically sorted unique columns
+  // so isomorphic DFAs across trigger keys share identical core tables).
+  absl::btree_map<std::vector<int32_t>, std::vector<int>> col_groups;
+  for (int c = 0; c < num_classes; ++c) {
+    std::vector<int32_t> col_vals(static_cast<size_t>(state_count));
+    for (int s = 0; s < state_count; ++s) {
+      col_vals[static_cast<size_t>(s)] =
+          dfa.transitions[static_cast<size_t>(s * num_classes + c)];
+    }
+    col_groups[std::move(col_vals)].push_back(c);
+  }
+
+  const int unique_col_count = static_cast<int>(col_groups.size());
+  const int col_elem = unique_col_count <= 255 ? 1 : 2;
+  const bool use_col_map =
+      unique_col_count < num_classes &&
+      state_count * (num_classes - unique_col_count) * trans_elem >
+          num_classes * col_elem;
+
+  std::vector<int> selected_cols;
+  std::vector<int32_t> col_map;
+  if (use_col_map) {
+    selected_cols.reserve(static_cast<size_t>(unique_col_count));
+    col_map.assign(static_cast<size_t>(num_classes), 0);
+    int col_id = 0;
+    for (const auto& [col_vals, ecs] : col_groups) {
+      selected_cols.push_back(ecs.front());
+      for (int ec : ecs) {
+        col_map[static_cast<size_t>(ec)] = col_id;
+      }
+      ++col_id;
+    }
+  } else {
+    selected_cols.resize(static_cast<size_t>(num_classes));
+    for (int c = 0; c < num_classes; ++c) {
+      selected_cols[static_cast<size_t>(c)] = c;
+    }
+  }
+  const int num_cols = static_cast<int>(selected_cols.size());
+
+  // 2. Canonical row deduplication over the selected columns.
+  absl::btree_map<std::vector<int32_t>, std::vector<int>> row_groups;
+  for (int s = 0; s < state_count; ++s) {
+    std::vector<int32_t> row_vals(static_cast<size_t>(num_cols));
+    for (int ci = 0; ci < num_cols; ++ci) {
+      row_vals[static_cast<size_t>(ci)] =
+          dfa.transitions[static_cast<size_t>(s * num_classes +
+                                              selected_cols[ci])];
+    }
+    row_groups[std::move(row_vals)].push_back(s);
+  }
+
+  const int unique_row_count = static_cast<int>(row_groups.size());
+  const int row_elem = unique_row_count <= 255 ? 1 : 2;
+  const bool use_row_map =
+      unique_row_count < state_count &&
+      (state_count - unique_row_count) * num_cols * trans_elem >
+          state_count * row_elem;
+
+  CompressedDfaRef ref;
+  ref.num_cols = num_cols;
+
+  std::vector<int32_t> core_trans;
+  if (use_row_map) {
+    std::vector<int32_t> row_map(static_cast<size_t>(state_count), 0);
+    core_trans.reserve(static_cast<size_t>(unique_row_count) *
+                       static_cast<size_t>(num_cols));
+    int row_id = 0;
+    for (const auto& [row_vals, states] : row_groups) {
+      core_trans.insert(core_trans.end(), row_vals.begin(), row_vals.end());
+      for (int s : states) {
+        row_map[static_cast<size_t>(s)] = row_id;
+      }
+      ++row_id;
+    }
+    ref.row_map_name = pool.Intern(row_elem, std::move(row_map));
+  } else {
+    core_trans.reserve(static_cast<size_t>(state_count) *
+                       static_cast<size_t>(num_cols));
+    for (int s = 0; s < state_count; ++s) {
+      for (int ci = 0; ci < num_cols; ++ci) {
+        core_trans.push_back(dfa.transitions[static_cast<size_t>(
+            s * num_classes + selected_cols[ci])]);
+      }
+    }
+  }
+
+  if (use_col_map) {
+    ref.col_map_name = pool.Intern(col_elem, std::move(col_map));
+  }
+  ref.trans_name = pool.Intern(trans_elem, std::move(core_trans));
+  return ref;
+}
+
+std::string FormatTableStepExpr(const CompressedDfaRef& ref) {
+  std::string row_expr =
+      ref.row_map_name.empty()
+          ? "static_cast<size_t>(state)"
+          : absl::Substitute("static_cast<size_t>($0[state])",
+                             ref.row_map_name);
+  std::string col_expr =
+      ref.col_map_name.empty()
+          ? "static_cast<size_t>(ec)"
+          : absl::Substitute("static_cast<size_t>($0[ec])", ref.col_map_name);
+  return absl::Substitute("static_cast<int32_t>($0[$1 * $2 + $3])",
+                          ref.trans_name, row_expr, ref.num_cols, col_expr);
+}
+
+void EmitDFAFunction(size_t index, const KeyAutomaton& dfa,
+                     const CompressedDfaRef* compressed, Sink& sink) {
   int state_count = dfa.StateCount();
   int num_classes = dfa.num_classes;
   bool has_unanchored = false;
@@ -587,7 +766,7 @@ void EmitDFAFunction(size_t index, const KeyAutomaton& dfa, Sink& sink) {
       break;
     }
   }
-  bool use_table = state_count > 8;
+  bool use_table = compressed != nullptr;
   bool uses_flags = DfaUsesFlags(dfa);
   std::string_view func_qual =
       uses_flags ? ") const noexcept {" : ") noexcept {";
@@ -610,25 +789,6 @@ void EmitDFAFunction(size_t index, const KeyAutomaton& dfa, Sink& sink) {
     return;
   }
 
-  if (use_table) {
-    std::string_view elem_type = state_count <= 255 ? "uint8_t" : "uint16_t";
-    sink.WriteLn("    static constexpr $0 kTrans[] = {", elem_type);
-    constexpr size_t kChunkSize = 24;
-    size_t offset = 0;
-    while (offset < dfa.transitions.size()) {
-      size_t end = std::min(offset + kChunkSize, dfa.transitions.size());
-      std::string row = "        ";
-      for (size_t i = offset; i < end; ++i) {
-        if (i > offset) absl::StrAppend(&row, ", ");
-        absl::StrAppend(&row, dfa.transitions[i]);
-      }
-      if (end < dfa.transitions.size()) absl::StrAppend(&row, ",");
-      sink.WriteLn(row);
-      offset = end;
-    }
-    sink.WriteLn("    };");
-  }
-
   // Fast pure-anchored path
   if (!has_unanchored && has_anchored) {
     sink.WriteLn("    int32_t state = 1;");
@@ -637,9 +797,7 @@ void EmitDFAFunction(size_t index, const KeyAutomaton& dfa, Sink& sink) {
     sink.WriteLn("      --cursor;");
     sink.WriteLn("      const int32_t ec = Classify(word[cursor]);");
     if (use_table) {
-      sink.WriteLn(
-          "      state = static_cast<int32_t>(kTrans[state * $0 + ec]);",
-          num_classes);
+      sink.WriteLn("      state = $0;", FormatTableStepExpr(*compressed));
     } else {
       EmitStateTransitionSwitch(dfa, state_count, num_classes, "      ", sink);
     }
@@ -738,8 +896,7 @@ void EmitDFAFunction(size_t index, const KeyAutomaton& dfa, Sink& sink) {
   sink.WriteLn("      --cursor;");
   sink.WriteLn("      const int32_t ec = Classify(word[cursor]);");
   if (use_table) {
-    sink.WriteLn("      state = static_cast<int32_t>(kTrans[state * $0 + ec]);",
-                 num_classes);
+    sink.WriteLn("      state = $0;", FormatTableStepExpr(*compressed));
   } else {
     EmitStateTransitionSwitch(dfa, state_count, num_classes, "      ", sink);
   }
@@ -923,7 +1080,6 @@ void EmitFixedPlanRuleBody(const CompiledRule& rule, const FixedSlicePlan& plan,
 void EmitPikeVMRuleBody(size_t rule_id, const CompiledRule& rule,
                         const std::vector<CharacterMap>& maps,
                         std::string_view indent, Sink& sink) {
-  sink.WriteLn("$0std::vector<int> tags;", indent);
   sink.WriteLn(
       "$0if (!MatchPikeVm_$1(matched_slice, slice_len, tags)) return -1;",
       indent, rule_id);
@@ -1038,6 +1194,17 @@ void EmitApplyRuleFunction(const CompiledAutomaton& compiled, Sink& sink) {
     return;
   }
 
+  bool has_pike_vm_rule = false;
+  for (const CompiledRule& rule : compiled.rules) {
+    if (!rule.has_fixed_plan) {
+      has_pike_vm_rule = true;
+      break;
+    }
+  }
+  if (has_pike_vm_rule) {
+    sink.WriteLn("    std::vector<int> tags;");
+  }
+
   sink.WriteLn("    switch (rule_id) {");
   for (size_t rule_id = 0; rule_id < compiled.rules.size(); ++rule_id) {
     const CompiledRule& rule = compiled.rules[rule_id];
@@ -1118,9 +1285,21 @@ absl::Cord GenerateCppAutomaton(const CompiledAutomaton& compiled,
   // 5. Fallback `RuleMatcher` helpers
   EmitFallbackMatchers(compiled, sink);
 
-  // 6. Direct-coded Reverse DFAs
+  // 6. Direct-coded Reverse DFAs (with deduplicated row/col compressed tables)
+  SharedIntTablePool table_pool;
+  std::vector<std::optional<CompressedDfaRef>> compressed_dfas(
+      compiled.key_automata.size());
   for (size_t idx = 0; idx < compiled.key_automata.size(); ++idx) {
-    EmitDFAFunction(idx, compiled.key_automata[idx], sink);
+    const KeyAutomaton& dfa = compiled.key_automata[idx];
+    if (dfa.StateCount() > 8 && DfaHasAccepts(dfa)) {
+      compressed_dfas[idx] = CompressDfaTable(dfa, table_pool);
+    }
+  }
+  table_pool.EmitAll(sink);
+  for (size_t idx = 0; idx < compiled.key_automata.size(); ++idx) {
+    const CompressedDfaRef* ref =
+        compressed_dfas[idx].has_value() ? &*compressed_dfas[idx] : nullptr;
+    EmitDFAFunction(idx, compiled.key_automata[idx], ref, sink);
     sink.WriteLn();
   }
 
