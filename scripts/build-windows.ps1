@@ -84,7 +84,7 @@ Write-Host "==> Using Bison : $bison"
 
 if (-not $SkipTests) {
     Write-Host "==> Running C++ engine, compiler, and Windows logic unit tests..."
-    & $bazel test //OKeyTre/ime/core/... //imec/... //invc/... //windows/...
+    & $bazel test //OKeyTre/ime/core/... //imec/... //invc/... //l10nc/... //windows/...
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 

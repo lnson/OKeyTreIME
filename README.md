@@ -62,7 +62,7 @@ Each rule can be toggled individually under **Tones & Spelling**:
 ### 4. Building from Source
 - **macOS**:
   ```zsh
-  bazel test //OKeyTre/ime/core/... //imec/... //invc/... //windows/...
+  bazel test //OKeyTre/ime/core/... //imec/... //invc/... //l10nc/... //windows/...
   bazel build --config=release //:OKeyTreApp
   ```
 - **Windows** (requires Visual Studio 2022 C++ Build Tools + Windows 10/11 SDK, Bazel/Bazelisk, and `win_flex`/`win_bison` on `PATH`):
@@ -75,7 +75,7 @@ Each rule can be toggled individually under **Tones & Spelling**:
   ```
   Or directly via Bazel:
   ```powershell
-  bazel test //OKeyTre/ime/core/... //imec/... //invc/... //windows/...
+  bazel test //OKeyTre/ime/core/... //imec/... //invc/... //l10nc/... //windows/...
   bazel build --config=release --features=static_link_msvcrt //:OKeyTreWindows
   ```
 

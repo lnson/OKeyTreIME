@@ -30,16 +30,6 @@ cc_test(
     ],
 )
 
-cc_binary(
-    name = "localization_codegen",
-    srcs = ["localization-codegen.cc"],
-    target_compatible_with = WIN_ONLY,
-    deps = [
-        "@abseil-cpp//absl/container:flat_hash_map",
-        "@abseil-cpp//absl/container:flat_hash_set",
-    ],
-)
-
 genrule(
     name = "generate_localization_tables",
     srcs = [
@@ -53,16 +43,16 @@ genrule(
         "localization-tables.generated.h",
     ],
     cmd = (
-        "$(location :localization_codegen) " +
-        "$(location //:OKeyTre/en.lproj/Localizable.strings) " +
-        "$(location resources/en.overrides.strings) " +
-        "$(location //:OKeyTre/vi.lproj/Localizable.strings) " +
-        "$(location resources/vi.overrides.strings) " +
-        "$(location localization-keys.generated.h) " +
-        "$(location localization-tables.generated.h)"
+        "$(location //l10nc:l10nc) " +
+        "--en_base=$(location //:OKeyTre/en.lproj/Localizable.strings) " +
+        "--en_overrides=$(location resources/en.overrides.strings) " +
+        "--vi_base=$(location //:OKeyTre/vi.lproj/Localizable.strings) " +
+        "--vi_overrides=$(location resources/vi.overrides.strings) " +
+        "--out_keys=$(location localization-keys.generated.h) " +
+        "--out_tables=$(location localization-tables.generated.h)"
     ),
     target_compatible_with = WIN_ONLY,
-    tools = [":localization_codegen"],
+    tools = ["//l10nc:l10nc"],
 )
 
 cc_library(
