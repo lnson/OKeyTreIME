@@ -5,12 +5,10 @@
 #define OKEYTRE_WINDOWS_SETTINGS_STORE_H_
 
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 
-#include "absl/container/flat_hash_map.h"
 #include "windows/app-version.h"
 #include "windows/localization.h"
 
@@ -33,48 +31,9 @@ enum class ShowcaseMode : uint8_t {
   kFeatureUpdate = 2,
 };
 
-// Abstract key-value persistence backend (implemented via HKCU\Software\OKeyTre
-// on Windows and an in-memory map for unit tests).
-class SettingsBackend {
- public:
-  virtual ~SettingsBackend() = default;
-
-  virtual std::optional<std::string> GetString(std::string_view key) const = 0;
-  virtual void SetString(std::string_view key, std::string_view value) = 0;
-  virtual void RemoveKey(std::string_view key) = 0;
-
-  virtual std::optional<int64_t> GetInt64(std::string_view key) const = 0;
-  virtual void SetInt64(std::string_view key, int64_t value) = 0;
-
-  virtual std::optional<bool> GetBool(std::string_view key) const = 0;
-  virtual void SetBool(std::string_view key, bool value) = 0;
-
-  virtual bool HasKey(std::string_view key) const = 0;
-};
-
-class InMemorySettingsBackend final : public SettingsBackend {
- public:
-  std::optional<std::string> GetString(std::string_view key) const override;
-  void SetString(std::string_view key, std::string_view value) override;
-  void RemoveKey(std::string_view key) override;
-
-  std::optional<int64_t> GetInt64(std::string_view key) const override;
-  void SetInt64(std::string_view key, int64_t value) override;
-
-  std::optional<bool> GetBool(std::string_view key) const override;
-  void SetBool(std::string_view key, bool value) override;
-
-  bool HasKey(std::string_view key) const override;
-
- private:
-  absl::flat_hash_map<std::string, std::string> strings_;
-  absl::flat_hash_map<std::string, int64_t> ints_;
-  absl::flat_hash_map<std::string, bool> bools_;
-};
-
-std::unique_ptr<SettingsBackend> CreateRegistrySettingsBackend();
-
-// Typed settings facade matching all macOS UserDefaults keys and defaults.
+// Typed settings store matching all macOS UserDefaults keys and defaults.
+// Persists to HKCU\Software\OKeyTre when opened via OpenRegistry(), or keeps
+// values in memory only when created via CreateInMemory() (for unit tests).
 class SettingsStore {
  public:
   static constexpr bool kDefaultModernTone = true;
@@ -85,45 +44,56 @@ class SettingsStore {
   static constexpr bool kDefaultAutoCheckUpdates = true;
   static constexpr int32_t kDefaultMaxBufferSize = 16;
 
-  explicit SettingsStore(std::unique_ptr<SettingsBackend> backend);
+  static SettingsStore OpenRegistry();
+  static SettingsStore CreateInMemory();
 
-  InputStyle GetInputStyle() const;
+  InputStyle GetInputStyle() const noexcept { return input_style_; }
   void SetInputStyle(InputStyle style);
 
-  InputStyle GetLastActiveInputStyle() const;
+  InputStyle GetLastActiveInputStyle() const noexcept;
   void SetLastActiveInputStyle(InputStyle style);
 
-  bool GetModernTone() const;
+  bool GetModernTone() const noexcept { return modern_tone_; }
   void SetModernTone(bool enabled);
 
-  bool GetUoHorn() const;
+  bool GetUoHorn() const noexcept { return uo_horn_; }
   void SetUoHorn(bool enabled);
 
-  bool GetNgToNgh() const;
+  bool GetNgToNgh() const noexcept { return ng_to_ngh_; }
   void SetNgToNgh(bool enabled);
 
-  bool GetNghToNg() const;
+  bool GetNghToNg() const noexcept { return ngh_to_ng_; }
   void SetNghToNg(bool enabled);
 
-  bool GetRestoreInvalidWords() const;
+  bool GetRestoreInvalidWords() const noexcept {
+    return restore_invalid_words_;
+  }
   void SetRestoreInvalidWords(bool enabled);
 
-  int32_t GetMaxBufferSize() const;
+  int32_t GetMaxBufferSize() const noexcept {
+    return max_buffer_size_ > 0 ? max_buffer_size_ : kDefaultMaxBufferSize;
+  }
   void SetMaxBufferSize(int32_t size);
 
-  AppLanguage GetAppLanguage() const;
+  AppLanguage GetAppLanguage() const noexcept { return app_language_; }
   void SetAppLanguage(AppLanguage language);
 
-  bool GetHasConfiguredLaunchAtLogin() const;
+  bool GetHasConfiguredLaunchAtLogin() const noexcept {
+    return has_configured_launch_at_login_;
+  }
   void SetHasConfiguredLaunchAtLogin(bool configured);
 
-  bool GetAutoCheckUpdates() const;
+  bool GetAutoCheckUpdates() const noexcept { return auto_check_updates_; }
   void SetAutoCheckUpdates(bool enabled);
 
-  int64_t GetLastUpdateCheckTimestamp() const;
+  int64_t GetLastUpdateCheckTimestamp() const noexcept {
+    return last_update_check_timestamp_;
+  }
   void SetLastUpdateCheckTimestamp(int64_t unix_seconds);
 
-  std::optional<std::string> GetSkippedUpdateVersion() const;
+  std::optional<std::string> GetSkippedUpdateVersion() const {
+    return skipped_update_version_;
+  }
   void SetSkippedUpdateVersion(std::string_view version);
   void ClearSkippedUpdateVersion();
 
@@ -134,7 +104,27 @@ class SettingsStore {
                             kCurrentFeatureMilestoneVersionString);
 
  private:
-  std::unique_ptr<SettingsBackend> backend_;
+  explicit SettingsStore(bool persist_to_registry) noexcept
+      : persist_to_registry_(persist_to_registry) {}
+
+  void LoadFromRegistry();
+
+  std::optional<std::string> skipped_update_version_;
+  std::optional<std::string> last_seen_showcase_version_;
+  int64_t last_update_check_timestamp_ = 0;
+  int32_t max_buffer_size_ = kDefaultMaxBufferSize;
+  InputStyle input_style_ = InputStyle::kTelex;
+  InputStyle last_active_input_style_ = InputStyle::kTelex;
+  AppLanguage app_language_ = AppLanguage::kSystem;
+  bool persist_to_registry_ = false;
+  bool modern_tone_ = kDefaultModernTone;
+  bool uo_horn_ = kDefaultUoHorn;
+  bool ng_to_ngh_ = kDefaultNgToNgh;
+  bool ngh_to_ng_ = kDefaultNghToNg;
+  bool restore_invalid_words_ = kDefaultRestoreInvalidWords;
+  bool has_configured_launch_at_login_ = false;
+  bool auto_check_updates_ = kDefaultAutoCheckUpdates;
+  bool has_prior_install_ = false;
 };
 
 }  // namespace okeytre::win

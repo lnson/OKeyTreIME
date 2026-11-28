@@ -105,7 +105,7 @@ bool App::CreateHiddenWindow() {
 }
 
 void App::WireSubsystems() {
-  settings_ = std::make_unique<SettingsStore>(CreateRegistrySettingsBackend());
+  settings_ = std::make_unique<SettingsStore>(SettingsStore::OpenRegistry());
   caret_reader_ = std::make_unique<CaretTextReader>();
 
   ime_controller_ = std::make_unique<ImeController>(

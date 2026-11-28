@@ -108,7 +108,6 @@ cc_library(
         ":app_version",
         ":localization",
         "@abseil-cpp//absl/cleanup",
-        "@abseil-cpp//absl/container:flat_hash_map",
     ],
 )
 

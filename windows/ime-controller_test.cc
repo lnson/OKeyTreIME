@@ -3,7 +3,6 @@
 
 #include "windows/ime-controller.h"
 
-#include <memory>
 #include <string>
 
 #include "gtest/gtest.h"
@@ -29,7 +28,7 @@ std::u16string TypeString(ImeController& controller, std::u16string_view keys) {
 }
 
 TEST(ImeControllerTest, TelexTypingAndToggleOffOn) {
-  SettingsStore store(std::make_unique<InMemorySettingsBackend>());
+  SettingsStore store = SettingsStore::CreateInMemory();
   ImeController controller(store, nullptr);
 
   EXPECT_EQ(TypeString(controller, u"vieetj"), u"vi\u1ec7t");
@@ -44,7 +43,7 @@ TEST(ImeControllerTest, TelexTypingAndToggleOffOn) {
 }
 
 TEST(ImeControllerTest, AutoRestoreAndManualRestore) {
-  SettingsStore store(std::make_unique<InMemorySettingsBackend>());
+  SettingsStore store = SettingsStore::CreateInMemory();
   ImeController controller(store, nullptr);
 
   // Auto-restore non-Vietnamese word on space and punctuation (including
@@ -113,7 +112,7 @@ TEST(ImeControllerTest, ExtractsSurroundingWordAtCaret) {
 
 TEST(ImeControllerTest,
      SuspendsTransformsAndReversionWhenSystemKeyboardIncompatible) {
-  SettingsStore store(std::make_unique<InMemorySettingsBackend>());
+  SettingsStore store = SettingsStore::CreateInMemory();
   ImeController controller(store, nullptr);
 
   EXPECT_TRUE(controller.is_vietnamese_enabled());
@@ -157,7 +156,7 @@ TEST(ImeControllerTest, TreatsRichTextSentinelsAsWordBoundaries) {
 }
 
 TEST(ImeControllerTest, CaretOffsetZeroDoesNotBreakAutoRestore) {
-  SettingsStore store(std::make_unique<InMemorySettingsBackend>());
+  SettingsStore store = SettingsStore::CreateInMemory();
   // Simulate a webview returning placeholder/next-word text at caret_offset 0.
   ImeController controller(store, []() -> std::optional<SurroundingWord> {
     return SurroundingWord{
