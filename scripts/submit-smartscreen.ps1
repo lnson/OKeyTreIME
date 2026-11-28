@@ -30,7 +30,7 @@ function Get-CurrentWindowsVersion {
             return $Matches[1]
         }
     }
-    return "0.3.2"
+    return "0.3.3"
 }
 
 $ResolvedVersion = if ($Version) { $Version } else { Get-CurrentWindowsVersion }
