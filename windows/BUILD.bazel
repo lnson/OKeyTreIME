@@ -245,6 +245,7 @@ cc_library(
         ":shortcut_detectors",
         ":update_parser",
         "//OKeyTre/ime/core:OKeyTreEngineLib",
+        "@abseil-cpp//absl/base",
         "@abseil-cpp//absl/base:core_headers",
         "@abseil-cpp//absl/base:no_destructor",
         "@abseil-cpp//absl/cleanup",

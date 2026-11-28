@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <string>
 
+#include "absl/base/call_once.h"
 #include "windows/resources/resource.h"
 
 namespace okeytre::win {
@@ -150,21 +151,20 @@ ShowcaseWindow::~ShowcaseWindow() {
 }
 
 void ShowcaseWindow::EnsureWindowClass() {
-  static bool registered = false;
-  if (registered) return;
-
-  HINSTANCE hinst = GetModuleHandleW(nullptr);
-  WNDCLASSEXW wc{};
-  wc.cbSize = sizeof(wc);
-  wc.style = CS_HREDRAW | CS_VREDRAW;
-  wc.lpfnWndProc = &ShowcaseWindow::WindowProc;
-  wc.hInstance = hinst;
-  wc.hIcon = LoadIconW(hinst, MAKEINTRESOURCEW(IDI_APP_ICON));
-  wc.hIconSm = wc.hIcon;
-  wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-  wc.lpszClassName = kShowcaseClassName;
-  RegisterClassExW(&wc);
-  registered = true;
+  static absl::once_flag once;
+  absl::call_once(once, []() {
+    HINSTANCE hinst = GetModuleHandleW(nullptr);
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof(wc);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = &ShowcaseWindow::WindowProc;
+    wc.hInstance = hinst;
+    wc.hIcon = LoadIconW(hinst, MAKEINTRESOURCEW(IDI_APP_ICON));
+    wc.hIconSm = wc.hIcon;
+    wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    wc.lpszClassName = kShowcaseClassName;
+    RegisterClassExW(&wc);
+  });
 }
 
 std::wstring ShowcaseWindow::ResolveWindowTitle() const {

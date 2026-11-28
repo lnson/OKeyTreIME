@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cwchar>
 
+#include "absl/base/call_once.h"
 #include "windows/resources/resource.h"
 
 namespace okeytre::win {
@@ -103,21 +104,20 @@ SettingsWindow::~SettingsWindow() {
 }
 
 void SettingsWindow::EnsureWindowClass() {
-  static bool registered = false;
-  if (registered) return;
-
-  HINSTANCE hinst = GetModuleHandleW(nullptr);
-  WNDCLASSEXW wc{};
-  wc.cbSize = sizeof(wc);
-  wc.style = CS_HREDRAW | CS_VREDRAW;
-  wc.lpfnWndProc = &SettingsWindow::WindowProc;
-  wc.hInstance = hinst;
-  wc.hIcon = LoadIconW(hinst, MAKEINTRESOURCEW(IDI_APP_ICON));
-  wc.hIconSm = wc.hIcon;
-  wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-  wc.lpszClassName = kSettingsClassName;
-  RegisterClassExW(&wc);
-  registered = true;
+  static absl::once_flag once;
+  absl::call_once(once, []() {
+    HINSTANCE hinst = GetModuleHandleW(nullptr);
+    WNDCLASSEXW wc{};
+    wc.cbSize = sizeof(wc);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc = &SettingsWindow::WindowProc;
+    wc.hInstance = hinst;
+    wc.hIcon = LoadIconW(hinst, MAKEINTRESOURCEW(IDI_APP_ICON));
+    wc.hIconSm = wc.hIcon;
+    wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    wc.lpszClassName = kSettingsClassName;
+    RegisterClassExW(&wc);
+  });
 }
 
 void SettingsWindow::Show(const SettingsViewModel& model) {
