@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
-#include <string>
 
 #include "windows/resources/resource.h"
 
@@ -40,8 +39,10 @@ bool QueryPersonalizeLightFlag(const wchar_t* value_name,
   return val != 0;
 }
 
-std::wstring PreferredFontFamily() {
-  static const std::wstring kFamily = []() -> std::wstring {
+}  // namespace
+
+const wchar_t* PreferredUiFontFamily() {
+  static const wchar_t* const kFamily = []() -> const wchar_t* {
     Gdiplus::FontFamily var_family(L"Segoe UI Variable Text");
     if (var_family.IsAvailable()) {
       return L"Segoe UI Variable Text";
@@ -50,8 +51,6 @@ std::wstring PreferredFontFamily() {
   }();
   return kFamily;
 }
-
-}  // namespace
 
 bool IsAppDarkMode() {
   return !QueryPersonalizeLightFlag(L"AppsUseLightTheme", true);
@@ -201,8 +200,8 @@ HFONT CreateUiFont(int point_size, int weight, UINT dpi) {
   lf.lfHeight = -MulDiv(point_size, static_cast<int>(dpi), 72);
   lf.lfWeight = weight;
   lf.lfQuality = CLEARTYPE_QUALITY;
-  const std::wstring family = PreferredFontFamily();
-  wcsncpy_s(lf.lfFaceName, family.c_str(), _TRUNCATE);
+  const wchar_t* family = PreferredUiFontFamily();
+  wcsncpy_s(lf.lfFaceName, family, _TRUNCATE);
   return CreateFontIndirectW(&lf);
 }
 
@@ -318,8 +317,8 @@ void DrawFluentButton(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
     StrokeRoundedRect(g, rect, radius, border, 1.0f);
   }
 
-  const std::wstring family = PreferredFontFamily();
-  Gdiplus::Font font(family.c_str(), ScaleDpiF(12.5f, dpi),
+  const wchar_t* family = PreferredUiFontFamily();
+  Gdiplus::Font font(family, ScaleDpiF(12.5f, dpi),
                      is_primary ? Gdiplus::FontStyleBold
                                 : Gdiplus::FontStyleRegular,
                      Gdiplus::UnitPixel);
@@ -344,8 +343,8 @@ void DrawFluentDropdown(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
 
   const float pad_l = ScaleDpiF(10.0f, dpi);
   const float chev_area = ScaleDpiF(22.0f, dpi);
-  const std::wstring family = PreferredFontFamily();
-  Gdiplus::Font font(family.c_str(), ScaleDpiF(12.0f, dpi),
+  const wchar_t* family = PreferredUiFontFamily();
+  Gdiplus::Font font(family, ScaleDpiF(12.0f, dpi),
                      Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
   Gdiplus::SolidBrush text_brush(palette.text_primary);
   Gdiplus::StringFormat fmt;

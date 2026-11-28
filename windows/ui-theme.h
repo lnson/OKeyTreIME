@@ -74,6 +74,10 @@ void RefreshNativeMenuTheme(bool dark_mode);
 int ScaleDpi(int value, UINT dpi) noexcept;
 float ScaleDpiF(float value, UINT dpi) noexcept;
 
+// Returns the preferred Windows UI font family ("Segoe UI Variable Text" on
+// Windows 11, falling back to "Segoe UI" on earlier versions).
+const wchar_t* PreferredUiFontFamily();
+
 // Creates a Segoe UI Variable (or Segoe UI fallback) HFONT for native Win32
 // child controls at the given DPI.
 HFONT CreateUiFont(int point_size, int weight, UINT dpi);

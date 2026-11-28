@@ -29,14 +29,6 @@ constexpr int kDefaultHeightDip = 520;
 constexpr int kMinWidthDip = 660;
 constexpr int kMinHeightDip = 460;
 
-std::wstring UiFontName() {
-  static const std::wstring kName = []() -> std::wstring {
-    Gdiplus::FontFamily ff(L"Segoe UI Variable Text");
-    return ff.IsAvailable() ? L"Segoe UI Variable Text" : L"Segoe UI";
-  }();
-  return kName;
-}
-
 void DrawNavBadge(Gdiplus::Graphics& g, const Gdiplus::RectF& rect,
                   const Gdiplus::Color& bg, SettingsSection sec, UINT dpi) {
   FillRoundedRect(g, rect, ScaleDpiF(5.0f, dpi), bg);
@@ -344,10 +336,10 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
   g.DrawLine(&div_pen, sidebar_w - 0.5f, 0.0f, sidebar_w - 0.5f,
              static_cast<float>(height));
 
-  const std::wstring font_name = UiFontName();
-  Gdiplus::Font nav_font(font_name.c_str(), ScaleDpiF(13.5f, dpi_),
+  const wchar_t* font_name = PreferredUiFontFamily();
+  Gdiplus::Font nav_font(font_name, ScaleDpiF(13.5f, dpi_),
                          Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
-  Gdiplus::Font nav_font_sel(font_name.c_str(), ScaleDpiF(13.5f, dpi_),
+  Gdiplus::Font nav_font_sel(font_name, ScaleDpiF(13.5f, dpi_),
                              Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
 
   struct NavItem {
@@ -431,9 +423,9 @@ void SettingsWindow::PaintSidebar(Gdiplus::Graphics& g, int /*width*/,
                            logo_sz, logo_sz);
   DrawAppLogo(g, logo_rect, ScaleDpiF(14.0f, dpi_));
 
-  Gdiplus::Font app_font(font_name.c_str(), ScaleDpiF(13.5f, dpi_),
+  Gdiplus::Font app_font(font_name, ScaleDpiF(13.5f, dpi_),
                          Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-  Gdiplus::Font ver_font(font_name.c_str(), ScaleDpiF(11.5f, dpi_),
+  Gdiplus::Font ver_font(font_name, ScaleDpiF(11.5f, dpi_),
                          Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
   Gdiplus::StringFormat center_fmt;
   center_fmt.SetAlignment(Gdiplus::StringAlignmentCenter);
@@ -470,8 +462,8 @@ void SettingsWindow::PaintDetailPane(Gdiplus::Graphics& g, int width,
                            static_cast<float>(width) - sidebar_w -
                                ScaleDpiF(48.0f, dpi_));
 
-  const std::wstring font_name = UiFontName();
-  Gdiplus::Font title_font(font_name.c_str(), ScaleDpiF(20.0f, dpi_),
+  const wchar_t* font_name = PreferredUiFontFamily();
+  Gdiplus::Font title_font(font_name, ScaleDpiF(20.0f, dpi_),
                            Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
 
   L10nKey title_key = L10nKey::kSettingsSectionGeneral;
@@ -502,14 +494,14 @@ void SettingsWindow::PaintDetailPane(Gdiplus::Graphics& g, int width,
 
 void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
                                       float w) {
-  const std::wstring font_name = UiFontName();
-  Gdiplus::Font hdr_font(font_name.c_str(), ScaleDpiF(12.5f, dpi_),
+  const wchar_t* font_name = PreferredUiFontFamily();
+  Gdiplus::Font hdr_font(font_name, ScaleDpiF(12.5f, dpi_),
                          Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-  Gdiplus::Font row_title_font(font_name.c_str(), ScaleDpiF(13.5f, dpi_),
+  Gdiplus::Font row_title_font(font_name, ScaleDpiF(13.5f, dpi_),
                                Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
-  Gdiplus::Font row_title_bold(font_name.c_str(), ScaleDpiF(13.5f, dpi_),
+  Gdiplus::Font row_title_bold(font_name, ScaleDpiF(13.5f, dpi_),
                                Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-  Gdiplus::Font desc_font(font_name.c_str(), ScaleDpiF(11.5f, dpi_),
+  Gdiplus::Font desc_font(font_name, ScaleDpiF(11.5f, dpi_),
                           Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 
   const float card_r = ScaleDpiF(8.0f, dpi_);
@@ -717,7 +709,7 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
   const bool link_hovered =
       (hovered_target_ == HitTargetKind::kLinkManualDownload);
   Gdiplus::Font link_font(
-      font_name.c_str(), ScaleDpiF(12.5f, dpi_),
+      font_name, ScaleDpiF(12.5f, dpi_),
       link_hovered ? Gdiplus::FontStyleUnderline : Gdiplus::FontStyleRegular,
       Gdiplus::UnitPixel);
   Gdiplus::SolidBrush link_brush(palette_.accent_teal);
@@ -731,12 +723,12 @@ void SettingsWindow::PaintGeneralPane(Gdiplus::Graphics& g, float x, float y,
 
 void SettingsWindow::PaintCorrectionPane(Gdiplus::Graphics& g, float x, float y,
                                          float w) {
-  const std::wstring font_name = UiFontName();
-  Gdiplus::Font hdr_font(font_name.c_str(), ScaleDpiF(12.5f, dpi_),
+  const wchar_t* font_name = PreferredUiFontFamily();
+  Gdiplus::Font hdr_font(font_name, ScaleDpiF(12.5f, dpi_),
                          Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-  Gdiplus::Font row_title_font(font_name.c_str(), ScaleDpiF(13.5f, dpi_),
+  Gdiplus::Font row_title_font(font_name, ScaleDpiF(13.5f, dpi_),
                                Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
-  Gdiplus::Font desc_font(font_name.c_str(), ScaleDpiF(11.5f, dpi_),
+  Gdiplus::Font desc_font(font_name, ScaleDpiF(11.5f, dpi_),
                           Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 
   const float card_r = ScaleDpiF(8.0f, dpi_);
@@ -828,12 +820,12 @@ void SettingsWindow::PaintCorrectionPane(Gdiplus::Graphics& g, float x, float y,
 
 void SettingsWindow::PaintAdvancedPane(Gdiplus::Graphics& g, float x, float y,
                                        float w) {
-  const std::wstring font_name = UiFontName();
-  Gdiplus::Font hdr_font(font_name.c_str(), ScaleDpiF(12.5f, dpi_),
+  const wchar_t* font_name = PreferredUiFontFamily();
+  Gdiplus::Font hdr_font(font_name, ScaleDpiF(12.5f, dpi_),
                          Gdiplus::FontStyleBold, Gdiplus::UnitPixel);
-  Gdiplus::Font row_title_font(font_name.c_str(), ScaleDpiF(13.5f, dpi_),
+  Gdiplus::Font row_title_font(font_name, ScaleDpiF(13.5f, dpi_),
                                Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
-  Gdiplus::Font desc_font(font_name.c_str(), ScaleDpiF(11.5f, dpi_),
+  Gdiplus::Font desc_font(font_name, ScaleDpiF(11.5f, dpi_),
                           Gdiplus::FontStyleRegular, Gdiplus::UnitPixel);
 
   const float card_r = ScaleDpiF(8.0f, dpi_);
