@@ -4,6 +4,7 @@
 #include "windows/caret-text-reader.h"
 
 #include <windows.h>
+
 #include <oleauto.h>
 #include <uiautomation.h>
 #include <wrl/client.h>
@@ -12,6 +13,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "absl/cleanup/cleanup.h"
 
 namespace okeytre::win {
 
@@ -27,6 +30,7 @@ constexpr int32_t kMaxClassicEditLen = 65536;
 using Microsoft::WRL::ComPtr;
 
 bool IsClassicEditClass(HWND hwnd) {
+  if (hwnd == nullptr) return false;
   wchar_t cls[64] = {};
   if (GetClassNameW(hwnd, cls, 64) == 0) {
     return false;
@@ -40,33 +44,22 @@ bool IsClassicEditClass(HWND hwnd) {
 HWND GetFocusedControlHwnd() {
   GUITHREADINFO gti{};
   gti.cbSize = sizeof(gti);
-  if (!GetGUIThreadInfo(0, &gti)) {
-    return nullptr;
-  }
-  return gti.hwndFocus;
+  return GetGUIThreadInfo(0, &gti) ? gti.hwndFocus : nullptr;
 }
 
-std::wstring BstrToWString(BSTR bstr) {
-  if (bstr == nullptr) {
-    return {};
-  }
-  return std::wstring(bstr, SysStringLen(bstr));
+std::wstring_view BstrView(BSTR bstr) {
+  return bstr == nullptr ? std::wstring_view{}
+                         : std::wstring_view(bstr, SysStringLen(bstr));
 }
 
-std::wstring TrimBeforeToCurrentLine(std::wstring_view text) {
+std::wstring_view TrimBeforeToCurrentLine(std::wstring_view text) {
   const size_t pos = text.find_last_of(L"\r\n");
-  if (pos != std::wstring_view::npos) {
-    text.remove_prefix(pos + 1);
-  }
-  return std::wstring(text);
+  return pos == std::wstring_view::npos ? text : text.substr(pos + 1);
 }
 
-std::wstring TrimAfterToCurrentLine(std::wstring_view text) {
+std::wstring_view TrimAfterToCurrentLine(std::wstring_view text) {
   const size_t pos = text.find_first_of(L"\r\n");
-  if (pos != std::wstring_view::npos) {
-    text = text.substr(0, pos);
-  }
-  return std::wstring(text);
+  return pos == std::wstring_view::npos ? text : text.substr(0, pos);
 }
 
 bool IsElementReadOnly(IUIAutomationElement* element) {
@@ -88,15 +81,12 @@ CaretTextReader::~CaretTextReader() {
     absl::MutexLock lock(mu_);
     stop_ = true;
   }
-  if (worker_.joinable()) {
-    worker_.join();
-  }
+  if (worker_.joinable()) worker_.join();
 }
 
 void CaretTextReader::EnsureWorkerStarted() {
-  if (worker_started_) {
-    return;
-  }
+  if (worker_started_) return;
+
   worker_started_ = true;
   worker_ = std::thread(&CaretTextReader::WorkerLoop, this);
 }
@@ -107,9 +97,7 @@ bool CaretTextReader::RunWorkerRequest(WorkerRequestKind kind,
 
   // If a previous cross-process UIA query is still unwinding, skip rather than
   // blocking the low-level keyboard hook.
-  if (in_flight_) {
-    return false;
-  }
+  if (in_flight_) return false;
 
   in_flight_ = true;
   request_kind_ = kind;
@@ -147,9 +135,8 @@ void CaretTextReader::WorkerLoop() {
         return stop_ || request_id_ != completed_id_;
       };
       mu_.Await(absl::Condition(&has_work));
-      if (stop_) {
-        break;
-      }
+      if (stop_) break;
+
       target_id = request_id_;
       kind = request_kind_;
     }
@@ -182,8 +169,7 @@ void CaretTextReader::WorkerLoop() {
 
 std::optional<SurroundingWord> CaretTextReader::GetSurroundingText() {
   // Fast non-blocking path for classic Win32 Edit/RichEdit controls.
-  if (HWND focused = GetFocusedControlHwnd();
-      focused != nullptr && IsClassicEditClass(focused)) {
+  if (IsClassicEditClass(GetFocusedControlHwnd())) {
     return ReadViaWin32Edit();
   }
 
@@ -197,8 +183,7 @@ std::optional<SurroundingWord> CaretTextReader::GetSurroundingText() {
 
 int32_t CaretTextReader::GetSelectedRangeLength() {
   // Fast non-blocking path for classic Win32 Edit/RichEdit controls.
-  if (HWND focused = GetFocusedControlHwnd();
-      focused != nullptr && IsClassicEditClass(focused)) {
+  if (IsClassicEditClass(GetFocusedControlHwnd())) {
     return SelectionLengthViaWin32Edit();
   }
 
@@ -273,9 +258,7 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaUIAutomationOnWorker(
     return std::nullopt;
   }
 
-  if (IsElementReadOnly(focused.Get())) {
-    return std::nullopt;
-  }
+  if (IsElementReadOnly(focused.Get())) return std::nullopt;
 
   // Prefer TextPattern2::GetCaretRange (supported by Chromium, Edge, Electron,
   // VS Code, Word, Win11 Notepad, WinUI, WPF).
@@ -293,8 +276,8 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaUIAutomationOnWorker(
 
   if (caret_range == nullptr) {
     ComPtr<IUIAutomationTextPattern> text_pattern;
-    if (SUCCEEDED(focused->GetCurrentPatternAs(
-            UIA_TextPatternId, IID_PPV_ARGS(&text_pattern))) &&
+    if (SUCCEEDED(focused->GetCurrentPatternAs(UIA_TextPatternId,
+                                               IID_PPV_ARGS(&text_pattern))) &&
         text_pattern != nullptr) {
       ComPtr<IUIAutomationTextRangeArray> selection;
       if (SUCCEEDED(text_pattern->GetSelection(&selection)) &&
@@ -307,9 +290,7 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaUIAutomationOnWorker(
     }
   }
 
-  if (caret_range == nullptr) {
-    return std::nullopt;
-  }
+  if (caret_range == nullptr) return std::nullopt;
 
   // Never seed when text is currently selected (the incoming keystroke will
   // replace the selection rather than editing within it).
@@ -339,20 +320,22 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaUIAutomationOnWorker(
                                    &moved_before);
 
   BSTR before_bstr = nullptr;
-  std::wstring before_str;
-  if (SUCCEEDED(before_range->GetText(kWindowRadiusChars, &before_bstr)) &&
-      before_bstr != nullptr) {
-    before_str = BstrToWString(before_bstr);
-    SysFreeString(before_bstr);
+  const auto free_before =
+      absl::MakeCleanup([&before_bstr]() { SysFreeString(before_bstr); });
+  std::wstring_view before;
+  if (SUCCEEDED(before_range->GetText(kWindowRadiusChars, &before_bstr))) {
+    before = TrimBeforeToCurrentLine(BstrView(before_bstr));
   }
-  before_str = TrimBeforeToCurrentLine(before_str);
-  if (before_str.empty() ||
-      IsCaretWordBoundary(static_cast<uint16_t>(before_str.back()))) {
+  if (before.empty() ||
+      IsCaretWordBoundary(static_cast<uint16_t>(before.back()))) {
     return std::nullopt;
   }
 
+  BSTR after_bstr = nullptr;
+  const auto free_after =
+      absl::MakeCleanup([&after_bstr]() { SysFreeString(after_bstr); });
+  std::wstring_view after;
   ComPtr<IUIAutomationTextRange> after_range;
-  std::wstring after_str;
   if (SUCCEEDED(caret_range->Clone(&after_range)) && after_range != nullptr) {
     after_range->MoveEndpointByRange(TextPatternRangeEndpoint_Start,
                                      caret_range.Get(),
@@ -365,31 +348,31 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaUIAutomationOnWorker(
                                     TextUnit_Character, kWindowRadiusChars,
                                     &moved_after);
 
-    BSTR after_bstr = nullptr;
-    if (SUCCEEDED(after_range->GetText(kWindowRadiusChars, &after_bstr)) &&
-        after_bstr != nullptr) {
-      after_str = BstrToWString(after_bstr);
-      SysFreeString(after_bstr);
+    if (SUCCEEDED(after_range->GetText(kWindowRadiusChars, &after_bstr))) {
+      after = TrimAfterToCurrentLine(BstrView(after_bstr));
     }
-    after_str = TrimAfterToCurrentLine(after_str);
   }
 
-  std::wstring combined = before_str + after_str;
-  const int32_t caret_loc = static_cast<int32_t>(before_str.size());
+  std::wstring combined_buf;
+  std::wstring_view combined = before;
+  if (!after.empty()) {
+    combined_buf.reserve(before.size() + after.size());
+    combined_buf.append(before);
+    combined_buf.append(after);
+    combined = combined_buf;
+  }
+  const int32_t caret_loc = static_cast<int32_t>(before.size());
   SurroundingWord word = ExtractSurroundingWord(
       reinterpret_cast<const uint16_t*>(combined.data()),
       static_cast<int32_t>(combined.size()), 0, caret_loc);
-  if (word.word_utf16.empty() || word.caret_offset <= 0) {
-    return std::nullopt;
-  }
+  if (word.word_utf16.empty() || word.caret_offset <= 0) return std::nullopt;
+
   return word;
 }
 
 std::optional<SurroundingWord> CaretTextReader::ReadViaWin32Edit() {
   HWND hwnd = GetFocusedControlHwnd();
-  if (hwnd == nullptr || !IsClassicEditClass(hwnd)) {
-    return std::nullopt;
-  }
+  if (!IsClassicEditClass(hwnd)) return std::nullopt;
 
   DWORD sel_start = 0;
   DWORD sel_end = 0;
@@ -399,9 +382,7 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaWin32Edit() {
                           kSendMsgTimeoutMs, &res) == 0) {
     return std::nullopt;
   }
-  if (sel_start == 0 || sel_end != sel_start) {
-    return std::nullopt;
-  }
+  if (sel_start == 0 || sel_end != sel_start) return std::nullopt;
 
   DWORD_PTR text_len_res = 0;
   if (SendMessageTimeoutW(hwnd, WM_GETTEXTLENGTH, 0, 0, SMTO_ABORTIFHUNG,
@@ -409,37 +390,30 @@ std::optional<SurroundingWord> CaretTextReader::ReadViaWin32Edit() {
     return std::nullopt;
   }
   const int32_t total_len = static_cast<int32_t>(text_len_res);
-  if (total_len <= 0 || total_len > kMaxClassicEditLen) {
-    return std::nullopt;
-  }
+  if (total_len <= 0 || total_len > kMaxClassicEditLen) return std::nullopt;
 
   std::wstring text(static_cast<size_t>(total_len) + 1, L'\0');
   DWORD_PTR copied = 0;
-  if (SendMessageTimeoutW(hwnd, WM_GETTEXT,
-                          static_cast<WPARAM>(text.size()),
+  if (SendMessageTimeoutW(hwnd, WM_GETTEXT, static_cast<WPARAM>(text.size()),
                           reinterpret_cast<LPARAM>(text.data()),
                           SMTO_ABORTIFHUNG, kSendMsgTimeoutMs, &copied) == 0) {
     return std::nullopt;
   }
   text.resize(static_cast<size_t>(copied));
-  if (text.empty()) {
-    return std::nullopt;
-  }
+  if (text.empty()) return std::nullopt;
 
   SurroundingWord word = ExtractSurroundingWord(
       reinterpret_cast<const uint16_t*>(text.data()),
       static_cast<int32_t>(text.size()), 0, static_cast<int32_t>(sel_start));
-  if (word.word_utf16.empty() || word.caret_offset <= 0) {
-    return std::nullopt;
-  }
+  if (word.word_utf16.empty() || word.caret_offset <= 0) return std::nullopt;
+
   return word;
 }
 
 int32_t CaretTextReader::SelectionLengthViaWin32Edit() {
   HWND hwnd = GetFocusedControlHwnd();
-  if (hwnd == nullptr || !IsClassicEditClass(hwnd)) {
-    return 0;
-  }
+  if (!IsClassicEditClass(hwnd)) return 0;
+
   DWORD sel_start = 0;
   DWORD sel_end = 0;
   DWORD_PTR res = 0;
