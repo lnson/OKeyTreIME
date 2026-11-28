@@ -77,7 +77,16 @@ final class InputMethodBuffer {
     static let maxAllowedBufferSize = Int(OKT_BUFFER_MAX_SIZE)
 
     private let rawBuffer: OpaquePointer
-    private(set) var style: InputMethodStyle
+
+    var style: InputMethodStyle {
+        didSet {
+            if style == .off {
+                reset()
+            } else {
+                okeytre_buffer_set_style(rawBuffer, style.cStyle)
+            }
+        }
+    }
 
     deinit {
         okeytre_buffer_destroy(rawBuffer)
@@ -86,15 +95,6 @@ final class InputMethodBuffer {
     var maxBufferSize: Int {
         get { Int(okeytre_buffer_get_max_size(rawBuffer)) }
         set { okeytre_buffer_set_max_size(rawBuffer, Int32(newValue)) }
-    }
-
-    func setStyle(_ newStyle: InputMethodStyle) {
-        style = newStyle
-        if newStyle == .off {
-            reset()
-        } else {
-            okeytre_buffer_set_style(rawBuffer, newStyle.cStyle)
-        }
     }
 
     var modernTone: Bool {

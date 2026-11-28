@@ -194,7 +194,7 @@ final class KeyTapManager: ObservableObject {
         if inputMethodStyle != style {
             inputMethodStyle = style
         }
-        inputMethodBuffer.setStyle(style)
+        inputMethodBuffer.style = style
         defaults.set(style.rawValue, forKey: InputMethodBuffer.inputMethodDefaultsKey)
         if style != .off {
             lastActiveStyle = style
